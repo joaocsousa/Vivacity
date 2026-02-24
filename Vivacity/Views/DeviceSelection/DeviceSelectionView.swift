@@ -17,6 +17,9 @@ struct DeviceSelectionView: View {
         .task {
             await viewModel.loadDevices()
         }
+        .task {
+            await viewModel.observeVolumeChanges()
+        }
         .alert(
             "Error",
             isPresented: Binding(

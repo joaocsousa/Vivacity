@@ -4,6 +4,7 @@ import os
 /// ViewModel for the device selection screen.
 ///
 /// Loads available storage devices and manages the user's selection.
+/// Automatically refreshes when volumes are mounted or unmounted.
 @Observable
 @MainActor
 final class DeviceSelectionViewModel {
@@ -43,11 +44,26 @@ final class DeviceSelectionViewModel {
         do {
             devices = try await deviceService.discoverDevices()
             logger.info("Discovered \(self.devices.count) device(s)")
+
+            // Clear selection if the previously selected device is no longer available.
+            if let selected = selectedDevice, !devices.contains(selected) {
+                selectedDevice = nil
+            }
         } catch {
             logger.error("Device discovery failed: \(error.localizedDescription)")
             errorMessage = "Failed to discover devices: \(error.localizedDescription)"
         }
 
         isLoading = false
+    }
+
+    /// Observes volume mount/unmount events and refreshes the device list automatically.
+    ///
+    /// Call this from a `.task {}` modifier — it runs for the lifetime of the task.
+    func observeVolumeChanges() async {
+        for await _ in deviceService.volumeChanges() {
+            logger.info("Volume change detected, refreshing device list")
+            await loadDevices()
+        }
     }
 }

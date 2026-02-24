@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// Service responsible for discovering mounted storage devices (volumes).
@@ -19,7 +20,6 @@ struct DeviceService: Sendable {
         "/private/",
     ]
 
-    /// Exact mount points to exclude.
     /// Exact mount points to exclude (currently none — root `/` is kept as the
     /// internal drive on systems where FileManager doesn't expose `/System/Volumes/Data`).
     private static let excludedPaths: Set<String> = []
@@ -75,6 +75,36 @@ struct DeviceService: Sendable {
         return devices
     }
 
+    /// Returns an `AsyncStream` that emits a value whenever a volume is mounted or unmounted.
+    ///
+    /// Use this to trigger a device list refresh automatically.
+    func volumeChanges() -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            let center = NSWorkspace.shared.notificationCenter
+
+            let mountObserver = center.addObserver(
+                forName: NSWorkspace.didMountNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                continuation.yield()
+            }
+
+            let unmountObserver = center.addObserver(
+                forName: NSWorkspace.didUnmountNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                continuation.yield()
+            }
+
+            continuation.onTermination = { _ in
+                center.removeObserver(mountObserver)
+                center.removeObserver(unmountObserver)
+            }
+        }
+    }
+
     // MARK: - Private Helpers
 
     private func storageDevice(
@@ -119,3 +149,4 @@ struct DeviceService: Sendable {
         )
     }
 }
+
