@@ -255,6 +255,7 @@
 - `func selectDestination()` — opens folder picker (`NSOpenPanel`)
 - `func updateAvailableSpace()` — queries selected volume
 - `func startRecovery() async` — triggers file recovery
+- **⚠️ Must reject destinations on the same device that was scanned** — comparing volume paths to prevent overwriting recoverable data
 
 **Files**:
 - `Vivacity/ViewModels/RecoveryDestinationViewModel.swift`
@@ -270,7 +271,8 @@
 - Displays selected path
 - Shows "Space needed: X MB" and "Space available: Y MB"
 - Visual indicator if not enough space (red warning, button disabled)
-- "Start Recovery" button — enabled only when `hasEnoughSpace`
+- **⚠️ Show warning and prevent selection if destination is on the scanned device**
+- "Start Recovery" button — enabled only when `hasEnoughSpace` and destination ≠ scanned device
 - Progress/status while recovery runs
 
 **Files**:
