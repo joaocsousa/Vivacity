@@ -53,13 +53,11 @@ struct DeviceRow: View {
 
             Spacer()
 
-            // Selection checkmark
-            if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.blue)
-                    .transition(.scale.combined(with: .opacity))
-            }
+            // Selection checkmark — always reserves space for consistent bar widths
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(.blue)
+                .opacity(isSelected ? 1 : 0)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
