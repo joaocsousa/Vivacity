@@ -36,7 +36,7 @@ Users who accidentally delete photos or videos need a clean, modern macOS-native
 | Milestone            | Status      |
 |----------------------|-------------|
 | Empty macOS app      | ✅ Done |
-| Device selection     | ❌ Not started |
+| Device selection     | ✅ Done |
 | File scanning        | ❌ Not started |
 | Preview & selection  | ❌ Not started |
 | Recovery destination | ❌ Not started |

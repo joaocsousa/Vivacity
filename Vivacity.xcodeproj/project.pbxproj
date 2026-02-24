@@ -10,6 +10,11 @@
 		AA000001 /* VivacityApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010 /* VivacityApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011 /* ContentView.swift */; };
 		AA000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000012 /* Assets.xcassets */; };
+		BB000001 /* StorageDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000010 /* StorageDevice.swift */; };
+		BB000002 /* DeviceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000011 /* DeviceService.swift */; };
+		BB000003 /* DeviceSelectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000012 /* DeviceSelectionViewModel.swift */; };
+		BB000004 /* DeviceSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000013 /* DeviceSelectionView.swift */; };
+		BB000005 /* DeviceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000014 /* DeviceRow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -18,6 +23,11 @@
 		AA000012 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA000013 /* Vivacity.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vivacity.entitlements; sourceTree = "<group>"; };
 		AA000020 /* Vivacity.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vivacity.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB000010 /* StorageDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDevice.swift; sourceTree = "<group>"; };
+		BB000011 /* DeviceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceService.swift; sourceTree = "<group>"; };
+		BB000012 /* DeviceSelectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionViewModel.swift; sourceTree = "<group>"; };
+		BB000013 /* DeviceSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionView.swift; sourceTree = "<group>"; };
+		BB000014 /* DeviceRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,10 +54,55 @@
 			children = (
 				AA000010 /* VivacityApp.swift */,
 				AA000011 /* ContentView.swift */,
+				BB000020 /* Models */,
+				BB000021 /* Services */,
+				BB000022 /* ViewModels */,
+				BB000023 /* Views */,
 				AA000012 /* Assets.xcassets */,
 				AA000013 /* Vivacity.entitlements */,
 			);
 			path = Vivacity;
+			sourceTree = "<group>";
+		};
+		BB000020 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BB000010 /* StorageDevice.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		BB000021 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				BB000011 /* DeviceService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		BB000022 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				BB000012 /* DeviceSelectionViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		BB000023 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BB000024 /* DeviceSelection */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		BB000024 /* DeviceSelection */ = {
+			isa = PBXGroup;
+			children = (
+				BB000013 /* DeviceSelectionView.swift */,
+				BB000014 /* DeviceRow.swift */,
+			);
+			path = DeviceSelection;
 			sourceTree = "<group>";
 		};
 		AA000042 /* Products */ = {
@@ -129,6 +184,11 @@
 			files = (
 				AA000001 /* VivacityApp.swift in Sources */,
 				AA000002 /* ContentView.swift in Sources */,
+				BB000001 /* StorageDevice.swift in Sources */,
+				BB000002 /* DeviceService.swift in Sources */,
+				BB000003 /* DeviceSelectionViewModel.swift in Sources */,
+				BB000004 /* DeviceSelectionView.swift in Sources */,
+				BB000005 /* DeviceRow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

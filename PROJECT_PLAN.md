@@ -9,7 +9,7 @@
 | # | Milestone | Tickets | Status |
 |---|-----------|---------|--------|
 | M1 | Project Scaffolding | T-001 | ✅ DONE |
-| M2 | Device Selection Screen | T-002 → T-005 | ⬜ TODO |
+| M2 | Device Selection Screen | T-002 → T-005 | ✅ DONE |
 | M3 | File Scan & Preview Screen | T-006 → T-012 | ⬜ TODO |
 | M4 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
 | M5 | Polish & Edge Cases | T-016 → T-018 | ⬜ TODO |
@@ -38,7 +38,7 @@
 
 ## M2 — Device Selection Screen
 
-### T-002 ⬜ Create `StorageDevice` model
+### T-002 ✅ Create `StorageDevice` model
 
 **Description**: Define the data model representing a storage device.
 
@@ -52,7 +52,7 @@
 
 ---
 
-### T-003 ⬜ Create `DeviceService` — enumerate connected devices
+### T-003 ✅ Create `DeviceService` — enumerate connected devices
 
 **Description**: Service that discovers all mounted volumes (internal + external) and returns `[StorageDevice]`.
 
@@ -68,7 +68,7 @@
 
 ---
 
-### T-004 ⬜ Create `DeviceSelectionViewModel`
+### T-004 ✅ Create `DeviceSelectionViewModel`
 
 **Description**: ViewModel for the device selection screen.
 
@@ -83,7 +83,7 @@
 
 ---
 
-### T-005 ⬜ Create `DeviceSelectionView`
+### T-005 ✅ Create `DeviceSelectionView`
 
 **Description**: SwiftUI view that lists all available devices and lets the user select one to scan.
 
