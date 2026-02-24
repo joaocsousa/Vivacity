@@ -43,6 +43,59 @@ Welcome! This guide tells you everything you need to get productive on **Vivacit
 - **Use structured concurrency** — `async`/`await`, not GCD/DispatchQueue.
 - **Keep this documentation in sync** — update status after every ticket.
 
+## Screenshots & Recordings
+
+Use **[macosrec](https://github.com/xenodium/macosrec)** to take screenshots and record videos of the running app.
+
+### 1. Find the window number
+
+```bash
+macosrec --list
+```
+
+Example output:
+
+```
+21902 Emacs
+22024 Dock - Desktop Picture - Stone.png
+44001 Vivacity
+```
+
+Look for the **Vivacity** window in the list and note its number.
+
+### 2. Take a screenshot
+
+```bash
+macosrec --screenshot <window_number>
+# Example: macosrec --screenshot 44001
+# Saves to ~/Desktop/<timestamp>-Vivacity.png
+```
+
+### 3. Record a video
+
+Start recording with `--record` and specify the format (`--gif` or `--mov`):
+
+```bash
+# Record as GIF
+macosrec --record <window_number> --gif
+
+# Record as MOV
+macosrec --record <window_number> --mov
+```
+
+You can also use the app name instead of the window number:
+
+```bash
+macosrec --record Vivacity --gif
+```
+
+To **stop recording**, either:
+- Send `SIGINT` (Ctrl+C) in the terminal, **or**
+- Run `macosrec --save` from another terminal session.
+
+> [!TIP]
+> Use screenshots after completing UI-related tickets to visually verify the result. Attach them to walkthroughs or artifact documentation when relevant.
+
 ## Persona
 
 Consider yourself a **senior native macOS/SwiftUI developer** with deep knowledge of:
