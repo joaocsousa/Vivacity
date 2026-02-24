@@ -10,7 +10,7 @@
 |---|-----------|---------|--------|
 | M1 | Project Scaffolding | T-001 | ✅ DONE |
 | M2 | Device Selection Screen | T-002 → T-005 | ✅ DONE |
-| M3 | File Scan & Preview Screen | T-006 → T-012 | ⬜ TODO |
+| M3 | File Scan & Preview Screen | T-006 → T-012 (T-008 split into a/b) | ⬜ TODO |
 | M4 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
 | M5 | Polish & Edge Cases | T-016 → T-018 | ⬜ TODO |
 
@@ -101,7 +101,11 @@
 
 ---
 
-## M3 — File Scan & Preview Screen
+## M3 — File Scan & Preview Screen (Dual Scan Mode)
+
+> Two-phase scanning: **Fast Scan** (metadata) runs first, then the user is
+> prompted to optionally run **Deep Scan** (raw file carving). Files from both
+> phases accumulate in a single list. Recovery is blocked while scanning.
 
 ### T-006 ⬜ Define supported file formats
 
@@ -125,6 +129,7 @@
 **Acceptance Criteria**:
 - `struct RecoverableFile: Identifiable, Hashable`
 - Properties: `id`, `fileName` (or generated name), `fileExtension`, `fileType` (image / video enum), `sizeInBytes`, `offsetOnDisk`, `signatureMatch`
+- `source` property: `.fastScan` or `.deepScan` — tracks which phase found it
 - Computed property: `sizeInMB: Double`
 - Conforms to `Sendable`
 
@@ -133,52 +138,74 @@
 
 ---
 
-### T-008 ⬜ Create `FileScannerService`
+### T-008a ⬜ Create `FastScanService` — metadata-based scan
 
-**Description**: Core service that performs a raw byte scan of a device looking for file signatures.
+**Description**: Service that scans file system metadata for recently deleted files (`.Trashes`, deleted catalog entries).
 
 **Acceptance Criteria**:
-- Opens the raw device or volume for reading (may need `open()` with `O_RDONLY`)
-- Scans sequentially, matching magic bytes from `FileSignature`
-- Yields results incrementally via `AsyncStream<RecoverableFile>`
-- Reports progress (bytes scanned / total bytes) via `AsyncStream<Double>` or callback
+- Uses `FileManager` and/or POSIX APIs to find deleted-but-not-overwritten file entries
+- Preserves original filenames and directory structure
+- Yields results incrementally via `AsyncStream<RecoverableFile>` with `source = .fastScan`
+- Reports progress via `AsyncStream<Double>`
 - Respects `Task` cancellation
-- Handles permissions gracefully (requests full-disk access if needed)
+- Handles permissions gracefully
 
 **Files**:
-- `Vivacity/Services/FileScannerService.swift`
+- `Vivacity/Services/FastScanService.swift`
 
 ---
 
-### T-009 ⬜ Create `FileScanViewModel`
+### T-008b ⬜ Create `DeepScanService` — raw byte carving
 
-**Description**: ViewModel for the scanning screen.
+**Description**: Core service that performs raw sector-by-sector scan using magic byte signatures.
+
+**Acceptance Criteria**:
+- Opens the raw device or volume for reading (`open()` with `O_RDONLY`)
+- Scans sequentially, matching magic bytes from `FileSignature`
+- Yields results incrementally via `AsyncStream<RecoverableFile>` with `source = .deepScan`
+- Generates file names (`file001.jpg`, `file002.mp4`, etc.)
+- Reports progress (bytes scanned / total bytes)
+- Deduplicates against files already found by Fast Scan (by offset)
+- Respects `Task` cancellation
+
+**Files**:
+- `Vivacity/Services/DeepScanService.swift`
+
+---
+
+### T-009 ⬜ Create `FileScanViewModel` — dual-phase state machine
+
+**Description**: ViewModel for the scanning screen with two-phase scan flow.
 
 **Acceptance Criteria**:
 - `@Observable class FileScanViewModel`
-- Properties: `foundFiles: [RecoverableFile]`, `selectedFiles: Set<RecoverableFile.ID>`, `progress: Double` (0–1), `isScanning: Bool`, `scanComplete: Bool`
-- `func startScan(device: StorageDevice) async`
-- `func toggleSelection(_ file: RecoverableFile)`
-- `func selectAll()` / `func deselectAll()`
-- Cancels scan on deinit or explicit cancel
+- `scanPhase` enum: `.idle` → `.fastScanning` → `.fastComplete` → `.deepScanning` → `.complete`
+- `foundFiles: [RecoverableFile]` — cumulative from both phases
+- `selectedFiles: Set<RecoverableFile.ID>`, `progress: Double` (0–1)
+- `canRecover: Bool` — true only when not scanning and ≥ 1 file selected
+- `func startFastScan(device:) async` — runs Fast Scan, transitions to `.fastComplete`
+- `func startDeepScan() async` — runs Deep Scan, appends to same list
+- `func stopScanning()` — cancels current scan phase
+- `func toggleSelection(_:)`, `selectAll()`, `deselectAll()`
 
 **Files**:
 - `Vivacity/ViewModels/FileScanViewModel.swift`
 
 ---
 
-### T-010 ⬜ Create `FileScanView` — scanning & file list
+### T-010 ⬜ Create `FileScanView` — progressive scan UI
 
-**Description**: Main scan UI with progress bar and growing list of found files.
+**Description**: Main scan UI with progressive file list, Deep Scan prompt, and scan controls.
 
 **Acceptance Criteria**:
-- Progress bar at the top showing scan progress (0–100%)
-- List of found files, each showing: icon (image/video), file name, size in MB
+- **Status bar**: current phase label + progress bar + "Stop" button
+- **File list**: grows in real-time; each row shows icon, name, size, source badge ("Fast"/"Deep")
+- **Deep Scan prompt**: banner after Fast Scan completes — _"X files found. Run Deep Scan for more?"_
 - Selectable rows (checkbox or highlight)
 - "Select All" / "Deselect All" toggle
-- "Recover" button — enabled when ≥ 1 file selected and scan is complete
-- "Cancel" option while scanning
-- Navigation to recovery destination screen on "Recover"
+- **Recover button**: enabled only when `canRecover` (not scanning + ≥ 1 selected)
+- "Stop" button cancels current scan phase
+- Navigation to recovery destination on "Recover"
 
 **Files**:
 - `Vivacity/Views/FileScan/FileScanView.swift`
