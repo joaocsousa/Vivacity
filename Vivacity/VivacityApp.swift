@@ -6,5 +6,6 @@ struct VivacityApp: App {
         WindowGroup {
             ContentView()
         }
+        .defaultSize(width: 560, height: 620)
     }
 }

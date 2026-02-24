@@ -1,0 +1,121 @@
+import Foundation
+
+/// Service responsible for discovering mounted storage devices (volumes).
+struct DeviceService: Sendable {
+
+    // MARK: - Volume Paths to Exclude
+
+    /// Path prefixes for system volumes that should never appear in the device list.
+    /// Note: `/System/Volumes/Data` is intentionally *not* excluded — it is the
+    /// user's main writable volume on modern macOS (APFS).
+    private static let excludedPrefixes: [String] = [
+        "/System/Volumes/Preboot",
+        "/System/Volumes/Recovery",
+        "/System/Volumes/VM",
+        "/System/Volumes/Update",
+        "/System/Volumes/xarts",
+        "/System/Volumes/iSCPreboot",
+        "/System/Volumes/Hardware",
+        "/private/",
+    ]
+
+    /// Exact mount points to exclude.
+    /// Exact mount points to exclude (currently none — root `/` is kept as the
+    /// internal drive on systems where FileManager doesn't expose `/System/Volumes/Data`).
+    private static let excludedPaths: Set<String> = []
+
+    /// Volume names that indicate system partitions.
+    private static let excludedNames: Set<String> = [
+        "Recovery",
+        "Preboot",
+        "VM",
+        "Update",
+    ]
+
+    // MARK: - Public API
+
+    /// Discovers all user-relevant mounted volumes.
+    ///
+    /// - Returns: An array of ``StorageDevice`` sorted with external devices first,
+    ///   then alphabetically by name.
+    func discoverDevices() async throws -> [StorageDevice] {
+        let resourceKeys: Set<URLResourceKey> = [
+            .volumeNameKey,
+            .volumeTotalCapacityKey,
+            .volumeAvailableCapacityKey,
+            .volumeIsRemovableKey,
+            .volumeIsInternalKey,
+            .volumeIsReadOnlyKey,
+        ]
+
+        guard let volumeURLs = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: Array(resourceKeys),
+            options: [.skipHiddenVolumes]
+        ) else {
+            return []
+        }
+
+        var devices: [StorageDevice] = []
+
+        for url in volumeURLs {
+            guard let device = try? storageDevice(from: url, keys: resourceKeys) else {
+                continue
+            }
+            devices.append(device)
+        }
+
+        // Sort: external first, then alphabetical by name.
+        devices.sort { lhs, rhs in
+            if lhs.isExternal != rhs.isExternal {
+                return lhs.isExternal
+            }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+
+        return devices
+    }
+
+    // MARK: - Private Helpers
+
+    private func storageDevice(
+        from url: URL,
+        keys: Set<URLResourceKey>
+    ) throws -> StorageDevice? {
+        let path = url.path
+
+        // Filter out system volumes by path.
+        if Self.excludedPaths.contains(path) {
+            return nil
+        }
+        for prefix in Self.excludedPrefixes {
+            if path.hasPrefix(prefix) {
+                return nil
+            }
+        }
+
+        let resourceValues = try url.resourceValues(forKeys: keys)
+
+        let name = resourceValues.volumeName ?? url.lastPathComponent
+
+        // Filter out system volumes by name.
+        if Self.excludedNames.contains(name) {
+            return nil
+        }
+
+        let isInternal = resourceValues.volumeIsInternal ?? true
+        let isRemovable = resourceValues.volumeIsRemovable ?? false
+        let isExternal = !isInternal || isRemovable
+
+        let totalCapacity = Int64(resourceValues.volumeTotalCapacity ?? 0)
+        let availableCapacity = Int64(resourceValues.volumeAvailableCapacity ?? 0)
+
+        return StorageDevice(
+            id: url.absoluteString,
+            name: name,
+            volumePath: url,
+            isExternal: isExternal,
+            totalCapacity: totalCapacity,
+            availableCapacity: availableCapacity
+        )
+    }
+}

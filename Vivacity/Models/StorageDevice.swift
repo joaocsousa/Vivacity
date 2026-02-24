@@ -1,0 +1,41 @@
+import Foundation
+
+/// Represents a mounted storage device (volume) that can be scanned for recoverable files.
+struct StorageDevice: Identifiable, Hashable, Sendable {
+
+    /// Unique identifier — uses the volume URL's absolute string.
+    let id: String
+
+    /// User-visible volume name (e.g. "Macintosh HD", "USB Drive").
+    let name: String
+
+    /// Mount-point URL for the volume (e.g. `/Volumes/MyDrive`).
+    let volumePath: URL
+
+    /// Whether the volume is on an external (removable) device.
+    let isExternal: Bool
+
+    /// Total capacity of the volume in bytes.
+    let totalCapacity: Int64
+
+    /// Currently available (free) capacity in bytes.
+    let availableCapacity: Int64
+
+    // MARK: - Computed Helpers
+
+    /// Total capacity formatted as a human-readable string (e.g. "500 GB").
+    var formattedTotal: String {
+        ByteCountFormatter.string(fromByteCount: totalCapacity, countStyle: .file)
+    }
+
+    /// Available capacity formatted as a human-readable string (e.g. "120 GB").
+    var formattedAvailable: String {
+        ByteCountFormatter.string(fromByteCount: availableCapacity, countStyle: .file)
+    }
+
+    /// Usage fraction (0–1) representing how full the volume is.
+    var usageFraction: Double {
+        guard totalCapacity > 0 else { return 0 }
+        return Double(totalCapacity - availableCapacity) / Double(totalCapacity)
+    }
+}
