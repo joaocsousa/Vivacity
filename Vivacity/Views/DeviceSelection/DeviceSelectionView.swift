@@ -13,7 +13,8 @@ struct DeviceSelectionView: View {
             Divider()
             footer
         }
-        .frame(minWidth: 500, minHeight: 520)
+        .frame(minWidth: 520, minHeight: 540)
+        .background(Color(white: 0.08))
         .task {
             await viewModel.loadDevices()
         }
@@ -43,18 +44,24 @@ struct DeviceSelectionView: View {
 private extension DeviceSelectionView {
 
     var header: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "externaldrive.badge.questionmark")
-                .font(.system(size: 36))
-                .foregroundStyle(.secondary)
-                .padding(.top, 20)
+        VStack(spacing: 6) {
+            // Icon in a rounded-square background
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.blue.opacity(0.12))
+                    .frame(width: 52, height: 52)
+
+                Image(systemName: "externaldrive.badge.questionmark")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.blue)
+            }
+            .padding(.top, 24)
 
             Text("Select a Device")
-                .font(.title2)
-                .fontWeight(.semibold)
+                .font(.system(size: 20, weight: .bold))
 
             Text("Choose a storage device to scan for recoverable files.")
-                .font(.subheadline)
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 16)
         }
@@ -79,7 +86,7 @@ private extension DeviceSelectionView {
                 )
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 4) {
+                    LazyVStack(spacing: 8) {
                         ForEach(viewModel.devices) { device in
                             DeviceRow(
                                 device: device,
@@ -96,7 +103,7 @@ private extension DeviceSelectionView {
                             }
                         }
                     }
-                    .padding(12)
+                    .padding(16)
                 }
             }
         }
@@ -109,21 +116,36 @@ private extension DeviceSelectionView {
                 Task { await viewModel.loadDevices() }
             } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
+                    .font(.system(size: 13))
             }
             .buttonStyle(.borderless)
 
             Spacer()
 
+            // Selection count
+            if viewModel.selectedDevice != nil {
+                Text("1 device selected")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
             Button {
-                // TODO: Navigate to scan screen (T-017)
+                // TODO: Navigate to scan screen (M3)
             } label: {
-                Label("Start Scanning", systemImage: "magnifyingglass")
+                HStack(spacing: 4) {
+                    Text("Start Scanning")
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
+                }
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(viewModel.selectedDevice == nil)
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
