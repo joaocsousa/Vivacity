@@ -74,7 +74,7 @@ struct DeviceRow: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.unemphasizedSelectedContentBackgroundColor))
+                .fill(Color(.controlColor))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
