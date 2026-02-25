@@ -1,13 +1,12 @@
-import SwiftUI
-import QuickLook
 import AVKit
+import QuickLook
+import SwiftUI
 
 /// Preview panel that displays a selected file's content.
 ///
 /// Shows thumbnails for images, video players for video files, and a
 /// placeholder for files that cannot be previewed.
 struct FilePreviewView: View {
-
     let file: RecoverableFile?
     let device: StorageDevice
 
@@ -26,10 +25,8 @@ struct FilePreviewView: View {
 
 // MARK: - Preview Content
 
-private extension FilePreviewView {
-
-    @ViewBuilder
-    func previewContent(for file: RecoverableFile) -> some View {
+extension FilePreviewView {
+    private func previewContent(for file: RecoverableFile) -> some View {
         VStack(spacing: 16) {
             // Preview area
             previewMedia(for: file)
@@ -43,7 +40,7 @@ private extension FilePreviewView {
     }
 
     @ViewBuilder
-    func previewMedia(for file: RecoverableFile) -> some View {
+    private func previewMedia(for file: RecoverableFile) -> some View {
         // For filesystem-found files, try to load from the volume path
         let fileURL = resolveFileURL(for: file)
 
@@ -61,7 +58,7 @@ private extension FilePreviewView {
         }
     }
 
-    func unavailablePreview(for file: RecoverableFile) -> some View {
+    private func unavailablePreview(for file: RecoverableFile) -> some View {
         VStack(spacing: 12) {
             Image(systemName: file.fileType == .image ? "photo" : "film")
                 .font(.system(size: 48))
@@ -85,7 +82,7 @@ private extension FilePreviewView {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    var emptyState: some View {
+    private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "eye.slash")
                 .font(.system(size: 40))
@@ -97,7 +94,7 @@ private extension FilePreviewView {
         }
     }
 
-    func fileInfoBar(for file: RecoverableFile) -> some View {
+    private func fileInfoBar(for file: RecoverableFile) -> some View {
         HStack(spacing: 16) {
             // File type icon
             Image(systemName: file.fileType == .image ? "photo.fill" : "film.fill")
@@ -134,10 +131,10 @@ private extension FilePreviewView {
     // MARK: - Helpers
 
     /// Attempts to resolve a URL on the volume where this file might exist.
-    func resolveFileURL(for file: RecoverableFile) -> URL? {
+    private func resolveFileURL(for file: RecoverableFile) -> URL? {
         // For fast-scan files that were found via FileManager, the file is
         // still at its original location — try to find it by name on the volume.
-        guard file.source == .fastScan && file.offsetOnDisk == 0 else { return nil }
+        guard file.source == .fastScan, file.offsetOnDisk == 0 else { return nil }
 
         // Walk the volume looking for this specific file
         let fm = FileManager.default
@@ -159,7 +156,7 @@ private extension FilePreviewView {
         return nil
     }
 
-    func formatOffset(_ offset: UInt64) -> String {
+    private func formatOffset(_ offset: UInt64) -> String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB, .useGB]
         formatter.countStyle = .file
@@ -171,7 +168,6 @@ private extension FilePreviewView {
 
 /// Loads and displays an image file asynchronously.
 private struct AsyncImagePreview: View {
-
     let url: URL
     @State private var image: NSImage?
 
@@ -208,7 +204,6 @@ private struct AsyncImagePreview: View {
 
 /// Displays a video file with playback controls.
 private struct VideoPlayerPreview: View {
-
     let url: URL
     @State private var player: AVPlayer?
 

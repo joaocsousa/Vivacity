@@ -21,7 +21,6 @@ enum ScanPhase: Sendable, Equatable {
 @Observable
 @MainActor
 final class FileScanViewModel {
-
     // MARK: - Published State
 
     /// Current scan phase.
@@ -48,7 +47,6 @@ final class FileScanViewModel {
     /// Whether disk access was denied and the user needs to grant permissions.
     var permissionDenied: Bool = false
 
-
     // MARK: - Computed
 
     /// The file currently selected for preview, if any.
@@ -58,7 +56,9 @@ final class FileScanViewModel {
     }
 
     /// Number of files the user has selected.
-    var selectedCount: Int { selectedFileIDs.count }
+    var selectedCount: Int {
+        selectedFileIDs.count
+    }
 
     /// Whether recovery can be started (not scanning + at least one selected).
     var canRecover: Bool {
@@ -176,18 +176,18 @@ final class FileScanViewModel {
     func stopScanning() {
         scanTask?.cancel()
         scanTask = nil
-        
+
         // If the user manually stops the scan, we always jump to the final completion state
         // (skipping any intermediate prompts like the Deep Scan prompt)
         switch scanPhase {
         case .fastScanning:
             logger.info("Fast scan stopped early by user. Transitioning to final complete state.")
             scanPhase = .complete
-            
+
         case .deepScanning:
             logger.info("Deep scan stopped early by user. Transitioning to final complete state.")
             scanPhase = .complete
-            
+
         default:
             break
         }
@@ -224,9 +224,9 @@ final class FileScanViewModel {
 
     private func handleScanEvent(_ event: ScanEvent) {
         switch event {
-        case .fileFound(let file):
+        case let .fileFound(file):
             foundFiles.append(file)
-        case .progress(let value):
+        case let .progress(value):
             progress = value
         case .completed:
             if scanPhase == .fastScanning {

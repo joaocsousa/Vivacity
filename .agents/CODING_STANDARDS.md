@@ -75,8 +75,13 @@ private extension DeviceSelectionView { ... }
 #Preview { ... }
 ```
 
-## Formatting
+## Formatting, Linting & Analysis
 
+We use **SwiftFormat**, **SwiftLint**, and **Xcode Static Analyzer** to enforce coding standards and catch bugs. Ensure the linters are installed (`brew install swiftlint swiftformat`).
+
+- **SwiftFormat**: Run `swiftformat .` before committing to automatically fix formatting issues.
+- **SwiftLint**: Runs automatically during Xcode builds. Fix any warnings before opening a PR.
+- **Xcode Static Analyzer**: Run `xcodebuild analyze` or use Product > Analyze in Xcode to catch memory and logic bugs before opening a PR.
 - **Indentation**: 4 spaces (Xcode default).
 - **Line length**: Soft limit 120 characters.
 - **Trailing commas**: Use in multi-line collections/enums.

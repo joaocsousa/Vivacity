@@ -7,7 +7,6 @@ import os
 /// for magic-byte patterns. Generates file names for discovered files and
 /// deduplicates against offsets already found by `FastScanService`.
 struct DeepScanService: Sendable {
-
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeepScan")
 
     /// Size of each read block (512 bytes = one disk sector).
@@ -47,7 +46,7 @@ struct DeepScanService: Sendable {
         AsyncThrowingStream { continuation in
             let task = Task.detached {
                 do {
-                    try await self.performScan(
+                    try await performScan(
                         device: device,
                         existingOffsets: existingOffsets,
                         continuation: continuation
@@ -66,6 +65,14 @@ struct DeepScanService: Sendable {
     }
 
     // MARK: - Scan Logic
+
+    private struct ScanContext {
+        let buffer: [UInt8]
+        let scanLength: Int
+        let readOffset: Int
+        let bytesScanned: UInt64
+        let existingOffsets: Set<UInt64>
+    }
 
     private func performScan(
         device: StorageDevice,
@@ -105,7 +112,7 @@ struct DeepScanService: Sendable {
         var lastProgressReport: Double = -1
         var carryOver = 0 // Bytes carried over from previous read for cross-boundary matching
 
-        logger.info("Deep scanning \(totalBytes) bytes (\(totalBytes / (1024*1024)) MB)")
+        logger.info("Deep scanning \(totalBytes) bytes (\(totalBytes / (1024 * 1024)) MB)")
 
         while bytesScanned < totalBytes {
             try Task.checkCancellation()
@@ -124,61 +131,26 @@ struct DeepScanService: Sendable {
             guard bytesRead > 0 else { break }
 
             let scanLength = readOffset + bytesRead
+            let context = ScanContext(
+                buffer: buffer,
+                scanLength: scanLength,
+                readOffset: readOffset,
+                bytesScanned: bytesScanned,
+                existingOffsets: existingOffsets
+            )
 
-            // Scan the chunk for magic bytes
-            var i = 0
-            while i < scanLength - Self.maxSignatureLength {
-                let offset = bytesScanned + UInt64(i) - UInt64(readOffset)
-
-                // Skip if already found by fast scan
-                if existingOffsets.contains(offset) {
-                    i += Self.sectorSize
-                    continue
-                }
-
-                if let match = matchSignatureAt(buffer: buffer, position: i) {
-                    filesFound += 1
-                    
-                    var fileName = "recovered_\(String(format: "%04d", filesFound))"
-                    
-                    // Try to extract an EXIF date for better naming on photos
-                    if match.category == .image {
-                        let availableBytes = buffer.count - i
-                        let checkLength = min(availableBytes, 65536)
-                        let headerSlice = Array(buffer[i..<i + checkLength])
-                        
-                        if let exifName = EXIFDateExtractor.extractFilenamePrefix(from: headerSlice) {
-                            fileName = "\(exifName)_\(String(format: "%04d", filesFound))"
-                        }
-                    }
-
-                    let file = RecoverableFile(
-                        id: UUID(),
-                        fileName: fileName,
-                        fileExtension: match.fileExtension,
-                        fileType: match.category,
-                        sizeInBytes: 0, // Unknown until we find the next header or EOF marker
-                        offsetOnDisk: offset,
-                        signatureMatch: match,
-                        source: .deepScan
-                    )
-                    continuation.yield(.fileFound(file))
-
-                    // Skip ahead past this header to avoid re-matching
-                    i += Self.sectorSize
-                    continue
-                }
-
-                // Move forward by sector alignment for efficiency
-                i += Self.sectorSize
-            }
+            scanChunk(
+                context: context,
+                filesFound: &filesFound,
+                continuation: continuation
+            )
 
             bytesScanned += UInt64(bytesRead)
 
             // Keep the last few bytes for cross-boundary matching
             if scanLength > Self.maxSignatureLength {
                 let keepFrom = scanLength - Self.maxSignatureLength
-                for j in 0..<Self.maxSignatureLength {
+                for j in 0 ..< Self.maxSignatureLength {
                     buffer[j] = buffer[keepFrom + j]
                 }
                 carryOver = Self.maxSignatureLength
@@ -200,6 +172,60 @@ struct DeepScanService: Sendable {
         continuation.finish()
     }
 
+    private func scanChunk(
+        context: ScanContext,
+        filesFound: inout Int,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
+    ) {
+        // Scan the chunk for magic bytes
+        var i = 0
+        while i < context.scanLength - Self.maxSignatureLength {
+            let offset = context.bytesScanned + UInt64(i) - UInt64(context.readOffset)
+
+            // Skip if already found by fast scan
+            if context.existingOffsets.contains(offset) {
+                i += Self.sectorSize
+                continue
+            }
+
+            if let match = matchSignatureAt(buffer: context.buffer, position: i) {
+                filesFound += 1
+
+                var fileName = "recovered_\(String(format: "%04d", filesFound))"
+
+                // Try to extract an EXIF date for better naming on photos
+                if match.category == .image {
+                    let availableBytes = context.buffer.count - i
+                    let checkLength = min(availableBytes, 65536)
+                    let headerSlice = Array(context.buffer[i ..< i + checkLength])
+
+                    if let exifName = EXIFDateExtractor.extractFilenamePrefix(from: headerSlice) {
+                        fileName = "\(exifName)_\(String(format: "%04d", filesFound))"
+                    }
+                }
+
+                let file = RecoverableFile(
+                    id: UUID(),
+                    fileName: fileName,
+                    fileExtension: match.fileExtension,
+                    fileType: match.category,
+                    sizeInBytes: 0, // Unknown until we find the next header or EOF marker
+                    offsetOnDisk: offset,
+                    signatureMatch: match,
+                    source: .deepScan
+                )
+                continuation.yield(.fileFound(file))
+
+                // Skip ahead past this header to avoid re-matching
+                i += Self.sectorSize
+                continue
+            }
+
+            // Move forward by sector alignment for efficiency
+            i += Self.sectorSize
+        }
+    }
+
     // MARK: - Signature Matching
 
     /// Checks the buffer at the given position for any known file signature.
@@ -207,11 +233,30 @@ struct DeepScanService: Sendable {
         let remaining = buffer.count - position
         guard remaining >= 4 else { return nil }
 
-        // Check direct (unambiguous) signatures first
+        if let direct = matchDirectSignatures(buffer: buffer, position: position, remaining: remaining) {
+            return direct
+        }
+
+        if let tiff = matchTIFFSignatures(buffer: buffer, position: position, remaining: remaining) {
+            return tiff
+        }
+
+        if let riff = matchRIFFSignatures(buffer: buffer, position: position, remaining: remaining) {
+            return riff
+        }
+
+        if let ftyp = matchFtypSignatures(buffer: buffer, position: position, remaining: remaining) {
+            return ftyp
+        }
+
+        return nil
+    }
+
+    private func matchDirectSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
         for (signature, magic) in Self.directSignatures {
             if remaining >= magic.count {
                 var matched = true
-                for j in 0..<magic.count {
+                for j in 0 ..< magic.count {
                     if buffer[position + j] != magic[j] {
                         matched = false
                         break
@@ -220,39 +265,46 @@ struct DeepScanService: Sendable {
                 if matched { return signature }
             }
         }
+        return nil
+    }
 
-        // Check TIFF-based formats (TIFF, CR2, ARW, DNG share the same prefix)
-        if remaining >= 4 {
-            // Little-endian TIFF: 49 49 2A 00
-            if buffer[position] == 0x49 && buffer[position + 1] == 0x49 &&
-               buffer[position + 2] == 0x2A && buffer[position + 3] == 0x00 {
-                // Could be TIFF, CR2, ARW, or DNG — default to TIFF
-                if remaining >= 10 && buffer[position + 8] == 0x43 && buffer[position + 9] == 0x52 {
-                    return .cr2 // "CR" at offset 8
-                }
-                return .tiff
+    private func matchTIFFSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
+        // Little-endian TIFF: 49 49 2A 00
+        if buffer[position] == 0x49, buffer[position + 1] == 0x49,
+           buffer[position + 2] == 0x2A, buffer[position + 3] == 0x00
+        {
+            // Could be TIFF, CR2, ARW, or DNG — default to TIFF
+            if remaining >= 10, buffer[position + 8] == 0x43, buffer[position + 9] == 0x52 {
+                return .cr2 // "CR" at offset 8
             }
-            // Big-endian TIFF: 4D 4D 00 2A
-            if buffer[position] == 0x4D && buffer[position + 1] == 0x4D &&
-               buffer[position + 2] == 0x00 && buffer[position + 3] == 0x2A {
-                return .tiffBigEndian
-            }
+            return .tiff
         }
+        // Big-endian TIFF: 4D 4D 00 2A
+        if buffer[position] == 0x4D, buffer[position + 1] == 0x4D,
+           buffer[position + 2] == 0x00, buffer[position + 3] == 0x2A
+        {
+            return .tiffBigEndian
+        }
+        return nil
+    }
 
-        // Check RIFF-based formats (AVI, WebP)
-        if remaining >= 12 &&
-           buffer[position] == 0x52 && buffer[position + 1] == 0x49 &&
-           buffer[position + 2] == 0x46 && buffer[position + 3] == 0x46 {
-            let sub = String(bytes: buffer[(position + 8)..<(position + 12)], encoding: .ascii) ?? ""
+    private func matchRIFFSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
+        if remaining >= 12,
+           buffer[position] == 0x52, buffer[position + 1] == 0x49,
+           buffer[position + 2] == 0x46, buffer[position + 3] == 0x46
+        {
+            let sub = String(bytes: buffer[(position + 8) ..< (position + 12)], encoding: .ascii) ?? ""
             if sub == "AVI " { return .avi }
             if sub == "WEBP" { return .webp }
         }
+        return nil
+    }
 
-        // Check ftyp-based formats (MP4, MOV, HEIC, HEIF, M4V, 3GP)
+    private func matchFtypSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
         if remaining >= 12 {
-            let ftypStr = String(bytes: buffer[(position + 4)..<(position + 8)], encoding: .ascii) ?? ""
+            let ftypStr = String(bytes: buffer[(position + 4) ..< (position + 8)], encoding: .ascii) ?? ""
             if ftypStr == "ftyp" {
-                let brand = String(bytes: buffer[(position + 8)..<(position + 12)], encoding: .ascii) ?? ""
+                let brand = String(bytes: buffer[(position + 8) ..< (position + 12)], encoding: .ascii) ?? ""
                 switch brand.trimmingCharacters(in: .whitespaces).lowercased() {
                 case "isom", "iso2", "mp41", "mp42", "avc1":
                     return .mp4
@@ -271,10 +323,8 @@ struct DeepScanService: Sendable {
                 }
             }
         }
-
         return nil
     }
-
 }
 
 // MARK: - Errors
@@ -285,8 +335,9 @@ enum DeepScanError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .cannotOpenDevice(let path, let reason):
-            return "Cannot open \(path) for scanning: \(reason). Try running with elevated privileges or granting Full Disk Access in System Settings."
+        case let .cannotOpenDevice(path, reason):
+            "Cannot open \(path) for scanning: \(reason). " +
+                "Try running with elevated privileges or granting Full Disk Access in System Settings."
         }
     }
 }

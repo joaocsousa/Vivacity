@@ -3,7 +3,6 @@ import Foundation
 
 /// Service responsible for discovering mounted storage devices (volumes).
 struct DeviceService: Sendable {
-
     // MARK: - Volume Paths to Exclude
 
     /// Path prefixes for system volumes that should never appear in the device list.
@@ -62,7 +61,10 @@ struct DeviceService: Sendable {
             guard let device = try? storageDevice(from: url, keys: resourceKeys) else {
                 continue
             }
-            print("DISCOVERED: [\(device.name)] Ext:\(device.isExternal) UUID:\(device.volumeUUID) Path:\(device.volumePath.path)")
+            print(
+                "DISCOVERED: [\(device.name)] Ext:\(device.isExternal) " +
+                    "UUID:\(device.volumeUUID) Path:\(device.volumePath.path)"
+            )
             devices.append(device)
         }
 
@@ -147,7 +149,7 @@ struct DeviceService: Sendable {
                 }
             }
             // `path` from URL usually drops trailing slashes unless it's `/`
-            if path != mountPoint && path != mountPoint + "/" {
+            if path != mountPoint, path != mountPoint + "/" {
                 return nil
             }
         } else {
@@ -177,7 +179,7 @@ struct DeviceService: Sendable {
             name: name,
             volumePath: url,
             volumeUUID: uuid,
-            filesystemType: .other,  // temp
+            filesystemType: .other, // temp
             isExternal: isExternal,
             totalCapacity: totalCapacity,
             availableCapacity: availableCapacity
@@ -195,4 +197,3 @@ struct DeviceService: Sendable {
         )
     }
 }
-

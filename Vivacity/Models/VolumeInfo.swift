@@ -5,22 +5,22 @@ import os
 
 /// The filesystem format of a mounted volume.
 enum FilesystemType: String, Sendable {
-    case fat32   = "msdos"   // FAT12/16/32 report as "msdos" on macOS
-    case exfat   = "exfat"
-    case ntfs    = "ntfs"    // NTFS (via macFUSE, Paragon, or Tuxera)
-    case apfs    = "apfs"
+    case fat32 = "msdos" // FAT12/16/32 report as "msdos" on macOS
+    case exfat
+    case ntfs // NTFS (via macFUSE, Paragon, or Tuxera)
+    case apfs
     case hfsPlus = "hfs"
-    case other   = "other"
+    case other
 
     /// Human-readable label shown in the device list.
     var displayName: String {
         switch self {
-        case .fat32:   return "FAT32"
-        case .exfat:   return "ExFAT"
-        case .ntfs:    return "NTFS"
-        case .apfs:    return "APFS"
-        case .hfsPlus: return "HFS+"
-        case .other:   return "Unknown FS"
+        case .fat32: "FAT32"
+        case .exfat: "ExFAT"
+        case .ntfs: "NTFS"
+        case .apfs: "APFS"
+        case .hfsPlus: "HFS+"
+        case .other: "Unknown FS"
         }
     }
 }
@@ -29,7 +29,6 @@ enum FilesystemType: String, Sendable {
 
 /// Metadata about a mounted volume, including filesystem type and raw device path.
 struct VolumeInfo: Sendable {
-
     /// The filesystem format.
     let filesystemType: FilesystemType
 
@@ -83,7 +82,7 @@ struct VolumeInfo: Sendable {
             if access(rawPath, R_OK) == 0 {
                 resolvedDevicePath = rawPath
             } else if access(devicePath, R_OK) == 0 {
-                resolvedDevicePath = devicePath  // block device is readable
+                resolvedDevicePath = devicePath // block device is readable
             }
             // else: neither is accessible without elevation — Deep Scan will
             //        prompt for permissions via PermissionService

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4155C6FBA2014067BFC7AD0C /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */; };
+		53042BE3A8A7C4D7E26D1653 /* FATModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701C8C0145874A1017A1233A /* FATModels.swift */; };
 		AA000001 /* VivacityApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010 /* VivacityApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011 /* ContentView.swift */; };
 		AA000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000012 /* Assets.xcassets */; };
@@ -15,25 +17,27 @@
 		BB000003 /* DeviceSelectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000012 /* DeviceSelectionViewModel.swift */; };
 		BB000004 /* DeviceSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000013 /* DeviceSelectionView.swift */; };
 		BB000005 /* DeviceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000014 /* DeviceRow.swift */; };
+		BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85684069117F459BA261B91B /* PermissionDeniedView.swift */; };
 		CC000001 /* FileSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000010 /* FileSignature.swift */; };
 		CC000002 /* RecoverableFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000011 /* RecoverableFile.swift */; };
 		CC000003 /* FastScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000012 /* FastScanService.swift */; };
 		CC000004 /* DeepScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000013 /* DeepScanService.swift */; };
 		CC000005 /* FileScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000014 /* FileScanViewModel.swift */; };
 		CC000006 /* FileScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000015 /* FileScanView.swift */; };
-		CC000008 /* FilePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000017 /* FilePreviewView.swift */; };
 		CC000007 /* FileRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000016 /* FileRow.swift */; };
+		CC000008 /* FilePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000017 /* FilePreviewView.swift */; };
 		DD000001 /* VolumeInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000010 /* VolumeInfo.swift */; };
 		DD000002 /* FATDirectoryScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000011 /* FATDirectoryScanner.swift */; };
-		DD000005 /* EXIFDateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000014 /* EXIFDateExtractor.swift */; };
 		DD000003 /* NTFSScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000012 /* NTFSScanner.swift */; };
 		DD000004 /* ExFATScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000013 /* ExFATScanner.swift */; };
-		4155C6FBA2014067BFC7AD0C /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */; };
-		BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85684069117F459BA261B91B /* PermissionDeniedView.swift */; };
+		DD000005 /* EXIFDateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000014 /* EXIFDateExtractor.swift */; };
 		EE000001 /* PrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000010 /* PrivilegedDiskReader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
+		701C8C0145874A1017A1233A /* FATModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FATModels.swift; sourceTree = "<group>"; };
+		85684069117F459BA261B91B /* PermissionDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionDeniedView.swift; sourceTree = "<group>"; };
 		AA000010 /* VivacityApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VivacityApp.swift; sourceTree = "<group>"; };
 		AA000011 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AA000012 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -50,16 +54,14 @@
 		CC000013 /* DeepScanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepScanService.swift; sourceTree = "<group>"; };
 		CC000014 /* FileScanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileScanViewModel.swift; sourceTree = "<group>"; };
 		CC000015 /* FileScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileScanView.swift; sourceTree = "<group>"; };
-		CC000017 /* FilePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreviewView.swift; sourceTree = "<group>"; };
 		CC000016 /* FileRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRow.swift; sourceTree = "<group>"; };
+		CC000017 /* FilePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreviewView.swift; sourceTree = "<group>"; };
 		DD000010 /* VolumeInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeInfo.swift; sourceTree = "<group>"; };
 		DD000011 /* FATDirectoryScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FATDirectoryScanner.swift; sourceTree = "<group>"; };
-		DD000014 /* EXIFDateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFDateExtractor.swift; sourceTree = "<group>"; };
 		DD000012 /* NTFSScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NTFSScanner.swift; sourceTree = "<group>"; };
 		DD000013 /* ExFATScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATScanner.swift; sourceTree = "<group>"; };
-		32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
+		DD000014 /* EXIFDateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFDateExtractor.swift; sourceTree = "<group>"; };
 		EE000010 /* PrivilegedDiskReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReader.swift; sourceTree = "<group>"; };
-		85684069117F459BA261B91B /* PermissionDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionDeniedView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,6 +98,14 @@
 			path = Vivacity;
 			sourceTree = "<group>";
 		};
+		AA000042 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA000020 /* Vivacity.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 		BB000020 /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -103,6 +113,7 @@
 				CC000010 /* FileSignature.swift */,
 				CC000011 /* RecoverableFile.swift */,
 				DD000010 /* VolumeInfo.swift */,
+				701C8C0145874A1017A1233A /* FATModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -161,14 +172,6 @@
 			path = FileScan;
 			sourceTree = "<group>";
 		};
-		AA000042 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				AA000020 /* Vivacity.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -179,6 +182,7 @@
 				AA000051 /* Sources */,
 				AA000030 /* Frameworks */,
 				AA000052 /* Resources */,
+				B1B3784DA8232F470F85A39D /* SwiftLint */,
 			);
 			buildRules = (
 			);
@@ -233,6 +237,27 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		B1B3784DA8232F470F85A39D /* SwiftLint */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = SwiftLint;
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cd \"${SRCROOT}\"\nexport PATH=\"$PATH:/opt/homebrew/bin\"\nif which swiftlint >/dev/null; then\n  swiftlint\nelse\n  echo \"warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		AA000051 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -261,6 +286,7 @@
 				4155C6FBA2014067BFC7AD0C /* PermissionService.swift in Sources */,
 				EE000001 /* PrivilegedDiskReader.swift in Sources */,
 				BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */,
+				53042BE3A8A7C4D7E26D1653 /* FATModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -354,7 +380,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -416,7 +442,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;

@@ -1,0 +1,17 @@
+--indent 4
+--indentcase false
+--trimwhitespace always
+--voidtype void
+--nospaceoperators
+--wraparguments before-first
+--wrapcollections before-first
+--wrapparameters before-first
+--maxwidth 120
+--importgrouping testable-bottom
+--semicolons never
+--commas always
+--stripunusedargs closure-only
+--header strip
+--ifdef no-indent
+--extensionacl on-declarations
+--swiftversion 5.9

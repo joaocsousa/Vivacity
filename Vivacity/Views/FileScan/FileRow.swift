@@ -5,7 +5,6 @@ import SwiftUI
 /// Design matches the Stitch screens — blue checkboxes, file-type icons,
 /// "FAST"/"DEEP" pill badges, and right-aligned size text.
 struct FileRow: View {
-
     let file: RecoverableFile
     let isSelected: Bool
     let isPreviewSelected: Bool
@@ -13,87 +12,87 @@ struct FileRow: View {
     let onSelectForPreview: () -> Void
 
     var body: some View {
-            // Container layout
-            VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    // Checkbox
-                    Button(action: onToggle) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(isSelected ? Color.blue : Color.white.opacity(0.08))
-                                .frame(width: 20, height: 20)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .strokeBorder(
-                                            isSelected ? Color.blue : Color.white.opacity(0.2),
-                                            lineWidth: 1
-                                        )
-                                )
+        // Container layout
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // Checkbox
+                Button(action: onToggle) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(isSelected ? Color.blue : Color.white.opacity(0.08))
+                            .frame(width: 20, height: 20)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .strokeBorder(
+                                        isSelected ? Color.blue : Color.white.opacity(0.2),
+                                        lineWidth: 1
+                                    )
+                            )
 
-                            if isSelected {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(.white)
-                            }
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white)
                         }
                     }
-                    .buttonStyle(.plain)
-
-                    // File type icon
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(iconBackgroundColor)
-                            .frame(width: 32, height: 32)
-
-                        Image(systemName: iconName)
-                            .font(.system(size: 14))
-                            .foregroundStyle(iconColor)
-                    }
-
-                    // File name
-                    Text(file.fullFileName)
-                        .font(.system(size: 13, weight: .medium))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    // Source badge
-                    Text(file.source.rawValue.uppercased())
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(0.5)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(badgeColor.opacity(0.15))
-                        .foregroundStyle(badgeColor)
-                        .clipShape(Capsule())
-
-                    Spacer()
-
-                    // File size
-                    Text(file.sizeFormatted)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
+                .buttonStyle(.plain)
+
+                // File type icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(iconBackgroundColor)
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: iconName)
+                        .font(.system(size: 14))
+                        .foregroundStyle(iconColor)
+                }
+
+                // File name
+                Text(file.fullFileName)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                // Source badge
+                Text(file.source.rawValue.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.5)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(badgeColor.opacity(0.15))
+                    .foregroundStyle(badgeColor)
+                    .clipShape(Capsule())
+
+                Spacer()
+
+                // File size
+                Text(file.sizeFormatted)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
-            .background(isPreviewSelected ? Color.blue.opacity(0.15) : Color.clear)
-            .contentShape(Rectangle())
-            .onTapGesture { onSelectForPreview() }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+        }
+        .background(isPreviewSelected ? Color.blue.opacity(0.15) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture { onSelectForPreview() }
     }
 
     // MARK: - Computed Styles
 
     private var iconName: String {
         switch file.fileType {
-        case .image: return "photo.fill"
-        case .video: return "video.fill"
+        case .image: "photo.fill"
+        case .video: "video.fill"
         }
     }
 
     private var iconColor: Color {
         switch file.fileType {
-        case .image: return .blue
-        case .video: return .purple
+        case .image: .blue
+        case .video: .purple
         }
     }
 

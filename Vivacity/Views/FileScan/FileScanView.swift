@@ -8,7 +8,6 @@ import SwiftUI
 /// 3. Scrolling file list with checkboxes
 /// 4. Footer with select all/deselect, file count, and recover button
 struct FileScanView: View {
-
     let device: StorageDevice
     @State private var viewModel = FileScanViewModel()
     @Environment(\.dismiss) private var dismiss
@@ -18,7 +17,7 @@ struct FileScanView: View {
             header
             Divider()
             deepScanPrompt
-            
+
             if viewModel.permissionDenied {
                 PermissionDeniedView(
                     onTryAgain: { startDeepScan() },
@@ -26,17 +25,17 @@ struct FileScanView: View {
                         viewModel.permissionDenied = false
                     }
                 )
-            } else if viewModel.foundFiles.isEmpty && viewModel.isScanning {
+            } else if viewModel.foundFiles.isEmpty, viewModel.isScanning {
                 VStack(spacing: 16) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary.opacity(0.5))
                         .padding(.bottom, 8)
-                    
+
                     Text("Scanning for files...")
                         .font(.title3)
                         .fontWeight(.bold)
-                    
+
                     Text("Found files will appear here.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -46,7 +45,7 @@ struct FileScanView: View {
                 HSplitView {
                     fileList
                         .frame(minWidth: 300, idealWidth: 350)
-                    
+
                     FilePreviewView(
                         file: viewModel.previewFile,
                         device: device
@@ -54,7 +53,7 @@ struct FileScanView: View {
                     .frame(minWidth: 350, idealWidth: 450, maxWidth: .infinity)
                 }
             }
-            
+
             Divider()
             footer
         }
@@ -100,9 +99,8 @@ struct FileScanView: View {
 
 // MARK: - Header
 
-private extension FileScanView {
-
-    var header: some View {
+extension FileScanView {
+    private var header: some View {
         VStack(spacing: 12) {
             HStack {
                 // Device name
@@ -142,7 +140,7 @@ private extension FileScanView {
     }
 
     @ViewBuilder
-    var scanStatusView: some View {
+    private var scanStatusView: some View {
         switch viewModel.scanPhase {
         case .idle:
             EmptyView()
@@ -213,10 +211,9 @@ private extension FileScanView {
 
 // MARK: - Deep Scan Prompt
 
-private extension FileScanView {
-
+extension FileScanView {
     @ViewBuilder
-    var deepScanPrompt: some View {
+    private var deepScanPrompt: some View {
         if viewModel.scanPhase == .fastComplete {
             VStack(spacing: 12) {
                 HStack(spacing: 14) {
@@ -234,10 +231,13 @@ private extension FileScanView {
                         Text("\(viewModel.foundFiles.count) files found. Run Deep Scan for more?")
                             .font(.system(size: 14, weight: .semibold))
 
-                        Text("Deep Scan reads every sector of the drive to find older or corrupted files. This may take several hours but yields more thorough results.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
+                        Text(
+                            "Deep Scan reads every sector of the drive to find older or " +
+                                "corrupted files. This may take several hours but yields more thorough results."
+                        )
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
                     }
                 }
 
@@ -278,11 +278,10 @@ private extension FileScanView {
 
 // MARK: - File List
 
-private extension FileScanView {
-
-    var fileList: some View {
+extension FileScanView {
+    private var fileList: some View {
         ZStack {
-            if viewModel.foundFiles.isEmpty && !viewModel.isScanning {
+            if viewModel.foundFiles.isEmpty, !viewModel.isScanning {
                 ContentUnavailableView(
                     "No Files Found",
                     systemImage: "doc.questionmark.fill",
@@ -338,7 +337,7 @@ private extension FileScanView {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    func sectionHeader(title: String, count: Int) -> some View {
+    private func sectionHeader(title: String, count: Int) -> some View {
         HStack {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
@@ -359,9 +358,8 @@ private extension FileScanView {
 
 // MARK: - Footer
 
-private extension FileScanView {
-
-    var footer: some View {
+extension FileScanView {
+    private var footer: some View {
         HStack {
             // Select All / Deselect All
             HStack(spacing: 12) {
