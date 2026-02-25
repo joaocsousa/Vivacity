@@ -115,8 +115,8 @@
 				DD000014 /* EXIFDateExtractor.swift */,
 				DD000012 /* NTFSScanner.swift */,
 				DD000013 /* ExFATScanner.swift */,
-			
-				32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */,);
+				32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */,
+			);
 			path = Services;
 			sourceTree = "<group>";
 		};
@@ -153,8 +153,8 @@
 				CC000015 /* FileScanView.swift */,
 				CC000017 /* FilePreviewView.swift */,
 				CC000016 /* FileRow.swift */,
-			
-				85684069117F459BA261B91B /* PermissionDeniedView.swift */,);
+				85684069117F459BA261B91B /* PermissionDeniedView.swift */,
+			);
 			path = FileScan;
 			sourceTree = "<group>";
 		};
@@ -255,9 +255,9 @@
 				DD000005 /* EXIFDateExtractor.swift in Sources */,
 				DD000003 /* NTFSScanner.swift in Sources */,
 				DD000004 /* ExFATScanner.swift in Sources */,
-			
 				4155C6FBA2014067BFC7AD0C /* PermissionService.swift in Sources */,
-				BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */,);
+				BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
