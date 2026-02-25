@@ -37,10 +37,12 @@ Users who accidentally delete photos or videos need a clean, modern macOS-native
 |----------------------|-------------|
 | Empty macOS app      | ✅ Done |
 | Device selection     | ✅ Done |
-| File scanning        | ❌ Not started |
-| Preview & selection  | ❌ Not started |
+| File scanning        | ✅ Done |
+| Preview & selection  | ✅ Done |
 | Recovery destination | ❌ Not started |
 | File recovery        | ❌ Not started |
+
+> **Minimum Supported OS**: macOS 14.0 (Sonoma). Also compatible with macOS 15.x (Sequoia).
 
 ## Directory Structure (Planned)
 

@@ -18,7 +18,15 @@ struct FileScanView: View {
             header
             Divider()
             
-            if viewModel.foundFiles.isEmpty && viewModel.isScanning {
+            if viewModel.permissionDenied {
+                PermissionDeniedView(
+                    onTryAgain: { tryRequestAccess() },
+                    onContinueLimited: {
+                        viewModel.permissionDenied = false
+                        viewModel.startFastScan(device: device)
+                    }
+                )
+            } else if viewModel.foundFiles.isEmpty && viewModel.isScanning {
                 VStack(spacing: 16) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 48))
@@ -53,7 +61,7 @@ struct FileScanView: View {
         .frame(minWidth: 620, minHeight: 580)
         .background(Color(white: 0.08))
         .task {
-            viewModel.startFastScan(device: device)
+            checkPermissionsAndScan()
         }
         .alert(
             "Scan Error",
@@ -70,6 +78,34 @@ struct FileScanView: View {
                 }
             }
         )
+    }
+
+    // MARK: - Permission Helpers
+
+    /// Silently probes disk access, prompts if denied, then starts the scan.
+    private func checkPermissionsAndScan() {
+        let permService = PermissionService()
+        let status = permService.checkRawDiskAccess(for: device)
+
+        if status == .granted {
+            viewModel.startFastScan(device: device)
+        } else {
+            tryRequestAccess()
+        }
+    }
+
+    /// Shows the macOS password dialog. If granted, starts scanning.
+    /// If denied, sets permissionDenied to show the fallback view.
+    private func tryRequestAccess() {
+        let permService = PermissionService()
+        let result = permService.requestElevatedAccess()
+
+        if result == .granted {
+            viewModel.permissionDenied = false
+            viewModel.startFastScan(device: device)
+        } else {
+            viewModel.permissionDenied = true
+        }
     }
 }
 
