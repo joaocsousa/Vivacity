@@ -144,6 +144,6 @@ struct FileRow: View {
             onSelectForPreview: {}
         )
     }
-    .background(Color(white: 0.08))
+    .background(Color(.controlBackgroundColor))
     .frame(width: 500)
 }

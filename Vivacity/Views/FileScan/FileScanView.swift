@@ -59,7 +59,7 @@ struct FileScanView: View {
             footer
         }
         .frame(minWidth: 620, minHeight: 580)
-        .background(Color(white: 0.08))
+        .background(Color(.windowBackgroundColor))
         .task {
             checkPermissionsAndScan()
         }
@@ -295,7 +295,7 @@ private extension FileScanView {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(white: 0.12))
+                    .fill(Color(.controlBackgroundColor))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -384,7 +384,7 @@ private extension FileScanView {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color(white: 0.06))
+        .background(Color(.unemphasizedSelectedContentBackgroundColor))
     }
 }
 

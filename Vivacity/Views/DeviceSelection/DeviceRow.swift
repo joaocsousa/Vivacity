@@ -63,7 +63,7 @@ struct DeviceRow: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(white: 0.12))
+                .fill(Color(.unemphasizedSelectedContentBackgroundColor))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -152,5 +152,5 @@ private struct CapacityBar: View {
     }
     .padding(16)
     .frame(width: 500)
-    .background(Color(white: 0.08))
+    .background(Color(.controlBackgroundColor))
 }

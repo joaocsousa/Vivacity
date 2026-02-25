@@ -20,7 +20,7 @@ struct FilePreviewView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(white: 0.06))
+        .background(Color(.windowBackgroundColor))
     }
 }
 
@@ -127,7 +127,7 @@ private extension FilePreviewView {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(white: 0.10))
+                .fill(Color(.unemphasizedSelectedContentBackgroundColor))
         )
     }
 
