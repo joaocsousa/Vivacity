@@ -1,36 +1,43 @@
 import SwiftUI
 
 /// A single row in the device list, showing drive icon, name, capacity, and badges.
+///
+/// Styled as a card with rounded corners. Selected cards receive a blue border glow.
 struct DeviceRow: View {
 
     let device: StorageDevice
     let isSelected: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Drive icon
-            Image(systemName: device.isExternal ? "externaldrive.fill" : "internaldrive.fill")
-                .font(.title2)
-                .foregroundStyle(device.isExternal ? .orange : .blue)
-                .frame(width: 32)
+        HStack(spacing: 14) {
+            // Drive icon — rounded square background
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(device.isExternal ? Color.orange.opacity(0.15) : Color.blue.opacity(0.15))
+                    .frame(width: 40, height: 40)
 
-            // Name + capacity
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
+                Image(systemName: device.isExternal ? "externaldrive.fill" : "internaldrive.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(device.isExternal ? .orange : .blue)
+            }
+
+            // Name + badge + capacity
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
                     Text(device.name)
-                        .font(.headline)
+                        .font(.system(size: 14, weight: .semibold))
 
-                    Text(device.isExternal ? "External" : "Internal")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                    Text(device.isExternal ? "EXTERNAL" : "INTERNAL")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.5)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
                         .background(
                             device.isExternal
-                                ? Color.orange.opacity(0.15)
+                                ? Color.green.opacity(0.15)
                                 : Color.blue.opacity(0.15)
                         )
-                        .foregroundStyle(device.isExternal ? .orange : .blue)
+                        .foregroundStyle(device.isExternal ? .green : .cyan)
                         .clipShape(Capsule())
                 }
 
@@ -40,26 +47,39 @@ struct DeviceRow: View {
 
                 // Capacity text
                 Text("\(device.formattedAvailable) available of \(device.formattedTotal)")
-                    .font(.caption)
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            // Selection checkmark
-            if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(.accent)
-            }
+            // Selection checkmark — always reserves space for consistent bar widths
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(.blue)
+                .opacity(isSelected ? 1 : 0)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor.opacity(0.08) : Color.clear)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(white: 0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    isSelected ? Color.blue.opacity(0.6) : Color.white.opacity(0.06),
+                    lineWidth: isSelected ? 1.5 : 1
+                )
+        )
+        .shadow(
+            color: isSelected ? Color.blue.opacity(0.2) : Color.clear,
+            radius: 8,
+            x: 0,
+            y: 0
         )
         .contentShape(Rectangle())
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }
 
@@ -82,7 +102,7 @@ private struct CapacityBar: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.secondary.opacity(0.2))
+                    .fill(Color.white.opacity(0.08))
 
                 RoundedRectangle(cornerRadius: 3)
                     .fill(barColor)
@@ -110,15 +130,27 @@ private struct CapacityBar: View {
         DeviceRow(
             device: StorageDevice(
                 id: "2",
-                name: "USB Drive",
+                name: "Samsung T7",
                 volumePath: URL(fileURLWithPath: "/Volumes/USB"),
                 isExternal: true,
-                totalCapacity: 64_000_000_000,
-                availableCapacity: 55_000_000_000
+                totalCapacity: 2_000_000_000_000,
+                availableCapacity: 1_200_000_000_000
+            ),
+            isSelected: false
+        )
+        DeviceRow(
+            device: StorageDevice(
+                id: "3",
+                name: "WD My Passport",
+                volumePath: URL(fileURLWithPath: "/Volumes/WD"),
+                isExternal: true,
+                totalCapacity: 1_000_000_000_000,
+                availableCapacity: 50_000_000_000
             ),
             isSelected: false
         )
     }
-    .padding()
-    .frame(width: 400)
+    .padding(16)
+    .frame(width: 500)
+    .background(Color(white: 0.08))
 }
