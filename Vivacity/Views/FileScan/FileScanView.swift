@@ -17,13 +17,13 @@ struct FileScanView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            deepScanPrompt
             
             if viewModel.permissionDenied {
                 PermissionDeniedView(
-                    onTryAgain: { tryRequestAccess() },
+                    onTryAgain: { startDeepScan() },
                     onContinueLimited: {
                         viewModel.permissionDenied = false
-                        viewModel.startFastScan(device: device)
                     }
                 )
             } else if viewModel.foundFiles.isEmpty && viewModel.isScanning {
@@ -80,32 +80,21 @@ struct FileScanView: View {
         )
     }
 
-    // MARK: - Permission Helpers
+    // MARK: - Scan Helpers
 
-    /// Silently probes disk access, prompts if denied, then starts the scan.
+    /// Starts fast scan immediately — no elevated access required.
+    ///
+    /// Fast Scan uses FileManager to walk the mounted filesystem, which
+    /// macOS allows without special permissions for external volumes.
     private func checkPermissionsAndScan() {
-        let permService = PermissionService()
-        let status = permService.checkRawDiskAccess(for: device)
-
-        if status == .granted {
-            viewModel.startFastScan(device: device)
-        } else {
-            tryRequestAccess()
-        }
+        viewModel.startFastScan(device: device)
     }
 
-    /// Shows the macOS password dialog. If granted, starts scanning.
-    /// If denied, sets permissionDenied to show the fallback view.
-    private func tryRequestAccess() {
-        let permService = PermissionService()
-        let result = permService.requestElevatedAccess()
-
-        if result == .granted {
-            viewModel.permissionDenied = false
-            viewModel.startFastScan(device: device)
-        } else {
-            viewModel.permissionDenied = true
-        }
+    /// Starts deep scan. PrivilegedDiskReader handles authorization
+    /// internally — it will show the macOS password dialog if the device
+    /// is not directly accessible.
+    private func startDeepScan() {
+        viewModel.startDeepScan(device: device)
     }
 }
 
@@ -116,22 +105,6 @@ private extension FileScanView {
     var header: some View {
         VStack(spacing: 12) {
             HStack {
-                // Back button
-                Button {
-                    viewModel.stopScanning()
-                    dismiss()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("Back")
-                            .font(.system(size: 13))
-                    }
-                }
-                .buttonStyle(.borderless)
-
-                Spacer()
-
                 // Device name
                 HStack(spacing: 6) {
                     Image(systemName: device.isExternal ? "externaldrive.fill" : "internaldrive.fill")
@@ -144,7 +117,7 @@ private extension FileScanView {
 
                 Spacer()
 
-                // Stop / placeholder for symmetry
+                // Stop button (only visible during scanning)
                 if viewModel.isScanning {
                     Button(role: .destructive) {
                         viewModel.stopScanning()
@@ -158,10 +131,6 @@ private extension FileScanView {
                     }
                     .buttonStyle(.bordered)
                     .tint(.red)
-                } else {
-                    // Invisible placeholder for layout symmetry
-                    Button {} label: { Text("Stop Scanning").font(.system(size: 13)) }
-                        .hidden()
                 }
             }
 
@@ -284,7 +253,7 @@ private extension FileScanView {
                     .buttonStyle(.bordered)
 
                     Button {
-                        viewModel.startDeepScan(device: device)
+                        startDeepScan()
                     } label: {
                         Text("Start Deep Scan")
                             .font(.system(size: 13))

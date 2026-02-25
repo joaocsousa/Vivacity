@@ -73,13 +73,20 @@ struct VolumeInfo: Sendable {
 
         let fsType = FilesystemType(rawValue: fsTypeName) ?? .other
 
-        // Prefer the raw character device (/dev/rdiskXsY) for faster reads
+        // Prefer the raw character device (/dev/rdiskXsY) for faster reads.
+        // Fall back to the block device (/dev/diskXsY) if the raw device isn't
+        // accessible — macOS often allows user-level read on block devices for
+        // external volumes, even when the raw device requires admin privileges.
         var resolvedDevicePath = devicePath
         if devicePath.hasPrefix("/dev/disk") {
             let rawPath = devicePath.replacingOccurrences(of: "/dev/disk", with: "/dev/rdisk")
             if access(rawPath, R_OK) == 0 {
                 resolvedDevicePath = rawPath
+            } else if access(devicePath, R_OK) == 0 {
+                resolvedDevicePath = devicePath  // block device is readable
             }
+            // else: neither is accessible without elevation — Deep Scan will
+            //        prompt for permissions via PermissionService
         }
 
         logger.info("Detected \(fsTypeName) filesystem on \(resolvedDevicePath) at \(volumePath)")
