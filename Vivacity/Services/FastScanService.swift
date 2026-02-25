@@ -54,65 +54,35 @@ struct FastScanService: Sendable {
     ) async throws {
         let volumeInfo = VolumeInfo.detect(for: device)
 
-        // Dispatch to the appropriate filesystem-specific catalog scanner.
-        switch volumeInfo.filesystemType {
-        case .fat32:
-            logger.info("FAT32 detected — scanning directory table for 0xE5 deleted entries")
-            do {
-                let scanner = FATDirectoryScanner()
-                try await scanner.scan(volumeInfo: volumeInfo, continuation: continuation)
-            } catch {
-                logger.warning("FAT32 catalog scan failed: \(error.localizedDescription)")
-            }
+        // Fast Scan uses FileManager to walk the mounted filesystem.
+        // This requires NO special permissions — macOS grants read access to
+        // mounted external volumes at the user level.
+        //
+        // Raw disk I/O (FAT directory table parsing, MFT scanning, byte carving)
+        // is deferred to Deep Scan, which will request elevated access if needed.
+        logger.info("Fast scan on \(volumeInfo.filesystemType.displayName) — using filesystem-level scan (no raw disk access)")
 
-        case .exfat:
-            logger.info("ExFAT detected — scanning directory entries for cleared InUse bits")
-            do {
-                let scanner = ExFATScanner()
-                try await scanner.scan(volumeInfo: volumeInfo, continuation: continuation)
-            } catch {
-                logger.warning("ExFAT catalog scan failed: \(error.localizedDescription)")
-            }
-
-        case .ntfs:
-            logger.info("NTFS detected — scanning MFT for cleared in-use flags")
-            do {
-                let scanner = NTFSScanner()
-                try await scanner.scan(volumeInfo: volumeInfo, continuation: continuation)
-            } catch {
-                logger.warning("NTFS catalog scan failed: \(error.localizedDescription)")
-            }
-
-        case .apfs, .hfsPlus:
-            logger.info("APFS/HFS+ detected — scanning Trash catalogs and snapshots")
-            try await performAPFSScan(device: device, continuation: continuation)
-            // Don't call .completed/.finish() here — performAPFSScan handles it
-            return
-
-        case .other:
-            logger.info("Unknown filesystem — skipping catalog scan")
-        }
-
-        // Signal completion for non-APFS filesystems
-        continuation.yield(.progress(1.0))
-        continuation.yield(.completed)
-        continuation.finish()
+        try await performFilesystemScan(device: device, continuation: continuation)
     }
 
-    // MARK: - APFS / HFS+ Scan
+    // MARK: - Filesystem-Level Scan (all FS types)
 
-    /// Scans APFS/HFS+ volumes for deleted files using three strategies:
+    /// Scans a mounted volume for deleted media files using standard file APIs.
     ///
-    /// 1. **`.Trashes` directory**: Files moved to trash but not yet purged
-    /// 2. **APFS local snapshots**: Read-only frozen states from earlier that may contain
-    ///    files that have since been deleted from the live filesystem
-    /// 3. **User `~/.Trash`**: The current user's trash on the boot volume
-    private func performAPFSScan(
+    /// This approach requires NO elevated permissions — macOS grants read access
+    /// to mounted external volumes at the user level. Strategies:
+    ///
+    /// 1. **`.Trashes` / `.Trash` directories**: Files moved to trash but not yet purged
+    /// 2. **User `~/.Trash`**: The current user's trash on the boot volume
+    /// 3. **APFS local snapshots** (APFS only): Read-only frozen states that may contain
+    ///    files deleted from the live filesystem
+    private func performFilesystemScan(
         device: StorageDevice,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let volumeRoot = device.volumePath
-        logger.info("Starting APFS catalog scan on \(device.name) at \(volumeRoot.path)")
+        let volumeInfo = VolumeInfo.detect(for: device)
+        logger.info("Starting filesystem scan on \(device.name) at \(volumeRoot.path)")
 
         var filesFound = 0
         var filesExamined = 0
@@ -178,18 +148,17 @@ struct FastScanService: Sendable {
 
         logger.info("Trash scan found \(filesFound) file(s) from \(filesExamined) examined")
 
-        // ── Strategy 2: Scan APFS local snapshots ──
-        // APFS keeps local snapshots (like mini Time Machine backups).
-        // Files deleted from the live filesystem may still exist in a recent snapshot.
-        // We use `tmutil listlocalsnapshots` to discover them and attempt to mount.
-        try await scanAPFSSnapshots(
-            volumeRoot: volumeRoot,
-            continuation: continuation,
-            filesFound: &filesFound,
-            filesExamined: &filesExamined
-        )
+        // ── Strategy 2: Scan APFS local snapshots (APFS only) ──
+        if volumeInfo.filesystemType == .apfs {
+            try await scanAPFSSnapshots(
+                volumeRoot: volumeRoot,
+                continuation: continuation,
+                filesFound: &filesFound,
+                filesExamined: &filesExamined
+            )
+        }
 
-        logger.info("APFS catalog scan complete: \(filesFound) total deleted file(s) found")
+        logger.info("Filesystem scan complete: \(filesFound) total deleted file(s) found")
         continuation.yield(.progress(1.0))
         continuation.yield(.completed)
         continuation.finish()
