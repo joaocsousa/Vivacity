@@ -17,6 +17,7 @@ struct FileScanView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            deepScanPrompt
             
             if viewModel.permissionDenied {
                 PermissionDeniedView(
@@ -116,22 +117,6 @@ private extension FileScanView {
     var header: some View {
         VStack(spacing: 12) {
             HStack {
-                // Back button
-                Button {
-                    viewModel.stopScanning()
-                    dismiss()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("Back")
-                            .font(.system(size: 13))
-                    }
-                }
-                .buttonStyle(.borderless)
-
-                Spacer()
-
                 // Device name
                 HStack(spacing: 6) {
                     Image(systemName: device.isExternal ? "externaldrive.fill" : "internaldrive.fill")
@@ -144,7 +129,7 @@ private extension FileScanView {
 
                 Spacer()
 
-                // Stop / placeholder for symmetry
+                // Stop button (only visible during scanning)
                 if viewModel.isScanning {
                     Button(role: .destructive) {
                         viewModel.stopScanning()
@@ -158,10 +143,6 @@ private extension FileScanView {
                     }
                     .buttonStyle(.bordered)
                     .tint(.red)
-                } else {
-                    // Invisible placeholder for layout symmetry
-                    Button {} label: { Text("Stop Scanning").font(.system(size: 13)) }
-                        .hidden()
                 }
             }
 
