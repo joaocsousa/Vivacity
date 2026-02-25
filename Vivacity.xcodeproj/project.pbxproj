@@ -30,6 +30,7 @@
 		DD000004 /* ExFATScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000013 /* ExFATScanner.swift */; };
 		4155C6FBA2014067BFC7AD0C /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */; };
 		BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85684069117F459BA261B91B /* PermissionDeniedView.swift */; };
+		EE000001 /* PrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000010 /* PrivilegedDiskReader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -57,6 +58,7 @@
 		DD000012 /* NTFSScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NTFSScanner.swift; sourceTree = "<group>"; };
 		DD000013 /* ExFATScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATScanner.swift; sourceTree = "<group>"; };
 		32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
+		EE000010 /* PrivilegedDiskReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReader.swift; sourceTree = "<group>"; };
 		85684069117F459BA261B91B /* PermissionDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionDeniedView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -116,6 +118,7 @@
 				DD000012 /* NTFSScanner.swift */,
 				DD000013 /* ExFATScanner.swift */,
 				32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */,
+				EE000010 /* PrivilegedDiskReader.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -256,6 +259,7 @@
 				DD000003 /* NTFSScanner.swift in Sources */,
 				DD000004 /* ExFATScanner.swift in Sources */,
 				4155C6FBA2014067BFC7AD0C /* PermissionService.swift in Sources */,
+				EE000001 /* PrivilegedDiskReader.swift in Sources */,
 				BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

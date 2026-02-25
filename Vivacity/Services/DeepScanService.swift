@@ -72,22 +72,22 @@ struct DeepScanService: Sendable {
         existingOffsets: Set<UInt64>,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
-        let volumePath = device.volumePath.path
+        let volumeInfo = VolumeInfo.detect(for: device)
+        let devicePath = volumeInfo.devicePath
 
-        logger.info("Starting deep scan on \(device.name) at \(volumePath)")
+        logger.info("Starting deep scan on \(device.name) using device \(devicePath)")
 
-        // Try to find the raw device node for this volume
-        let devicePath = try resolveDevicePath(for: volumePath)
-        logger.info("Resolved device path: \(devicePath)")
-
-        // Open the device/volume for reading
-        let fd = open(devicePath, O_RDONLY)
-        guard fd >= 0 else {
-            let err = String(cString: strerror(errno))
-            logger.error("Failed to open \(devicePath): \(err)")
-            throw DeepScanError.cannotOpenDevice(path: devicePath, reason: err)
+        // Use PrivilegedDiskReader which handles authorization and privilege
+        // escalation transparently — tries direct open() first, then falls
+        // back to AuthorizationExecuteWithPrivileges for root-level dd.
+        let reader = PrivilegedDiskReader(devicePath: devicePath)
+        do {
+            try reader.start()
+        } catch {
+            logger.error("Failed to start privileged reader: \(error.localizedDescription)")
+            throw DeepScanError.cannotOpenDevice(path: devicePath, reason: error.localizedDescription)
         }
-        defer { close(fd) }
+        defer { reader.stop() }
 
         // Get total size for progress
         let totalBytes = UInt64(device.totalCapacity)
@@ -115,7 +115,11 @@ struct DeepScanService: Sendable {
             let readOffset = carryOver // We keep leftover bytes at the start of buffer
 
             let bytesRead = buffer.withUnsafeMutableBytes { rawBuffer in
-                pread(fd, rawBuffer.baseAddress! + readOffset, toRead, off_t(bytesScanned))
+                reader.read(
+                    into: rawBuffer.baseAddress! + readOffset,
+                    offset: bytesScanned,
+                    length: toRead
+                )
             }
             guard bytesRead > 0 else { break }
 
@@ -271,45 +275,6 @@ struct DeepScanService: Sendable {
         return nil
     }
 
-    // MARK: - Device Resolution
-
-    /// Resolves the raw device path for a given volume mount point.
-    ///
-    /// Uses `statfs` to find the device node (e.g. `/dev/disk2s1`).
-    /// Falls back to opening the volume path directly if resolution fails.
-    private func resolveDevicePath(for volumePath: String) throws -> String {
-        var stat = statfs()
-        guard statfs(volumePath, &stat) == 0 else {
-            let err = String(cString: strerror(errno))
-            logger.warning("statfs failed for \(volumePath): \(err), falling back to volume path")
-            return volumePath
-        }
-
-        let devicePath = withUnsafePointer(to: &stat.f_mntfromname) { ptr in
-            ptr.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { cStr in
-                String(cString: cStr)
-            }
-        }
-
-        // If we got a device path like /dev/disk2s1, try the raw version /dev/rdisk2s1
-        if devicePath.hasPrefix("/dev/disk") {
-            let rawPath = devicePath.replacingOccurrences(of: "/dev/disk", with: "/dev/rdisk")
-            // Check if we can open the raw device
-            let testFd = open(rawPath, O_RDONLY)
-            if testFd >= 0 {
-                close(testFd)
-                return rawPath
-            }
-            // Fall back to the block device
-            let blockFd = open(devicePath, O_RDONLY)
-            if blockFd >= 0 {
-                close(blockFd)
-                return devicePath
-            }
-        }
-
-        return volumePath
-    }
 }
 
 // MARK: - Errors

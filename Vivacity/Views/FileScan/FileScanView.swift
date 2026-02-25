@@ -21,7 +21,7 @@ struct FileScanView: View {
             
             if viewModel.permissionDenied {
                 PermissionDeniedView(
-                    onTryAgain: { checkPermissionsForDeepScan() },
+                    onTryAgain: { startDeepScan() },
                     onContinueLimited: {
                         viewModel.permissionDenied = false
                     }
@@ -80,33 +80,21 @@ struct FileScanView: View {
         )
     }
 
-    // MARK: - Permission Helpers
+    // MARK: - Scan Helpers
 
     /// Starts fast scan immediately — no elevated access required.
     ///
     /// Fast Scan uses FileManager to walk the mounted filesystem, which
     /// macOS allows without special permissions for external volumes.
-    /// Elevated access is only needed for Deep Scan (raw disk I/O).
     private func checkPermissionsAndScan() {
         viewModel.startFastScan(device: device)
     }
 
-    /// Checks raw disk permissions before starting Deep Scan.
-    /// Shows the macOS password dialog if access is denied.
-    private func checkPermissionsForDeepScan() {
-        let permService = PermissionService()
-        let status = permService.checkRawDiskAccess(for: device)
-
-        if status == .granted {
-            viewModel.startDeepScan(device: device)
-        } else {
-            let result = permService.requestElevatedAccess()
-            if result == .granted {
-                viewModel.startDeepScan(device: device)
-            } else {
-                viewModel.permissionDenied = true
-            }
-        }
+    /// Starts deep scan. PrivilegedDiskReader handles authorization
+    /// internally — it will show the macOS password dialog if the device
+    /// is not directly accessible.
+    private func startDeepScan() {
+        viewModel.startDeepScan(device: device)
     }
 }
 
@@ -265,7 +253,7 @@ private extension FileScanView {
                     .buttonStyle(.bordered)
 
                     Button {
-                        checkPermissionsForDeepScan()
+                        startDeepScan()
                     } label: {
                         Text("Start Deep Scan")
                             .font(.system(size: 13))
