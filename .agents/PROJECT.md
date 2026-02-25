@@ -9,6 +9,14 @@ description: Project context and status for AI agents working on the Vivacity co
 
 Vivacity is a **native macOS application** built with **SwiftUI** that allows users to recover deleted image and video files from internal and external storage devices connected to their Mac.
 
+## AI Context & Handoff
+> **Note to next AI Assistant (Codex or others):**
+> Welcome to Vivacity! The codebase is set up, compiling cleanly, and fully linted with **SwiftLint**, **SwiftFormat**, and **Xcode Static Analyzer** (0 warnings). 
+> 
+> **Where we are:** We have successfully built the M1-M3 milestones. The app currently discovers devices (Fast Scan) and can perform raw sector-by-sector carving (Deep Scan) for predefined file signatures. The UI allows users to select a device, scan it, and preview found files.
+> 
+> **What to do next:** Your immediate next priority is **M4 (Recovery Destination Screen)** — checking `PROJECT_PLAN.md` for tickets T-013 through T-015. After M4 is complete, you should move on to M6 (Scan Engine Hardening) to fix scanning bugs on real devices. Please read `PROJECT_PLAN.md` for detailed technical implementation steps.
+
 ## Purpose
 
 Users who accidentally delete photos or videos need a clean, modern macOS-native tool to scan drives and recover those files. Vivacity provides:
