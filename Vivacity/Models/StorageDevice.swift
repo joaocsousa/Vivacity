@@ -12,6 +12,9 @@ struct StorageDevice: Identifiable, Hashable, Sendable {
     /// Mount-point URL for the volume (e.g. `/Volumes/MyDrive`).
     let volumePath: URL
 
+    /// The filesystem type of the volume (e.g. APFS, HFS+, ExFAT, FAT32).
+    let filesystemType: FilesystemType
+
     /// Whether the volume is on an external (removable) device.
     let isExternal: Bool
 

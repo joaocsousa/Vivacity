@@ -139,10 +139,21 @@ struct DeviceService: Sendable {
         let totalCapacity = Int64(resourceValues.volumeTotalCapacity ?? 0)
         let availableCapacity = Int64(resourceValues.volumeAvailableCapacity ?? 0)
 
+        let volumeInfo = VolumeInfo.detect(for: StorageDevice(
+            id: url.absoluteString,
+            name: name,
+            volumePath: url,
+            filesystemType: .other,  // temp
+            isExternal: isExternal,
+            totalCapacity: totalCapacity,
+            availableCapacity: availableCapacity
+        ))
+
         return StorageDevice(
             id: url.absoluteString,
             name: name,
             volumePath: url,
+            filesystemType: volumeInfo.filesystemType,
             isExternal: isExternal,
             totalCapacity: totalCapacity,
             availableCapacity: availableCapacity

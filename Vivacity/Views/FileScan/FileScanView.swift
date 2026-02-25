@@ -447,6 +447,7 @@ private extension FileScanView {
             id: "preview",
             name: "Samsung T7",
             volumePath: URL(fileURLWithPath: "/Volumes/USB"),
+            filesystemType: .exfat,
             isExternal: true,
             totalCapacity: 2_000_000_000_000,
             availableCapacity: 1_200_000_000_000

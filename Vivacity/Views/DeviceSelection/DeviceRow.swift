@@ -27,6 +27,7 @@ struct DeviceRow: View {
                     Text(device.name)
                         .font(.system(size: 14, weight: .semibold))
 
+                    // EXTERNAL / INTERNAL badge
                     Text(device.isExternal ? "EXTERNAL" : "INTERNAL")
                         .font(.system(size: 9, weight: .bold))
                         .tracking(0.5)
@@ -38,6 +39,16 @@ struct DeviceRow: View {
                                 : Color.blue.opacity(0.15)
                         )
                         .foregroundStyle(device.isExternal ? .green : .cyan)
+                        .clipShape(Capsule())
+
+                    // Filesystem type badge
+                    Text(device.filesystemType.displayName)
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.5)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Color.purple.opacity(0.15))
+                        .foregroundStyle(Color.purple)
                         .clipShape(Capsule())
                 }
 
@@ -121,6 +132,7 @@ private struct CapacityBar: View {
                 id: "1",
                 name: "Macintosh HD",
                 volumePath: URL(fileURLWithPath: "/"),
+                filesystemType: .apfs,
                 isExternal: false,
                 totalCapacity: 500_000_000_000,
                 availableCapacity: 120_000_000_000
@@ -132,6 +144,7 @@ private struct CapacityBar: View {
                 id: "2",
                 name: "Samsung T7",
                 volumePath: URL(fileURLWithPath: "/Volumes/USB"),
+                filesystemType: .exfat,
                 isExternal: true,
                 totalCapacity: 2_000_000_000_000,
                 availableCapacity: 1_200_000_000_000
@@ -143,6 +156,7 @@ private struct CapacityBar: View {
                 id: "3",
                 name: "WD My Passport",
                 volumePath: URL(fileURLWithPath: "/Volumes/WD"),
+                filesystemType: .fat32,
                 isExternal: true,
                 totalCapacity: 1_000_000_000_000,
                 availableCapacity: 50_000_000_000
