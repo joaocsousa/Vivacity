@@ -57,7 +57,7 @@ struct DeviceRow: View {
                     .frame(height: 6)
 
                 // Capacity text
-                Text("\(device.formattedAvailable) available of \(device.formattedTotal)")
+                Text("\(device.formattedAvailable) available of \(device.formattedTotal) · \(Int(device.usageFraction * 100))% used")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
