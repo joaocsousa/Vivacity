@@ -4,6 +4,7 @@ import SwiftUI
 struct DeviceSelectionView: View {
 
     @State private var viewModel = DeviceSelectionViewModel()
+    @State private var navigationTarget: StorageDevice?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,6 +16,9 @@ struct DeviceSelectionView: View {
         }
         .frame(minWidth: 520, minHeight: 540)
         .background(Color(white: 0.08))
+        .navigationDestination(item: $navigationTarget) { device in
+            FileScanView(device: device)
+        }
         .task {
             await viewModel.loadDevices()
         }
@@ -132,7 +136,7 @@ private extension DeviceSelectionView {
             Spacer()
 
             Button {
-                // TODO: Navigate to scan screen (M3)
+                navigationTarget = viewModel.selectedDevice
             } label: {
                 HStack(spacing: 4) {
                     Text("Start Scanning")

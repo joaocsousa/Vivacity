@@ -2,7 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        DeviceSelectionView()
+        NavigationStack {
+            DeviceSelectionView()
+        }
     }
 }
 
