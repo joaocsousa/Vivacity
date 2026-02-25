@@ -35,6 +35,17 @@ open build/Debug/Vivacity.app
 
 Or open `Vivacity.xcodeproj` in Xcode and press ⌘R.
 
+### Code Quality
+
+Vivacity uses **SwiftFormat** and **SwiftLint** to maintain code quality. 
+
+Ensure both are installed (`brew install swiftlint swiftformat`). 
+Before committing, format your code:
+```bash
+swiftformat .
+```
+SwiftLint runs automatically during the Xcode build phase to surface warnings.
+
 ## How It Works
 
 ```

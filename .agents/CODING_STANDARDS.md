@@ -75,8 +75,12 @@ private extension DeviceSelectionView { ... }
 #Preview { ... }
 ```
 
-## Formatting
+## Formatting & Linting
 
+We use **SwiftFormat** and **SwiftLint** to enforce coding standards. Ensure both are installed (`brew install swiftlint swiftformat`).
+
+- **SwiftFormat**: Run `swiftformat .` before committing to automatically fix formatting issues.
+- **SwiftLint**: Runs automatically during Xcode builds. Fix any warnings before opening a PR.
 - **Indentation**: 4 spaces (Xcode default).
 - **Line length**: Soft limit 120 characters.
 - **Trailing commas**: Use in multi-line collections/enums.

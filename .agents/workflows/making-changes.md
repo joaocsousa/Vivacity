@@ -19,30 +19,34 @@ All changes to the Vivacity codebase must follow this workflow.
 
 2. Make your code changes.
 
-3. Update documentation as needed:
+3. Format and Lint your code:
+   - Run `swiftformat .` to auto-format files.
+   - Run `swiftlint` or build in Xcode to check for and fix any remaining violations.
+
+4. Update documentation as needed:
    - **`README.md`** — if the change affects features, architecture, or build instructions.
    - **`PROJECT_PLAN.md`** — update ticket statuses (⬜ → 🔶 → ✅) and add new tickets if needed.
    - **`.agents/PROJECT.md`** — update the project status table if a milestone status changed.
    - **Code comments** — add `///` doc comments on new public types and functions.
 
-4. Build and verify:
+5. Build and verify:
    ```bash
    xcodebuild build -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"
    ```
 
-5. Commit with a descriptive message:
+6. Commit with a descriptive message:
    ```bash
    git add -A && git commit -m "<type>: <description>"
    ```
    Types: `feat`, `fix`, `docs`, `refactor`, `chore`.
 
-6. Push and create a pull request:
+7. Push and create a pull request:
    ```bash
    git push origin <branch-name>
    gh pr create --title "<title>" --body "<description>"
    ```
 
-7. After the PR is merged, switch back to `main`:
+8. After the PR is merged, switch back to `main`:
    ```bash
    git checkout main && git pull origin main
    ```
