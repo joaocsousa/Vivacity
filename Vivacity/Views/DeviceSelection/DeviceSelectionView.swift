@@ -15,7 +15,7 @@ struct DeviceSelectionView: View {
             footer
         }
         .frame(minWidth: 520, minHeight: 540)
-        .background(Color(white: 0.08))
+        .background(Color(.windowBackgroundColor))
         .navigationDestination(item: $navigationTarget) { device in
             FileScanView(device: device)
         }

@@ -20,7 +20,7 @@ struct FilePreviewView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(white: 0.06))
+        .background(Color(.windowBackgroundColor))
     }
 }
 
@@ -127,7 +127,7 @@ private extension FilePreviewView {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(white: 0.10))
+                .fill(Color(.unemphasizedSelectedContentBackgroundColor))
         )
     }
 
@@ -250,6 +250,8 @@ private struct VideoPlayerPreview: View {
             id: "preview",
             name: "Samsung T7",
             volumePath: URL(fileURLWithPath: "/Volumes/USB"),
+            volumeUUID: "preview-samsung",
+            filesystemType: .exfat,
             isExternal: true,
             totalCapacity: 2_000_000_000_000,
             availableCapacity: 1_200_000_000_000

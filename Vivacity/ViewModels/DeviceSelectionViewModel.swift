@@ -63,6 +63,8 @@ final class DeviceSelectionViewModel {
     func observeVolumeChanges() async {
         for await _ in deviceService.volumeChanges() {
             logger.info("Volume change detected, refreshing device list")
+            // Add a small delay so macOS can clean up unmounted paths before we read them
+            try? await Task.sleep(nanoseconds: 500_000_000)
             await loadDevices()
         }
     }

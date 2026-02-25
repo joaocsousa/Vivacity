@@ -27,6 +27,7 @@ struct DeviceRow: View {
                     Text(device.name)
                         .font(.system(size: 14, weight: .semibold))
 
+                    // EXTERNAL / INTERNAL badge
                     Text(device.isExternal ? "EXTERNAL" : "INTERNAL")
                         .font(.system(size: 9, weight: .bold))
                         .tracking(0.5)
@@ -39,6 +40,16 @@ struct DeviceRow: View {
                         )
                         .foregroundStyle(device.isExternal ? .green : .cyan)
                         .clipShape(Capsule())
+
+                    // Filesystem type badge
+                    Text(device.filesystemType.displayName)
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.5)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Color.purple.opacity(0.15))
+                        .foregroundStyle(Color.purple)
+                        .clipShape(Capsule())
                 }
 
                 // Capacity bar
@@ -46,7 +57,7 @@ struct DeviceRow: View {
                     .frame(height: 6)
 
                 // Capacity text
-                Text("\(device.formattedAvailable) available of \(device.formattedTotal)")
+                Text("\(device.formattedAvailable) available of \(device.formattedTotal) · \(Int(device.usageFraction * 100))% used")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -63,7 +74,7 @@ struct DeviceRow: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(white: 0.12))
+                .fill(Color(.unemphasizedSelectedContentBackgroundColor))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -102,7 +113,7 @@ private struct CapacityBar: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.white.opacity(0.08))
+                    .fill(Color(.tertiaryLabelColor).opacity(0.35))
 
                 RoundedRectangle(cornerRadius: 3)
                     .fill(barColor)
@@ -121,6 +132,8 @@ private struct CapacityBar: View {
                 id: "1",
                 name: "Macintosh HD",
                 volumePath: URL(fileURLWithPath: "/"),
+                volumeUUID: "preview-mac-hd",
+                filesystemType: .apfs,
                 isExternal: false,
                 totalCapacity: 500_000_000_000,
                 availableCapacity: 120_000_000_000
@@ -132,6 +145,8 @@ private struct CapacityBar: View {
                 id: "2",
                 name: "Samsung T7",
                 volumePath: URL(fileURLWithPath: "/Volumes/USB"),
+                volumeUUID: "preview-samsung",
+                filesystemType: .exfat,
                 isExternal: true,
                 totalCapacity: 2_000_000_000_000,
                 availableCapacity: 1_200_000_000_000
@@ -143,6 +158,8 @@ private struct CapacityBar: View {
                 id: "3",
                 name: "WD My Passport",
                 volumePath: URL(fileURLWithPath: "/Volumes/WD"),
+                volumeUUID: "preview-wd",
+                filesystemType: .fat32,
                 isExternal: true,
                 totalCapacity: 1_000_000_000_000,
                 availableCapacity: 50_000_000_000
@@ -152,5 +169,5 @@ private struct CapacityBar: View {
     }
     .padding(16)
     .frame(width: 500)
-    .background(Color(white: 0.08))
+    .background(Color(.controlBackgroundColor))
 }

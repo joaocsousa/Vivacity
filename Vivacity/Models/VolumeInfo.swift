@@ -5,12 +5,24 @@ import os
 
 /// The filesystem format of a mounted volume.
 enum FilesystemType: String, Sendable {
-    case fat32  = "msdos"   // FAT12/16/32 report as "msdos" on macOS
-    case exfat  = "exfat"
-    case ntfs   = "ntfs"    // NTFS (via macFUSE, Paragon, or Tuxera)
-    case apfs   = "apfs"
+    case fat32   = "msdos"   // FAT12/16/32 report as "msdos" on macOS
+    case exfat   = "exfat"
+    case ntfs    = "ntfs"    // NTFS (via macFUSE, Paragon, or Tuxera)
+    case apfs    = "apfs"
     case hfsPlus = "hfs"
-    case other  = "other"
+    case other   = "other"
+
+    /// Human-readable label shown in the device list.
+    var displayName: String {
+        switch self {
+        case .fat32:   return "FAT32"
+        case .exfat:   return "ExFAT"
+        case .ntfs:    return "NTFS"
+        case .apfs:    return "APFS"
+        case .hfsPlus: return "HFS+"
+        case .other:   return "Unknown FS"
+        }
+    }
 }
 
 // MARK: - Volume Info

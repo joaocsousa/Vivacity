@@ -46,6 +46,7 @@ struct DeviceService: Sendable {
             .volumeIsRemovableKey,
             .volumeIsInternalKey,
             .volumeIsReadOnlyKey,
+            .volumeUUIDStringKey,
         ]
 
         guard let volumeURLs = FileManager.default.mountedVolumeURLs(
@@ -61,8 +62,20 @@ struct DeviceService: Sendable {
             guard let device = try? storageDevice(from: url, keys: resourceKeys) else {
                 continue
             }
+            print("DISCOVERED: [\(device.name)] Ext:\(device.isExternal) UUID:\(device.volumeUUID) Path:\(device.volumePath.path)")
             devices.append(device)
         }
+
+        // Deduplicate by volume UUID — on APFS, `/` and `/System/Volumes/Data`
+        // share the same UUID. Keep only the first occurrence per UUID,
+        // preferring the internal-flagged entry (i.e. the real mount point).
+        var seen = Set<String>()
+        devices = devices
+            .sorted { !$0.isExternal && $1.isExternal } // internal first for stable dedup
+            .filter { device in
+                guard seen.insert(device.volumeUUID).inserted else { return false }
+                return true
+            }
 
         // Sort: external first, then alphabetical by name.
         devices.sort { lhs, rhs in
@@ -123,6 +136,24 @@ struct DeviceService: Sendable {
             }
         }
 
+        // Ensure this is an actual mount point. macOS can fire didUnmountNotification
+        // while the volume is still unmounting, leaving a "zombie" directory in /Volumes.
+        // statfs reads the real filesystem mount point to filter these out.
+        var stat = statfs()
+        if statfs(path, &stat) == 0 {
+            let mountPoint = withUnsafePointer(to: stat.f_mntonname) { ptr in
+                ptr.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { cString in
+                    String(cString: cString)
+                }
+            }
+            // `path` from URL usually drops trailing slashes unless it's `/`
+            if path != mountPoint && path != mountPoint + "/" {
+                return nil
+            }
+        } else {
+            return nil
+        }
+
         let resourceValues = try url.resourceValues(forKeys: keys)
 
         let name = resourceValues.volumeName ?? url.lastPathComponent
@@ -139,10 +170,25 @@ struct DeviceService: Sendable {
         let totalCapacity = Int64(resourceValues.volumeTotalCapacity ?? 0)
         let availableCapacity = Int64(resourceValues.volumeAvailableCapacity ?? 0)
 
+        let uuid = resourceValues.volumeUUIDString ?? url.absoluteString
+
+        let volumeInfo = VolumeInfo.detect(for: StorageDevice(
+            id: url.absoluteString,
+            name: name,
+            volumePath: url,
+            volumeUUID: uuid,
+            filesystemType: .other,  // temp
+            isExternal: isExternal,
+            totalCapacity: totalCapacity,
+            availableCapacity: availableCapacity
+        ))
+
         return StorageDevice(
             id: url.absoluteString,
             name: name,
             volumePath: url,
+            volumeUUID: uuid,
+            filesystemType: volumeInfo.filesystemType,
             isExternal: isExternal,
             totalCapacity: totalCapacity,
             availableCapacity: availableCapacity

@@ -1,6 +1,8 @@
 # Vivacity — Project Plan & Tickets
 
 > **Goal**: Build a native macOS SwiftUI app that lets users scan storage devices for deleted image/video files and recover them.
+>
+> **Minimum OS**: macOS 14.0 (Sonoma) — also compatible with macOS 15.x (Sequoia)
 
 ---
 
@@ -298,18 +300,28 @@
 
 ## M5 — Polish & Edge Cases
 
-### T-016 ⬜ Permission handling & sandboxing
+### T-016 ✅ Permission handling — privileged disk access
 
-**Description**: Ensure the app requests the necessary permissions and handles denial gracefully.
+**Description**: Before scanning, silently probe whether the app can open the raw disk device. If access works (common for external USB/SD drives), proceed immediately with no prompt. If access is denied (`EACCES`), use `AuthorizationServices` to request elevated privileges via the native macOS password dialog. The user sees this as a "disk access" request, not an "admin" request.
+
+> **Note**: The app is non-sandboxed (`com.apple.security.app-sandbox = false`), so `.Trashes` and filesystem directories are already accessible. The only runtime permission needed is elevated privileges for raw disk device I/O (`/dev/diskXsY`).
 
 **Acceptance Criteria**:
-- App entitlements configured: `com.apple.security.device.usb`, full-disk access if needed
-- Guides user to System Preferences if permissions are missing
-- Sandboxing decisions documented (may need to be non-sandboxed for raw disk access)
+- `PermissionService` probes raw device access silently — no prompt if already permitted
+- If denied, uses `AuthorizationServices` to show macOS password dialog
+- If the user cancels the password dialog, show `PermissionDeniedView` with:
+  - Shield icon + "Disk Access Needed" title
+  - Explanation: reading raw disk sectors requires elevated privileges
+  - "Without disk access, scanning will be limited to files found in the Trash."
+  - "Try Again" button → re-prompts the password dialog
+  - "Continue with limited scan" subtle link → proceeds with Trash-only scan
+- Works on macOS 14.0+ (Sonoma) and 15.x (Sequoia) — same API
 
 **Files**:
-- `Vivacity/Vivacity.entitlements`
-- `Vivacity/Views/PermissionPromptView.swift`
+- `Vivacity/Services/PermissionService.swift` [NEW]
+- `Vivacity/Views/FileScan/PermissionDeniedView.swift` [NEW]
+- `Vivacity/Views/FileScan/FileScanView.swift` [MODIFY]
+- `Vivacity/ViewModels/FileScanViewModel.swift` [MODIFY]
 
 ---
 

@@ -45,6 +45,10 @@ final class FileScanViewModel {
     /// User-facing error message.
     var errorMessage: String?
 
+    /// Whether disk access was denied and the user needs to grant permissions.
+    var permissionDenied: Bool = false
+
+
     // MARK: - Computed
 
     /// The file currently selected for preview, if any.
