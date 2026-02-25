@@ -15,6 +15,19 @@
 		BB000003 /* DeviceSelectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000012 /* DeviceSelectionViewModel.swift */; };
 		BB000004 /* DeviceSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000013 /* DeviceSelectionView.swift */; };
 		BB000005 /* DeviceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000014 /* DeviceRow.swift */; };
+		CC000001 /* FileSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000010 /* FileSignature.swift */; };
+		CC000002 /* RecoverableFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000011 /* RecoverableFile.swift */; };
+		CC000003 /* FastScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000012 /* FastScanService.swift */; };
+		CC000004 /* DeepScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000013 /* DeepScanService.swift */; };
+		CC000005 /* FileScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000014 /* FileScanViewModel.swift */; };
+		CC000006 /* FileScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000015 /* FileScanView.swift */; };
+		CC000008 /* FilePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000017 /* FilePreviewView.swift */; };
+		CC000007 /* FileRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000016 /* FileRow.swift */; };
+		DD000001 /* VolumeInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000010 /* VolumeInfo.swift */; };
+		DD000002 /* FATDirectoryScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000011 /* FATDirectoryScanner.swift */; };
+		DD000005 /* EXIFDateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000014 /* EXIFDateExtractor.swift */; };
+		DD000003 /* NTFSScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000012 /* NTFSScanner.swift */; };
+		DD000004 /* ExFATScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000013 /* ExFATScanner.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +41,19 @@
 		BB000012 /* DeviceSelectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionViewModel.swift; sourceTree = "<group>"; };
 		BB000013 /* DeviceSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionView.swift; sourceTree = "<group>"; };
 		BB000014 /* DeviceRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRow.swift; sourceTree = "<group>"; };
+		CC000010 /* FileSignature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSignature.swift; sourceTree = "<group>"; };
+		CC000011 /* RecoverableFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoverableFile.swift; sourceTree = "<group>"; };
+		CC000012 /* FastScanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastScanService.swift; sourceTree = "<group>"; };
+		CC000013 /* DeepScanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepScanService.swift; sourceTree = "<group>"; };
+		CC000014 /* FileScanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileScanViewModel.swift; sourceTree = "<group>"; };
+		CC000015 /* FileScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileScanView.swift; sourceTree = "<group>"; };
+		CC000017 /* FilePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreviewView.swift; sourceTree = "<group>"; };
+		CC000016 /* FileRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRow.swift; sourceTree = "<group>"; };
+		DD000010 /* VolumeInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeInfo.swift; sourceTree = "<group>"; };
+		DD000011 /* FATDirectoryScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FATDirectoryScanner.swift; sourceTree = "<group>"; };
+		DD000014 /* EXIFDateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFDateExtractor.swift; sourceTree = "<group>"; };
+		DD000012 /* NTFSScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NTFSScanner.swift; sourceTree = "<group>"; };
+		DD000013 /* ExFATScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATScanner.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +94,9 @@
 			isa = PBXGroup;
 			children = (
 				BB000010 /* StorageDevice.swift */,
+				CC000010 /* FileSignature.swift */,
+				CC000011 /* RecoverableFile.swift */,
+				DD000010 /* VolumeInfo.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -76,6 +105,12 @@
 			isa = PBXGroup;
 			children = (
 				BB000011 /* DeviceService.swift */,
+				CC000012 /* FastScanService.swift */,
+				CC000013 /* DeepScanService.swift */,
+				DD000011 /* FATDirectoryScanner.swift */,
+				DD000014 /* EXIFDateExtractor.swift */,
+				DD000012 /* NTFSScanner.swift */,
+				DD000013 /* ExFATScanner.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -84,6 +119,7 @@
 			isa = PBXGroup;
 			children = (
 				BB000012 /* DeviceSelectionViewModel.swift */,
+				CC000014 /* FileScanViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -92,6 +128,7 @@
 			isa = PBXGroup;
 			children = (
 				BB000024 /* DeviceSelection */,
+				CC000020 /* FileScan */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -103,6 +140,16 @@
 				BB000014 /* DeviceRow.swift */,
 			);
 			path = DeviceSelection;
+			sourceTree = "<group>";
+		};
+		CC000020 /* FileScan */ = {
+			isa = PBXGroup;
+			children = (
+				CC000015 /* FileScanView.swift */,
+				CC000017 /* FilePreviewView.swift */,
+				CC000016 /* FileRow.swift */,
+			);
+			path = FileScan;
 			sourceTree = "<group>";
 		};
 		AA000042 /* Products */ = {
@@ -189,6 +236,19 @@
 				BB000003 /* DeviceSelectionViewModel.swift in Sources */,
 				BB000004 /* DeviceSelectionView.swift in Sources */,
 				BB000005 /* DeviceRow.swift in Sources */,
+				CC000001 /* FileSignature.swift in Sources */,
+				CC000002 /* RecoverableFile.swift in Sources */,
+				CC000003 /* FastScanService.swift in Sources */,
+				CC000004 /* DeepScanService.swift in Sources */,
+				CC000005 /* FileScanViewModel.swift in Sources */,
+				CC000006 /* FileScanView.swift in Sources */,
+				CC000008 /* FilePreviewView.swift in Sources */,
+				CC000007 /* FileRow.swift in Sources */,
+				DD000001 /* VolumeInfo.swift in Sources */,
+				DD000002 /* FATDirectoryScanner.swift in Sources */,
+				DD000005 /* EXIFDateExtractor.swift in Sources */,
+				DD000003 /* NTFSScanner.swift in Sources */,
+				DD000004 /* ExFATScanner.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

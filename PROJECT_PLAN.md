@@ -10,7 +10,7 @@
 |---|-----------|---------|--------|
 | M1 | Project Scaffolding | T-001 | ✅ DONE |
 | M2 | Device Selection Screen | T-002 → T-005 | ✅ DONE |
-| M3 | File Scan & Preview Screen | T-006 → T-012 (T-008 split into a/b) | ⬜ TODO |
+| M3 | File Scan & Preview Screen | T-006 → T-012 (T-008 split into a/b) | ✅ DONE |
 | M4 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
 | M5 | Polish & Edge Cases | T-016 → T-018 | ⬜ TODO |
 
@@ -107,7 +107,7 @@
 > prompted to optionally run **Deep Scan** (raw file carving). Files from both
 > phases accumulate in a single list. Recovery is blocked while scanning.
 
-### T-006 ⬜ Define supported file formats
+### T-006 ✅ Define supported file formats
 
 **Description**: Central list of image and video file signatures (magic bytes) and extensions the scanner should look for.
 
@@ -122,7 +122,7 @@
 
 ---
 
-### T-007 ⬜ Create `RecoverableFile` model
+### T-007 ✅ Create `RecoverableFile` model
 
 **Description**: Data model representing a file that can be recovered.
 
@@ -138,7 +138,7 @@
 
 ---
 
-### T-008a ⬜ Create `FastScanService` — metadata-based scan
+### T-008a ✅ Create `FastScanService` — metadata-based scan
 
 **Description**: Service that scans file system metadata for recently deleted files (`.Trashes`, deleted catalog entries).
 
@@ -155,7 +155,7 @@
 
 ---
 
-### T-008b ⬜ Create `DeepScanService` — raw byte carving
+### T-008b ✅ Create `DeepScanService` — raw byte carving
 
 **Description**: Core service that performs raw sector-by-sector scan using magic byte signatures.
 
@@ -173,7 +173,7 @@
 
 ---
 
-### T-009 ⬜ Create `FileScanViewModel` — dual-phase state machine
+### T-009 ✅ Create `FileScanViewModel` — dual-phase state machine
 
 **Description**: ViewModel for the scanning screen with two-phase scan flow.
 
@@ -193,7 +193,7 @@
 
 ---
 
-### T-010 ⬜ Create `FileScanView` — progressive scan UI
+### T-010 ✅ Create `FileScanView` — progressive scan UI
 
 **Description**: Main scan UI with progressive file list, Deep Scan prompt, and scan controls.
 
@@ -213,7 +213,7 @@
 
 ---
 
-### T-011 ⬜ Create `FilePreviewView` — preview panel
+### T-011 ✅ Create `FilePreviewView` — preview panel
 
 **Description**: When a file is selected in the list, show a preview in a side panel or detail view.
 
@@ -229,7 +229,7 @@
 
 ---
 
-### T-012 ⬜ Wire up split view — list + preview
+### T-012 ✅ Wire up split view — list + preview
 
 **Description**: Combine file list and preview into a split/detail layout.
 
@@ -313,7 +313,7 @@
 
 ---
 
-### T-017 ⬜ Navigation & app flow integration
+### T-017 🔶 Navigation & app flow integration
 
 **Description**: Wire all screens together with proper navigation.
 
