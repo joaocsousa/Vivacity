@@ -74,7 +74,7 @@ struct DeviceRow: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.controlColor))
+                .fill(Color(.unemphasizedSelectedContentBackgroundColor))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -113,7 +113,7 @@ private struct CapacityBar: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(.separatorColor).opacity(0.4))
+                    .fill(Color(.tertiaryLabelColor).opacity(0.35))
 
                 RoundedRectangle(cornerRadius: 3)
                     .fill(barColor)
