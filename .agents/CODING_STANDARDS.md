@@ -98,3 +98,18 @@ private extension DeviceSelectionView { ... }
 - Unit test ViewModels and Services — Views are tested visually via Xcode Previews.
 - Test files live in `VivacityTests/` and mirror the source structure.
 - Use Swift Testing framework (`@Test`, `#expect`) for new tests.
+
+## Git Workflow
+
+- **All changes must go through pull requests** — never push directly to `main`.
+- Create a feature branch from `main` (e.g., `feature/m4-recovery`, `fix/deep-scan-permissions`).
+- PRs should have a descriptive title and body summarizing the changes.
+- Merge via GitHub after review.
+
+## Documentation
+
+- **`README.md`** and **`PROJECT_PLAN.md`** must be updated as part of every PR that changes functionality, adds features, or modifies the project structure.
+- Update milestone and ticket statuses in `PROJECT_PLAN.md` when completing work.
+- Update `.agents/PROJECT.md` project status table when milestones change.
+- Add `///` doc comments on all public types and non-trivial functions.
+- Use `// MARK: -` to separate logical sections within a file.
