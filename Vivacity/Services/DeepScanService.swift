@@ -202,13 +202,31 @@ struct DeepScanService: Sendable {
 
     // MARK: - Signature Matching
 
-    // swiftlint:disable:next cyclomatic_complexity
     /// Checks the buffer at the given position for any known file signature.
     private func matchSignatureAt(buffer: [UInt8], position: Int) -> FileSignature? {
         let remaining = buffer.count - position
         guard remaining >= 4 else { return nil }
 
-        // Check direct (unambiguous) signatures first
+        if let direct = matchDirectSignatures(buffer: buffer, position: position, remaining: remaining) {
+            return direct
+        }
+
+        if let tiff = matchTIFFSignatures(buffer: buffer, position: position, remaining: remaining) {
+            return tiff
+        }
+
+        if let riff = matchRIFFSignatures(buffer: buffer, position: position, remaining: remaining) {
+            return riff
+        }
+
+        if let ftyp = matchFtypSignatures(buffer: buffer, position: position, remaining: remaining) {
+            return ftyp
+        }
+
+        return nil
+    }
+
+    private func matchDirectSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
         for (signature, magic) in Self.directSignatures {
             if remaining >= magic.count {
                 var matched = true
@@ -221,28 +239,30 @@ struct DeepScanService: Sendable {
                 if matched { return signature }
             }
         }
+        return nil
+    }
 
-        // Check TIFF-based formats (TIFF, CR2, ARW, DNG share the same prefix)
-        if remaining >= 4 {
-            // Little-endian TIFF: 49 49 2A 00
-            if buffer[position] == 0x49, buffer[position + 1] == 0x49,
-               buffer[position + 2] == 0x2A, buffer[position + 3] == 0x00
-            {
-                // Could be TIFF, CR2, ARW, or DNG — default to TIFF
-                if remaining >= 10, buffer[position + 8] == 0x43, buffer[position + 9] == 0x52 {
-                    return .cr2 // "CR" at offset 8
-                }
-                return .tiff
+    private func matchTIFFSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
+        // Little-endian TIFF: 49 49 2A 00
+        if buffer[position] == 0x49, buffer[position + 1] == 0x49,
+           buffer[position + 2] == 0x2A, buffer[position + 3] == 0x00
+        {
+            // Could be TIFF, CR2, ARW, or DNG — default to TIFF
+            if remaining >= 10, buffer[position + 8] == 0x43, buffer[position + 9] == 0x52 {
+                return .cr2 // "CR" at offset 8
             }
-            // Big-endian TIFF: 4D 4D 00 2A
-            if buffer[position] == 0x4D, buffer[position + 1] == 0x4D,
-               buffer[position + 2] == 0x00, buffer[position + 3] == 0x2A
-            {
-                return .tiffBigEndian
-            }
+            return .tiff
         }
+        // Big-endian TIFF: 4D 4D 00 2A
+        if buffer[position] == 0x4D, buffer[position + 1] == 0x4D,
+           buffer[position + 2] == 0x00, buffer[position + 3] == 0x2A
+        {
+            return .tiffBigEndian
+        }
+        return nil
+    }
 
-        // Check RIFF-based formats (AVI, WebP)
+    private func matchRIFFSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
         if remaining >= 12,
            buffer[position] == 0x52, buffer[position + 1] == 0x49,
            buffer[position + 2] == 0x46, buffer[position + 3] == 0x46
@@ -251,8 +271,10 @@ struct DeepScanService: Sendable {
             if sub == "AVI " { return .avi }
             if sub == "WEBP" { return .webp }
         }
+        return nil
+    }
 
-        // Check ftyp-based formats (MP4, MOV, HEIC, HEIF, M4V, 3GP)
+    private func matchFtypSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
         if remaining >= 12 {
             let ftypStr = String(bytes: buffer[(position + 4) ..< (position + 8)], encoding: .ascii) ?? ""
             if ftypStr == "ftyp" {
@@ -275,7 +297,6 @@ struct DeepScanService: Sendable {
                 }
             }
         }
-
         return nil
     }
 }

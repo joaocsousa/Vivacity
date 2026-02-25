@@ -57,7 +57,6 @@ struct FastScanService: Sendable {
         //
         // Raw disk I/O (FAT directory table parsing, MFT scanning, byte carving)
         // is deferred to Deep Scan, which will request elevated access if needed.
-        // swiftlint:disable:next line_length
         logger.info("Fast scan on \(volumeInfo.filesystemType.displayName) — using filesystem-level scan (no raw disk access)")
 
         try await performFilesystemScan(device: device, continuation: continuation)
@@ -162,7 +161,6 @@ struct FastScanService: Sendable {
         continuation.finish()
     }
 
-    // swiftlint:disable:next function_body_length
     /// Discovers and scans APFS local snapshots for media files that may have been
     /// deleted from the live filesystem but still exist in a snapshot.
     private func scanAPFSSnapshots(
@@ -171,27 +169,7 @@ struct FastScanService: Sendable {
         filesFound: inout Int,
         filesExamined: inout Int
     ) async throws {
-        let fm = FileManager.default
-
-        // List local snapshots using tmutil
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/tmutil")
-        process.arguments = ["listlocalsnapshots", volumeRoot.path]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe() // Suppress stderr
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            logger.info("tmutil not available or failed: \(error.localizedDescription)")
-            return
-        }
-
-        let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: outputData, encoding: .utf8) else { return }
+        guard let output = runTMUtil(volumeRoot: volumeRoot) else { return }
 
         // Parse snapshot names (format: "com.apple.TimeMachine.YYYY-MM-DD-HHMMSS.local")
         let snapshotNames = output.components(separatedBy: "\n")
@@ -210,81 +188,119 @@ struct FastScanService: Sendable {
         let recentSnapshots = snapshotNames.suffix(3)
 
         for snapshotName in recentSnapshots {
-            try Task.checkCancellation()
+            try await scanSingleSnapshot(
+                snapshotName: snapshotName,
+                volumeRoot: volumeRoot,
+                continuation: continuation,
+                filesFound: &filesFound,
+                filesExamined: &filesExamined
+            )
+        }
+    }
 
-            // Mount the snapshot read-only
-            let mountPoint = fm.temporaryDirectory.appendingPathComponent("vivacity_snapshot_\(UUID().uuidString)")
-            try? fm.createDirectory(at: mountPoint, withIntermediateDirectories: true)
+    private func runTMUtil(volumeRoot: URL) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tmutil")
+        process.arguments = ["listlocalsnapshots", volumeRoot.path]
 
-            let mountProcess = Process()
-            mountProcess.executableURL = URL(fileURLWithPath: "/sbin/mount_apfs")
-            mountProcess.arguments = ["-s", snapshotName, "-o", "rdonly", volumeRoot.path, mountPoint.path]
-            mountProcess.standardOutput = Pipe()
-            mountProcess.standardError = Pipe()
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe() // Suppress stderr
 
-            do {
-                try mountProcess.run()
-                mountProcess.waitUntilExit()
-            } catch {
-                logger.info("Failed to mount snapshot \(snapshotName): \(error.localizedDescription)")
-                try? fm.removeItem(at: mountPoint)
-                continue
-            }
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: outputData, encoding: .utf8)
+        } catch {
+            logger.info("tmutil not available or failed: \(error.localizedDescription)")
+            return nil
+        }
+    }
 
+    private func scanSingleSnapshot(
+        snapshotName: String,
+        volumeRoot: URL,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation,
+        filesFound: inout Int,
+        filesExamined: inout Int
+    ) async throws {
+        try Task.checkCancellation()
+        let fm = FileManager.default
+        let mountPoint = fm.temporaryDirectory.appendingPathComponent("vivacity_snapshot_\(UUID().uuidString)")
+        try? fm.createDirectory(at: mountPoint, withIntermediateDirectories: true)
+
+        let mountProcess = Process()
+        mountProcess.executableURL = URL(fileURLWithPath: "/sbin/mount_apfs")
+        mountProcess.arguments = ["-s", snapshotName, "-o", "rdonly", volumeRoot.path, mountPoint.path]
+        mountProcess.standardOutput = Pipe()
+        mountProcess.standardError = Pipe()
+
+        do {
+            try mountProcess.run()
+            mountProcess.waitUntilExit()
             guard mountProcess.terminationStatus == 0 else {
                 logger.info("mount_apfs returned non-zero for snapshot \(snapshotName)")
                 try? fm.removeItem(at: mountPoint)
-                continue
+                return
             }
+        } catch {
+            logger.info("Failed to mount snapshot \(snapshotName): \(error.localizedDescription)")
+            try? fm.removeItem(at: mountPoint)
+            return
+        }
 
-            logger.info("Mounted snapshot \(snapshotName) at \(mountPoint.path)")
+        logger.info("Mounted snapshot \(snapshotName) at \(mountPoint.path)")
+        await enumerateSnapshot(mountPoint: mountPoint, volumeRoot: volumeRoot, continuation: continuation,
+                                filesFound: &filesFound, filesExamined: &filesExamined)
 
-            // Scan the mounted snapshot for media files
-            // These are files that existed at the time of the snapshot but may no longer exist on the live filesystem
-            if let enumerator = fm.enumerator(
-                at: mountPoint,
-                includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
-                options: [.skipsPackageDescendants, .skipsHiddenFiles]
-            ) {
-                for case let fileURL as URL in enumerator {
-                    try Task.checkCancellation()
+        let unmountProcess = Process()
+        unmountProcess.executableURL = URL(fileURLWithPath: "/sbin/umount")
+        unmountProcess.arguments = [mountPoint.path]
+        unmountProcess.standardOutput = Pipe()
+        unmountProcess.standardError = Pipe()
+        try? unmountProcess.run()
+        unmountProcess.waitUntilExit()
 
-                    let ext = fileURL.pathExtension.lowercased()
-                    guard Self.supportedExtensions.contains(ext) else { continue }
+        try? fm.removeItem(at: mountPoint)
+    }
 
-                    // Check if the corresponding file still exists on the live filesystem
-                    let relativePath = fileURL.path.replacingOccurrences(of: mountPoint.path, with: "")
-                    let liveURL = volumeRoot.appendingPathComponent(relativePath)
+    private func enumerateSnapshot(
+        mountPoint: URL,
+        volumeRoot: URL,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation,
+        filesFound: inout Int,
+        filesExamined: inout Int
+    ) async {
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(
+            at: mountPoint,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+            options: [.skipsPackageDescendants, .skipsHiddenFiles]
+        ) else { return }
 
-                    // Only report if the file does NOT exist on the live filesystem (i.e., it was deleted)
-                    if !fm.fileExists(atPath: liveURL.path) {
-                        filesExamined += 1
+        for case let fileURL as URL in enumerator {
+            guard !Task.isCancelled else { break }
 
-                        if let file = examineFile(at: fileURL, source: .fastScan) {
-                            filesFound += 1
-                            continuation.yield(.fileFound(file))
-                        }
-                    }
+            let ext = fileURL.pathExtension.lowercased()
+            guard Self.supportedExtensions.contains(ext) else { continue }
 
-                    if filesExamined % 100 == 0 {
-                        let progress = 0.50 + 0.40 * (1.0 - (1.0 / (1.0 + Double(filesExamined) / 1000.0)))
-                        continuation.yield(.progress(min(progress, 0.95)))
-                        await Task.yield()
-                    }
+            let relativePath = fileURL.path.replacingOccurrences(of: mountPoint.path, with: "")
+            let liveURL = volumeRoot.appendingPathComponent(relativePath)
+
+            if !fm.fileExists(atPath: liveURL.path) {
+                filesExamined += 1
+                if let file = examineFile(at: fileURL, source: .fastScan) {
+                    filesFound += 1
+                    continuation.yield(.fileFound(file))
                 }
             }
 
-            // Unmount the snapshot
-            let unmountProcess = Process()
-            unmountProcess.executableURL = URL(fileURLWithPath: "/sbin/umount")
-            unmountProcess.arguments = [mountPoint.path]
-            unmountProcess.standardOutput = Pipe()
-            unmountProcess.standardError = Pipe()
-            try? unmountProcess.run()
-            unmountProcess.waitUntilExit()
-
-            try? fm.removeItem(at: mountPoint)
-            logger.info("Unmounted snapshot \(snapshotName)")
+            if filesExamined % 100 == 0 {
+                let progress = 0.50 + 0.40 * (1.0 - (1.0 / (1.0 + Double(filesExamined) / 1000.0)))
+                continuation.yield(.progress(min(progress, 0.95)))
+                await Task.yield()
+            }
         }
     }
 

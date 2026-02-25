@@ -196,15 +196,12 @@ struct NTFSScanner: Sendable {
     }
 
     // MARK: - MFT Record Parsing
-
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     /// Parses a deleted MFT record to extract filename and verify data.
     private func parseDeletedRecord(
         record: [UInt8],
         boot: NTFSBoot,
         fd: Int32
     ) -> RecoverableFile? {
-        // First attribute offset is at record offset 20 (2 bytes, LE)
         let firstAttrOffset = Int(record[20]) | (Int(record[21]) << 8)
         guard firstAttrOffset >= 56, firstAttrOffset < record.count else { return nil }
 
@@ -214,8 +211,6 @@ struct NTFSScanner: Sendable {
         var dataRunCluster: UInt64?
 
         var offset = firstAttrOffset
-
-        // Walk attributes
         while offset + 4 < record.count {
             let attrType = UInt32(record[offset]) |
                 (UInt32(record[offset + 1]) << 8) |
@@ -224,71 +219,86 @@ struct NTFSScanner: Sendable {
 
             if attrType == Self.endMarker { break }
 
-            // Attribute length at offset+4 (4 bytes)
-            let attrLength = Int(record[offset + 4]) |
-                (Int(record[offset + 5]) << 8) |
-                (Int(record[offset + 6]) << 16) |
-                (Int(record[offset + 7]) << 24)
-
+            let attrLength = parseAttributeLength(record: record, offset: offset)
             guard attrLength > 0, offset + attrLength <= record.count else { break }
 
             if attrType == Self.filenameAttributeType {
-                // Parse filename attribute
-                let parsed = parseFilenameAttribute(record: record, attrOffset: offset)
-                if let parsed {
-                    // Prefer Win32 namespace (type 1 or 3) over DOS (type 2)
-                    if fileName == nil || parsed.namespace == 1 || parsed.namespace == 3 {
-                        fileName = parsed.name
-                        fileExtension = parsed.ext
-                    }
-                }
+                parseNameAttr(record: record, offset: offset, fileName: &fileName, fileExtension: &fileExtension)
             } else if attrType == Self.dataAttributeType {
-                // Parse data attribute for file size and data run
-                let isResident = record[offset + 8] == 0
-
-                if isResident {
-                    // Resident data — size at offset+16 (4 bytes)
-                    fileSize = Int64(record[offset + 16]) |
-                        (Int64(record[offset + 17]) << 8) |
-                        (Int64(record[offset + 18]) << 16) |
-                        (Int64(record[offset + 19]) << 24)
-                } else {
-                    // Non-resident — real size at offset+48 (8 bytes)
-                    if offset + 56 <= record.count {
-                        fileSize = 0
-                        for i in 0 ..< 8 {
-                            fileSize |= Int64(record[offset + 48 + i]) << (i * 8)
-                        }
-
-                        // Data run offset at offset+32 (2 bytes)
-                        let dataRunOffset = Int(record[offset + 32]) | (Int(record[offset + 33]) << 8)
-                        if dataRunOffset > 0, offset + dataRunOffset + 1 < record.count {
-                            dataRunCluster = parseFirstDataRun(record: record, runOffset: offset + dataRunOffset)
-                        }
-                    }
-                }
+                parseDataAttr(record: record, offset: offset, fileSize: &fileSize, dataRunCluster: &dataRunCluster)
             }
-
             offset += attrLength
         }
 
-        // Validate what we found
         guard let name = fileName, let ext = fileExtension else { return nil }
         guard fileSize > 0 else { return nil }
-
-        // Check if the extension matches a known signature
         guard let expectedSig = FileSignature.from(extension: ext) else { return nil }
 
-        // If we have a data run, verify magic bytes
-        if let cluster = dataRunCluster {
+        return buildRecoverableFile(
+            parsed: ParsedRecord(name: name, ext: ext, fileSize: fileSize, dataRunCluster: dataRunCluster),
+            expectedSig: expectedSig,
+            boot: boot,
+            fd: fd
+        )
+    }
+
+    private struct ParsedRecord {
+        let name: String
+        let ext: String
+        let fileSize: Int64
+        let dataRunCluster: UInt64?
+    }
+
+    private func parseAttributeLength(record: [UInt8], offset: Int) -> Int {
+        Int(record[offset + 4]) |
+            (Int(record[offset + 5]) << 8) |
+            (Int(record[offset + 6]) << 16) |
+            (Int(record[offset + 7]) << 24)
+    }
+
+    private func parseNameAttr(record: [UInt8], offset: Int, fileName: inout String?, fileExtension: inout String?) {
+        let parsed = parseFilenameAttribute(record: record, attrOffset: offset)
+        if let parsed {
+            if fileName == nil || parsed.namespace == 1 || parsed.namespace == 3 {
+                fileName = parsed.name
+                fileExtension = parsed.ext
+            }
+        }
+    }
+
+    private func parseDataAttr(record: [UInt8], offset: Int, fileSize: inout Int64, dataRunCluster: inout UInt64?) {
+        let isResident = record[offset + 8] == 0
+        if isResident {
+            fileSize = Int64(record[offset + 16]) |
+                (Int64(record[offset + 17]) << 8) |
+                (Int64(record[offset + 18]) << 16) |
+                (Int64(record[offset + 19]) << 24)
+        } else {
+            if offset + 56 <= record.count {
+                fileSize = 0
+                for i in 0 ..< 8 {
+                    fileSize |= Int64(record[offset + 48 + i]) << (i * 8)
+                }
+                let dataRunOffset = Int(record[offset + 32]) | (Int(record[offset + 33]) << 8)
+                if dataRunOffset > 0, offset + dataRunOffset + 1 < record.count {
+                    dataRunCluster = parseFirstDataRun(record: record, runOffset: offset + dataRunOffset)
+                }
+            }
+        }
+    }
+
+    private func buildRecoverableFile(
+        parsed: ParsedRecord,
+        expectedSig: FileSignature,
+        boot: NTFSBoot,
+        fd: Int32
+    ) -> RecoverableFile? {
+        if let cluster = parsed.dataRunCluster {
             let byteOffset = cluster * UInt64(boot.clusterSize)
             var header = [UInt8](repeating: 0, count: 16)
-            let bytesRead = header.withUnsafeMutableBytes { buf in
-                pread(fd, buf.baseAddress!, 16, off_t(byteOffset))
-            }
+            let bytesRead = header.withUnsafeMutableBytes { buf in pread(fd, buf.baseAddress!, 16, off_t(byteOffset)) }
             guard bytesRead == 16 else { return nil }
 
-            // Try expected signature first, then any match
             var matchedSig: FileSignature?
             if matchesSignature(header, signature: expectedSig) {
                 matchedSig = expectedSig
@@ -300,31 +310,17 @@ struct NTFSScanner: Sendable {
                     }
                 }
             }
-
             guard let sig = matchedSig else { return nil }
 
             return RecoverableFile(
-                id: UUID(),
-                fileName: name,
-                fileExtension: ext,
-                fileType: sig.category,
-                sizeInBytes: fileSize,
-                offsetOnDisk: byteOffset,
-                signatureMatch: sig,
-                source: .fastScan
+                id: UUID(), fileName: parsed.name, fileExtension: parsed.ext, fileType: sig.category,
+                sizeInBytes: parsed.fileSize, offsetOnDisk: byteOffset, signatureMatch: sig, source: .fastScan
             )
         }
 
-        // No data run — still report if extension is valid (resident small file)
         return RecoverableFile(
-            id: UUID(),
-            fileName: name,
-            fileExtension: ext,
-            fileType: expectedSig.category,
-            sizeInBytes: fileSize,
-            offsetOnDisk: 0,
-            signatureMatch: expectedSig,
-            source: .fastScan
+            id: UUID(), fileName: parsed.name, fileExtension: parsed.ext, fileType: expectedSig.category,
+            sizeInBytes: parsed.fileSize, offsetOnDisk: 0, signatureMatch: expectedSig, source: .fastScan
         )
     }
 

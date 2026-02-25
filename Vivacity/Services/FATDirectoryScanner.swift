@@ -41,45 +41,6 @@ struct FATDirectoryScanner: Sendable {
     /// FAT32 bad cluster marker.
     private static let fatBadCluster: UInt32 = 0x0FFF_FFF7
 
-    // MARK: - BPB (Boot Parameter Block)
-
-    /// Parsed FAT32 Boot Parameter Block with layout information.
-    private struct BPB {
-        let bytesPerSector: Int
-        let sectorsPerCluster: Int
-        let reservedSectors: Int
-        let numberOfFATs: Int
-        let sectorsPerFAT: Int
-        let rootCluster: UInt32
-        let totalSectors: UInt64
-
-        /// Bytes per cluster.
-        var clusterSize: Int {
-            bytesPerSector * sectorsPerCluster
-        }
-
-        /// Byte offset where the FAT table starts.
-        var fatOffset: Int {
-            reservedSectors * bytesPerSector
-        }
-
-        /// Size of one FAT table in bytes.
-        var fatSize: Int {
-            sectorsPerFAT * bytesPerSector
-        }
-
-        /// Byte offset where the data region starts.
-        var dataRegionOffset: Int {
-            (reservedSectors + numberOfFATs * sectorsPerFAT) * bytesPerSector
-        }
-
-        /// Converts a cluster number to its byte offset on disk.
-        func clusterOffset(_ cluster: UInt32) -> UInt64 {
-            // Clusters start at 2, so subtract 2
-            UInt64(dataRegionOffset) + UInt64(cluster - 2) * UInt64(clusterSize)
-        }
-    }
-
     // MARK: - Recovery Confidence
 
     /// How confident we are that a deleted file can be recovered.
@@ -91,7 +52,6 @@ struct FATDirectoryScanner: Sendable {
 
     // MARK: - Public API
 
-    // swiftlint:disable:next function_body_length
     /// Scans a FAT32 volume for deleted files by reading raw directory entries.
     ///
     /// - Parameters:
@@ -114,10 +74,8 @@ struct FATDirectoryScanner: Sendable {
 
         // Step 1: Parse the BPB
         let bpb = try parseBPB(fd: fd)
-        logger.info(
-            // swiftlint:disable:next line_length
-            "BPB: \(bpb.bytesPerSector) bytes/sector, \(bpb.sectorsPerCluster) sectors/cluster, root cluster \(bpb.rootCluster)"
-        )
+        // swiftlint:disable:next line_length
+        logger.info("BPB: \(bpb.bytesPerSector) bytes/sector, \(bpb.sectorsPerCluster) sectors/cluster, root cluster \(bpb.rootCluster)")
 
         // Step 2: Read the FAT table (first copy)
         let fat = try readFATTable(fd: fd, bpb: bpb)
@@ -148,57 +106,18 @@ struct FATDirectoryScanner: Sendable {
                     bpb: bpb
                 )
 
-                for entry in entries {
-                    if entry.isEndOfDirectory { break }
+                let result = processEntries(
+                    entries: entries,
+                    bpb: bpb,
+                    fat: fat,
+                    fd: fd,
+                    continuation: continuation
+                )
 
-                    // If this is a subdirectory (not deleted), queue it for scanning
-                    if entry.isSubdirectory, !entry.isDeleted, entry.startingCluster >= 2 {
-                        clustersToScan.append(entry.startingCluster)
-                    }
+                clustersToScan.append(contentsOf: result.newClusters)
+                filesFound += result.filesFoundDelta
 
-                    // We only care about deleted file entries
-                    guard entry.isDeleted, !entry.isSubdirectory, !entry.isVolumeLabel else {
-                        continue
-                    }
-
-                    // Skip if no valid starting cluster
-                    guard entry.startingCluster >= 2 else { continue }
-
-                    // Skip if file size is 0
-                    guard entry.fileSize > 0 else { continue }
-
-                    // Check cluster status in FAT
-                    let confidence = checkClusterStatus(
-                        cluster: entry.startingCluster,
-                        fat: fat
-                    )
-
-                    // Skip if clusters are in use (file has been overwritten)
-                    guard confidence != .low else { continue }
-
-                    // Verify magic bytes at the starting cluster
-                    let signature = verifyMagicBytes(
-                        fd: fd,
-                        cluster: entry.startingCluster,
-                        bpb: bpb,
-                        expectedExtension: entry.fileExtension
-                    )
-
-                    guard let sig = signature else { continue }
-
-                    filesFound += 1
-                    let file = RecoverableFile(
-                        id: UUID(),
-                        fileName: entry.fileName,
-                        fileExtension: entry.fileExtension,
-                        fileType: sig.category,
-                        sizeInBytes: Int64(entry.fileSize),
-                        offsetOnDisk: bpb.clusterOffset(entry.startingCluster),
-                        signatureMatch: sig,
-                        source: .fastScan
-                    )
-                    continuation.yield(.fileFound(file))
-                }
+                if result.endOfDir { break }
 
                 directoriesScanned += 1
 
@@ -224,9 +143,71 @@ struct FATDirectoryScanner: Sendable {
         }
 
         logger.info(
-            // swiftlint:disable:next line_length
             "FAT scan complete: \(filesFound) deleted file(s) found across \(directoriesScanned) directory cluster(s)"
         )
+    }
+
+    private struct ProcessResult {
+        let newClusters: [UInt32]
+        let filesFoundDelta: Int
+        let endOfDir: Bool
+    }
+
+    private func processEntries(
+        entries: [FATDirectoryEntry],
+        bpb: BPB,
+        fat: [UInt32],
+        fd: Int32,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
+    ) -> ProcessResult {
+        var newClusters: [UInt32] = []
+        var filesFoundDelta = 0
+        var endOfDir = false
+
+        for entry in entries {
+            if entry.isEndOfDirectory {
+                endOfDir = true
+                break
+            }
+
+            // If this is a subdirectory (not deleted), queue it for scanning
+            if entry.isSubdirectory, !entry.isDeleted, entry.startingCluster >= 2 {
+                newClusters.append(entry.startingCluster)
+            }
+
+            guard entry.isDeleted, !entry.isSubdirectory, !entry.isVolumeLabel else {
+                continue
+            }
+            guard entry.startingCluster >= 2 else { continue }
+            guard entry.fileSize > 0 else { continue }
+
+            let confidence = checkClusterStatus(cluster: entry.startingCluster, fat: fat)
+            guard confidence != .low else { continue }
+
+            let signature = verifyMagicBytes(
+                fd: fd,
+                cluster: entry.startingCluster,
+                bpb: bpb,
+                expectedExtension: entry.fileExtension
+            )
+
+            guard let sig = signature else { continue }
+
+            filesFoundDelta += 1
+            let file = RecoverableFile(
+                id: UUID(),
+                fileName: entry.fileName,
+                fileExtension: entry.fileExtension,
+                fileType: sig.category,
+                sizeInBytes: Int64(entry.fileSize),
+                offsetOnDisk: bpb.clusterOffset(entry.startingCluster),
+                signatureMatch: sig,
+                source: .fastScan
+            )
+            continuation.yield(.fileFound(file))
+        }
+
+        return ProcessResult(newClusters: newClusters, filesFoundDelta: filesFoundDelta, endOfDir: endOfDir)
     }
 
     // MARK: - BPB Parsing
@@ -313,21 +294,6 @@ struct FATDirectoryScanner: Sendable {
 
     // MARK: - Directory Entry Parsing
 
-    /// A parsed FAT32 directory entry with optional Long File Name.
-    private struct DirectoryEntry {
-        let rawBytes: [UInt8]
-        let isDeleted: Bool
-        let isEndOfDirectory: Bool
-        let isSubdirectory: Bool
-        let isVolumeLabel: Bool
-        /// The best available file name (LFN if available, otherwise 8.3).
-        let fileName: String
-        /// File extension from the 8.3 entry (lowercased).
-        let fileExtension: String
-        let startingCluster: UInt32
-        let fileSize: UInt32
-    }
-
     /// Reads all directory entries from a single cluster, reconstructing LFN names.
     ///
     /// FAT32 Long File Names work as follows:
@@ -339,7 +305,7 @@ struct FATDirectoryScanner: Sendable {
         fd: Int32,
         cluster: UInt32,
         bpb: BPB
-    ) throws -> [DirectoryEntry] {
+    ) throws -> [FATDirectoryEntry] {
         let offset = bpb.clusterOffset(cluster)
         let clusterSize = bpb.clusterSize
         var buffer = [UInt8](repeating: 0, count: clusterSize)
@@ -352,7 +318,7 @@ struct FATDirectoryScanner: Sendable {
         }
 
         let entryCount = clusterSize / Self.directoryEntrySize
-        var entries: [DirectoryEntry] = []
+        var entries: [FATDirectoryEntry] = []
 
         // Accumulate LFN segments as we encounter them
         var lfnSegments: [(order: Int, chars: [UInt16])] = []
@@ -365,7 +331,7 @@ struct FATDirectoryScanner: Sendable {
 
             // End of directory
             if firstByte == Self.endOfDirectory {
-                entries.append(DirectoryEntry(
+                entries.append(FATDirectoryEntry(
                     rawBytes: entryBytes,
                     isDeleted: false,
                     isEndOfDirectory: true,
@@ -428,7 +394,7 @@ struct FATDirectoryScanner: Sendable {
             let fileSize = UInt32(entryBytes[28]) | (UInt32(entryBytes[29]) << 8) |
                 (UInt32(entryBytes[30]) << 16) | (UInt32(entryBytes[31]) << 24)
 
-            entries.append(DirectoryEntry(
+            entries.append(FATDirectoryEntry(
                 rawBytes: entryBytes,
                 isDeleted: isDeleted,
                 isEndOfDirectory: false,
@@ -575,26 +541,6 @@ struct FATDirectoryScanner: Sendable {
             return ftyp == "ftyp"
         default:
             return true
-        }
-    }
-}
-
-// MARK: - Errors
-
-/// Errors specific to FAT32 directory scanning.
-enum FATScanError: LocalizedError {
-    case cannotOpenDevice(path: String, reason: String)
-    case invalidBootSector
-    case cannotReadFAT
-
-    var errorDescription: String? {
-        switch self {
-        case let .cannotOpenDevice(path, reason):
-            "Cannot open \(path): \(reason)"
-        case .invalidBootSector:
-            "Invalid FAT32 boot sector — this volume may not be FAT32 formatted."
-        case .cannotReadFAT:
-            "Failed to read the FAT table from the volume."
         }
     }
 }
