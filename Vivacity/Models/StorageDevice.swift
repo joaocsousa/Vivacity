@@ -12,6 +12,10 @@ struct StorageDevice: Identifiable, Hashable, Sendable {
     /// Mount-point URL for the volume (e.g. `/Volumes/MyDrive`).
     let volumePath: URL
 
+    /// Stable volume UUID — used to deduplicate APFS volumes that appear
+    /// at multiple mount points (e.g. `/` and `/System/Volumes/Data`).
+    let volumeUUID: String
+
     /// The filesystem type of the volume (e.g. APFS, HFS+, ExFAT, FAT32).
     let filesystemType: FilesystemType
 

@@ -250,6 +250,7 @@ private struct VideoPlayerPreview: View {
             id: "preview",
             name: "Samsung T7",
             volumePath: URL(fileURLWithPath: "/Volumes/USB"),
+            volumeUUID: "preview-samsung",
             filesystemType: .exfat,
             isExternal: true,
             totalCapacity: 2_000_000_000_000,

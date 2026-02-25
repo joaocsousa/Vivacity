@@ -46,6 +46,7 @@ struct DeviceService: Sendable {
             .volumeIsRemovableKey,
             .volumeIsInternalKey,
             .volumeIsReadOnlyKey,
+            .volumeUUIDStringKey,
         ]
 
         guard let volumeURLs = FileManager.default.mountedVolumeURLs(
@@ -63,6 +64,17 @@ struct DeviceService: Sendable {
             }
             devices.append(device)
         }
+
+        // Deduplicate by volume UUID — on APFS, `/` and `/System/Volumes/Data`
+        // share the same UUID. Keep only the first occurrence per UUID,
+        // preferring the internal-flagged entry (i.e. the real mount point).
+        var seen = Set<String>()
+        devices = devices
+            .sorted { !$0.isExternal && $1.isExternal } // internal first for stable dedup
+            .filter { device in
+                guard seen.insert(device.volumeUUID).inserted else { return false }
+                return true
+            }
 
         // Sort: external first, then alphabetical by name.
         devices.sort { lhs, rhs in
@@ -139,10 +151,13 @@ struct DeviceService: Sendable {
         let totalCapacity = Int64(resourceValues.volumeTotalCapacity ?? 0)
         let availableCapacity = Int64(resourceValues.volumeAvailableCapacity ?? 0)
 
+        let uuid = resourceValues.volumeUUIDString ?? url.absoluteString
+
         let volumeInfo = VolumeInfo.detect(for: StorageDevice(
             id: url.absoluteString,
             name: name,
             volumePath: url,
+            volumeUUID: uuid,
             filesystemType: .other,  // temp
             isExternal: isExternal,
             totalCapacity: totalCapacity,
@@ -153,6 +168,7 @@ struct DeviceService: Sendable {
             id: url.absoluteString,
             name: name,
             volumePath: url,
+            volumeUUID: uuid,
             filesystemType: volumeInfo.filesystemType,
             isExternal: isExternal,
             totalCapacity: totalCapacity,
