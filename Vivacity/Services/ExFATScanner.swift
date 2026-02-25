@@ -17,7 +17,6 @@ import os
 ///
 /// The rest of the entry content remains intact.
 struct ExFATScanner: Sendable {
-
     private let logger = Logger(subsystem: "com.vivacity.app", category: "ExFATScanner")
 
     // MARK: - ExFAT Constants
@@ -51,15 +50,17 @@ struct ExFATScanner: Sendable {
     private struct ExFATBoot {
         let bytesPerSector: Int
         let sectorsPerCluster: Int
-        let clusterHeapOffset: UInt32  // Sector offset of cluster 2
+        let clusterHeapOffset: UInt32 // Sector offset of cluster 2
         let rootDirCluster: UInt32
         let totalClusters: UInt32
 
-        var clusterSize: Int { bytesPerSector * sectorsPerCluster }
+        var clusterSize: Int {
+            bytesPerSector * sectorsPerCluster
+        }
 
         func clusterOffset(_ cluster: UInt32) -> UInt64 {
             UInt64(clusterHeapOffset) * UInt64(bytesPerSector) +
-            UInt64(cluster - 2) * UInt64(clusterSize)
+                UInt64(cluster - 2) * UInt64(clusterSize)
         }
     }
 
@@ -83,7 +84,10 @@ struct ExFATScanner: Sendable {
 
         // Step 1: Parse boot sector
         let boot = try parseBootSector(fd: fd)
-        logger.info("ExFAT boot: \(boot.bytesPerSector) bytes/sector, \(boot.sectorsPerCluster) sectors/cluster, root cluster \(boot.rootDirCluster)")
+        logger.info(
+            // swiftlint:disable:next line_length
+            "ExFAT boot: \(boot.bytesPerSector) bytes/sector, \(boot.sectorsPerCluster) sectors/cluster, root cluster \(boot.rootDirCluster)"
+        )
 
         // Step 2: Scan directory tree starting from root
         var filesFound = 0
@@ -141,7 +145,7 @@ struct ExFATScanner: Sendable {
         }
 
         // Verify ExFAT signature at offset 3: "EXFAT   "
-        let sig = String(bytes: sector[3..<11], encoding: .ascii)?.trimmingCharacters(in: .whitespaces) ?? ""
+        let sig = String(bytes: sector[3 ..< 11], encoding: .ascii)?.trimmingCharacters(in: .whitespaces) ?? ""
         guard sig == "EXFAT" else {
             throw ExFATScanError.invalidBootSector
         }
@@ -156,17 +160,17 @@ struct ExFATScanner: Sendable {
 
         // Cluster heap offset at offset 88 (4 bytes)
         let heapOffset = UInt32(sector[88]) | (UInt32(sector[89]) << 8) |
-                         (UInt32(sector[90]) << 16) | (UInt32(sector[91]) << 24)
+            (UInt32(sector[90]) << 16) | (UInt32(sector[91]) << 24)
 
         // Root directory cluster at offset 96 (4 bytes)
         let rootCluster = UInt32(sector[96]) | (UInt32(sector[97]) << 8) |
-                          (UInt32(sector[98]) << 16) | (UInt32(sector[99]) << 24)
+            (UInt32(sector[98]) << 16) | (UInt32(sector[99]) << 24)
 
         // Total clusters at offset 92 (4 bytes)
         let totalClusters = UInt32(sector[92]) | (UInt32(sector[93]) << 8) |
-                            (UInt32(sector[94]) << 16) | (UInt32(sector[95]) << 24)
+            (UInt32(sector[94]) << 16) | (UInt32(sector[95]) << 24)
 
-        guard bytesPerSector > 0 && sectorsPerCluster > 0 else {
+        guard bytesPerSector > 0, sectorsPerCluster > 0 else {
             throw ExFATScanError.invalidBootSector
         }
 
@@ -216,7 +220,7 @@ struct ExFATScanner: Sendable {
                 let secondaryCount = Int(buffer[entryOffset + 1])
 
                 // We need at least a stream extension and a file name entry
-                guard secondaryCount >= 2 && i + secondaryCount < entryCount else {
+                guard secondaryCount >= 2, i + secondaryCount < entryCount else {
                     i += 1
                     continue
                 }
@@ -242,14 +246,14 @@ struct ExFATScanner: Sendable {
                 let isDir = attrs & 0x10 != 0
                 let secondaryCount = Int(buffer[entryOffset + 1])
 
-                if isDir && secondaryCount >= 2 && i + 1 < entryCount {
+                if isDir, secondaryCount >= 2, i + 1 < entryCount {
                     // Stream extension is the next entry
                     let streamOffset = (i + 1) * Self.entrySize
                     if buffer[streamOffset] == Self.streamExtType {
                         let dirCluster = UInt32(buffer[streamOffset + 20]) |
-                                         (UInt32(buffer[streamOffset + 21]) << 8) |
-                                         (UInt32(buffer[streamOffset + 22]) << 16) |
-                                         (UInt32(buffer[streamOffset + 23]) << 24)
+                            (UInt32(buffer[streamOffset + 21]) << 8) |
+                            (UInt32(buffer[streamOffset + 22]) << 16) |
+                            (UInt32(buffer[streamOffset + 23]) << 24)
                         if dirCluster >= 2 {
                             results.subdirectories.append(dirCluster)
                         }
@@ -278,7 +282,7 @@ struct ExFATScanner: Sendable {
         var fileSize: Int64 = 0
         var fileName = ""
 
-        for j in 1...secondaryCount {
+        for j in 1 ... secondaryCount {
             let offset = (startIndex + j) * Self.entrySize
             guard offset + Self.entrySize <= buffer.count else { break }
 
@@ -287,12 +291,12 @@ struct ExFATScanner: Sendable {
             if type == Self.deletedStreamExtType {
                 // Stream extension: starting cluster at offset 20, file size at offset 24
                 startingCluster = UInt32(buffer[offset + 20]) |
-                                  (UInt32(buffer[offset + 21]) << 8) |
-                                  (UInt32(buffer[offset + 22]) << 16) |
-                                  (UInt32(buffer[offset + 23]) << 24)
+                    (UInt32(buffer[offset + 21]) << 8) |
+                    (UInt32(buffer[offset + 22]) << 16) |
+                    (UInt32(buffer[offset + 23]) << 24)
 
                 fileSize = 0
-                for k in 0..<8 {
+                for k in 0 ..< 8 {
                     fileSize |= Int64(buffer[offset + 24 + k]) << (k * 8)
                 }
             } else if type == Self.deletedFileNameType {
@@ -312,7 +316,7 @@ struct ExFATScanner: Sendable {
             }
         }
 
-        guard !fileName.isEmpty && fileSize > 0 && startingCluster >= 2 else { return nil }
+        guard !fileName.isEmpty, fileSize > 0, startingCluster >= 2 else { return nil }
 
         let url = URL(fileURLWithPath: fileName)
         let name = url.deletingPathExtension().lastPathComponent
@@ -359,15 +363,15 @@ struct ExFATScanner: Sendable {
     private func matchesSignature(_ header: [UInt8], signature: FileSignature) -> Bool {
         let magic = signature.magicBytes
         guard header.count >= magic.count else { return false }
-        for i in 0..<magic.count {
+        for i in 0 ..< magic.count {
             if header[i] != magic[i] { return false }
         }
 
         if signature == .avi || signature == .webp {
             guard header.count >= 12 else { return true }
-            let sub = String(bytes: header[8..<12], encoding: .ascii) ?? ""
+            let sub = String(bytes: header[8 ..< 12], encoding: .ascii) ?? ""
             switch signature {
-            case .avi:  return sub == "AVI "
+            case .avi: return sub == "AVI "
             case .webp: return sub == "WEBP"
             default: break
             }
@@ -376,7 +380,7 @@ struct ExFATScanner: Sendable {
         switch signature {
         case .mp4, .mov, .heic, .heif, .m4v, .threeGP:
             guard header.count >= 8 else { return true }
-            let ftyp = String(bytes: header[4..<8], encoding: .ascii) ?? ""
+            let ftyp = String(bytes: header[4 ..< 8], encoding: .ascii) ?? ""
             return ftyp == "ftyp"
         default:
             return true
@@ -392,10 +396,10 @@ enum ExFATScanError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .cannotOpenDevice(let path, let reason):
-            return "Cannot open \(path): \(reason)"
+        case let .cannotOpenDevice(path, reason):
+            "Cannot open \(path): \(reason)"
         case .invalidBootSector:
-            return "Invalid ExFAT boot sector — this volume may not be ExFAT formatted."
+            "Invalid ExFAT boot sector — this volume may not be ExFAT formatted."
         }
     }
 }

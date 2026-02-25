@@ -1,6 +1,6 @@
 import Foundation
-import Security
 import os
+import Security
 
 /// Service that checks and requests disk access permissions for raw device I/O.
 ///
@@ -13,7 +13,6 @@ import os
 /// This service probes silently first. If access is denied, it uses
 /// `AuthorizationServices` to show the native macOS password dialog.
 struct PermissionService: Sendable {
-
     private static let logger = Logger(subsystem: "com.vivacity.app", category: "Permissions")
 
     /// Result of a permission check or request.
@@ -83,9 +82,9 @@ struct PermissionService: Sendable {
             }
 
             let flags: AuthorizationFlags = [
-                .interactionAllowed,  // Show the password dialog
-                .preAuthorize,        // Actually verify the password
-                .extendRights         // Extend existing rights
+                .interactionAllowed, // Show the password dialog
+                .preAuthorize, // Actually verify the password
+                .extendRights, // Extend existing rights
             ]
 
             status = AuthorizationCopyRights(auth, &rights, nil, flags, nil)

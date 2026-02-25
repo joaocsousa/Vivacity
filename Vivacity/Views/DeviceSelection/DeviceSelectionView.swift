@@ -2,7 +2,6 @@ import SwiftUI
 
 /// Screen that lists all available storage devices and lets the user select one to scan.
 struct DeviceSelectionView: View {
-
     @State private var viewModel = DeviceSelectionViewModel()
     @State private var navigationTarget: StorageDevice?
 
@@ -45,9 +44,8 @@ struct DeviceSelectionView: View {
 
 // MARK: - Subviews
 
-private extension DeviceSelectionView {
-
-    var header: some View {
+extension DeviceSelectionView {
+    private var header: some View {
         VStack(spacing: 6) {
             // Icon in a rounded-square background
             ZStack {
@@ -71,7 +69,7 @@ private extension DeviceSelectionView {
         }
     }
 
-    var deviceList: some View {
+    private var deviceList: some View {
         ZStack {
             if viewModel.isLoading {
                 VStack(spacing: 12) {
@@ -114,7 +112,7 @@ private extension DeviceSelectionView {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    var footer: some View {
+    private var footer: some View {
         HStack {
             Button {
                 Task { await viewModel.loadDevices() }

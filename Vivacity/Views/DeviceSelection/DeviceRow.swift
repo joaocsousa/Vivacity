@@ -4,7 +4,6 @@ import SwiftUI
 ///
 /// Styled as a card with rounded corners. Selected cards receive a blue border glow.
 struct DeviceRow: View {
-
     let device: StorageDevice
     let isSelected: Bool
 
@@ -57,9 +56,12 @@ struct DeviceRow: View {
                     .frame(height: 6)
 
                 // Capacity text
-                Text("\(device.formattedAvailable) available of \(device.formattedTotal) · \(Int(device.usageFraction * 100))% used")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                Text(
+                    "\(device.formattedAvailable) available of " +
+                        "\(device.formattedTotal) · \(Int(device.usageFraction * 100))% used"
+                )
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -98,14 +100,13 @@ struct DeviceRow: View {
 
 /// A small progress bar showing volume usage.
 private struct CapacityBar: View {
-
     let fraction: Double
 
     private var barColor: Color {
         switch fraction {
-        case 0..<0.7:  return .green
-        case 0.7..<0.9: return .yellow
-        default:        return .red
+        case 0 ..< 0.7: .green
+        case 0.7 ..< 0.9: .yellow
+        default: .red
         }
     }
 

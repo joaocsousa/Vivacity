@@ -2,7 +2,6 @@ import Foundation
 
 /// Represents a mounted storage device (volume) that can be scanned for recoverable files.
 struct StorageDevice: Identifiable, Hashable, Sendable {
-
     /// Unique identifier — uses the volume URL's absolute string.
     let id: String
 

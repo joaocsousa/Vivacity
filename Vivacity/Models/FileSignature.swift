@@ -15,7 +15,6 @@ enum FileCategory: String, Sendable, CaseIterable, Codable {
 /// Each case carries a file extension, the starting magic-byte sequence, and the broad
 /// category (image or video). Used by both `FastScanService` and `DeepScanService`.
 enum FileSignature: String, Sendable, CaseIterable, Codable {
-
     // Images
     case jpeg
     case png
@@ -46,27 +45,27 @@ enum FileSignature: String, Sendable, CaseIterable, Codable {
     /// The file extension (without leading dot).
     var fileExtension: String {
         switch self {
-        case .jpeg:            return "jpg"
-        case .png:             return "png"
-        case .heic:            return "heic"
-        case .heif:            return "heif"
-        case .tiff:            return "tiff"
-        case .tiffBigEndian:   return "tiff"
-        case .bmp:             return "bmp"
-        case .gif:             return "gif"
-        case .webp:            return "webp"
-        case .cr2:             return "cr2"
-        case .nef:             return "nef"
-        case .arw:             return "arw"
-        case .dng:             return "dng"
-        case .mp4:             return "mp4"
-        case .mov:             return "mov"
-        case .avi:             return "avi"
-        case .mkv:             return "mkv"
-        case .m4v:             return "m4v"
-        case .wmv:             return "wmv"
-        case .flv:             return "flv"
-        case .threeGP:         return "3gp"
+        case .jpeg: "jpg"
+        case .png: "png"
+        case .heic: "heic"
+        case .heif: "heif"
+        case .tiff: "tiff"
+        case .tiffBigEndian: "tiff"
+        case .bmp: "bmp"
+        case .gif: "gif"
+        case .webp: "webp"
+        case .cr2: "cr2"
+        case .nef: "nef"
+        case .arw: "arw"
+        case .dng: "dng"
+        case .mp4: "mp4"
+        case .mov: "mov"
+        case .avi: "avi"
+        case .mkv: "mkv"
+        case .m4v: "m4v"
+        case .wmv: "wmv"
+        case .flv: "flv"
+        case .threeGP: "3gp"
         }
     }
 
@@ -76,27 +75,27 @@ enum FileSignature: String, Sendable, CaseIterable, Codable {
     /// we match the common prefix here and refine by the brand string when needed.
     var magicBytes: [UInt8] {
         switch self {
-        case .jpeg:            return [0xFF, 0xD8, 0xFF]
-        case .png:             return [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
-        case .heic:            return [0x00, 0x00, 0x00] // ftyp at offset 4; brand "heic"
-        case .heif:            return [0x00, 0x00, 0x00] // ftyp at offset 4; brand "mif1"
-        case .tiff:            return [0x49, 0x49, 0x2A, 0x00] // Little-endian
-        case .tiffBigEndian:   return [0x4D, 0x4D, 0x00, 0x2A] // Big-endian
-        case .bmp:             return [0x42, 0x4D]
-        case .gif:             return [0x47, 0x49, 0x46, 0x38]
-        case .webp:            return [0x52, 0x49, 0x46, 0x46] // "RIFF", followed by "WEBP" at offset 8
-        case .cr2:             return [0x49, 0x49, 0x2A, 0x00] // Same TIFF header; CR2 has "CR" at offset 8
-        case .nef:             return [0x4D, 0x4D, 0x00, 0x2A] // Big-endian TIFF; Nikon-specific IFD
-        case .arw:             return [0x49, 0x49, 0x2A, 0x00] // TIFF-based; Sony-specific
-        case .dng:             return [0x49, 0x49, 0x2A, 0x00] // TIFF-based; Adobe DNG
-        case .mp4:             return [0x00, 0x00, 0x00] // ftyp at offset 4; brand "isom"/"mp4"
-        case .mov:             return [0x00, 0x00, 0x00] // ftyp at offset 4; brand "qt  "
-        case .avi:             return [0x52, 0x49, 0x46, 0x46] // "RIFF", followed by "AVI " at offset 8
-        case .mkv:             return [0x1A, 0x45, 0xDF, 0xA3]
-        case .m4v:             return [0x00, 0x00, 0x00] // ftyp at offset 4; brand "M4V "
-        case .wmv:             return [0x30, 0x26, 0xB2, 0x75]
-        case .flv:             return [0x46, 0x4C, 0x56, 0x01]
-        case .threeGP:         return [0x00, 0x00, 0x00] // ftyp at offset 4; brand "3gp"
+        case .jpeg: [0xFF, 0xD8, 0xFF]
+        case .png: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+        case .heic: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "heic"
+        case .heif: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "mif1"
+        case .tiff: [0x49, 0x49, 0x2A, 0x00] // Little-endian
+        case .tiffBigEndian: [0x4D, 0x4D, 0x00, 0x2A] // Big-endian
+        case .bmp: [0x42, 0x4D]
+        case .gif: [0x47, 0x49, 0x46, 0x38]
+        case .webp: [0x52, 0x49, 0x46, 0x46] // "RIFF", followed by "WEBP" at offset 8
+        case .cr2: [0x49, 0x49, 0x2A, 0x00] // Same TIFF header; CR2 has "CR" at offset 8
+        case .nef: [0x4D, 0x4D, 0x00, 0x2A] // Big-endian TIFF; Nikon-specific IFD
+        case .arw: [0x49, 0x49, 0x2A, 0x00] // TIFF-based; Sony-specific
+        case .dng: [0x49, 0x49, 0x2A, 0x00] // TIFF-based; Adobe DNG
+        case .mp4: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "isom"/"mp4"
+        case .mov: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "qt  "
+        case .avi: [0x52, 0x49, 0x46, 0x46] // "RIFF", followed by "AVI " at offset 8
+        case .mkv: [0x1A, 0x45, 0xDF, 0xA3]
+        case .m4v: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "M4V "
+        case .wmv: [0x30, 0x26, 0xB2, 0x75]
+        case .flv: [0x46, 0x4C, 0x56, 0x01]
+        case .threeGP: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "3gp"
         }
     }
 
@@ -105,9 +104,9 @@ enum FileSignature: String, Sendable, CaseIterable, Codable {
         switch self {
         case .jpeg, .png, .heic, .heif, .tiff, .tiffBigEndian,
              .bmp, .gif, .webp, .cr2, .nef, .arw, .dng:
-            return .image
+            .image
         case .mp4, .mov, .avi, .mkv, .m4v, .wmv, .flv, .threeGP:
-            return .video
+            .video
         }
     }
 

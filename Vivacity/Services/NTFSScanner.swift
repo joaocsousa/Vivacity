@@ -18,7 +18,6 @@ import os
 /// 4. Seek to the data run and verify magic bytes
 /// 5. Emit `RecoverableFile` for validated matches
 struct NTFSScanner: Sendable {
-
     private let logger = Logger(subsystem: "com.vivacity.app", category: "NTFSScanner")
 
     // MARK: - NTFS Constants
@@ -33,13 +32,13 @@ struct NTFSScanner: Sendable {
     private static let mftDirectoryFlag: UInt16 = 0x0002
 
     /// Filename attribute type ID.
-    private static let filenameAttributeType: UInt32 = 0x00000030
+    private static let filenameAttributeType: UInt32 = 0x0000_0030
 
     /// Data attribute type ID.
-    private static let dataAttributeType: UInt32 = 0x00000080
+    private static let dataAttributeType: UInt32 = 0x0000_0080
 
     /// End-of-attributes marker.
-    private static let endMarker: UInt32 = 0xFFFFFFFF
+    private static let endMarker: UInt32 = 0xFFFF_FFFF
 
     // MARK: - Boot Sector
 
@@ -51,7 +50,9 @@ struct NTFSScanner: Sendable {
         let mftRecordSize: Int
 
         /// Bytes per cluster.
-        var clusterSize: Int { bytesPerSector * sectorsPerCluster }
+        var clusterSize: Int {
+            bytesPerSector * sectorsPerCluster
+        }
 
         /// Byte offset of the $MFT on disk.
         var mftOffset: UInt64 {
@@ -79,7 +80,10 @@ struct NTFSScanner: Sendable {
 
         // Step 1: Parse the boot sector
         let boot = try parseBootSector(fd: fd)
-        logger.info("NTFS boot: \(boot.bytesPerSector) bytes/sector, \(boot.sectorsPerCluster) sectors/cluster, MFT at cluster \(boot.mftClusterNumber), record size \(boot.mftRecordSize)")
+        logger.info(
+            // swiftlint:disable:next line_length
+            "NTFS boot: \(boot.bytesPerSector) bytes/sector, \(boot.sectorsPerCluster) sectors/cluster, MFT at cluster \(boot.mftClusterNumber), record size \(boot.mftRecordSize)"
+        )
 
         // Step 2: Read MFT records
         var filesFound = 0
@@ -88,7 +92,7 @@ struct NTFSScanner: Sendable {
 
         var recordBuffer = [UInt8](repeating: 0, count: boot.mftRecordSize)
 
-        for recordIndex in 0..<maxRecords {
+        for recordIndex in 0 ..< maxRecords {
             try Task.checkCancellation()
 
             let recordOffset = boot.mftOffset + UInt64(recordIndex) * UInt64(boot.mftRecordSize)
@@ -102,9 +106,10 @@ struct NTFSScanner: Sendable {
 
             // Verify "FILE" signature
             guard recordBuffer[0] == Self.fileSignature[0] &&
-                  recordBuffer[1] == Self.fileSignature[1] &&
-                  recordBuffer[2] == Self.fileSignature[2] &&
-                  recordBuffer[3] == Self.fileSignature[3] else {
+                recordBuffer[1] == Self.fileSignature[1] &&
+                recordBuffer[2] == Self.fileSignature[2] &&
+                recordBuffer[3] == Self.fileSignature[3]
+            else {
                 // Not a valid MFT record — might be end of MFT
                 // Try a few more before giving up
                 if recordsScanned > 100 { break }
@@ -155,7 +160,7 @@ struct NTFSScanner: Sendable {
         }
 
         // Verify NTFS OEM ID at offset 3: "NTFS    "
-        let oemID = String(bytes: sector[3..<11], encoding: .ascii)?.trimmingCharacters(in: .whitespaces) ?? ""
+        let oemID = String(bytes: sector[3 ..< 11], encoding: .ascii)?.trimmingCharacters(in: .whitespaces) ?? ""
         guard oemID == "NTFS" else {
             throw NTFSScanError.invalidBootSector
         }
@@ -165,21 +170,20 @@ struct NTFSScanner: Sendable {
 
         // MFT cluster number at offset 48 (8 bytes, little-endian)
         var mftCluster: UInt64 = 0
-        for i in 0..<8 {
+        for i in 0 ..< 8 {
             mftCluster |= UInt64(sector[48 + i]) << (i * 8)
         }
 
         // MFT record size: stored at offset 64 as a signed byte
         // If positive: clusters per record. If negative: 2^|value| bytes per record.
         let rawRecordSize = Int8(bitPattern: sector[64])
-        let mftRecordSize: Int
-        if rawRecordSize > 0 {
-            mftRecordSize = Int(rawRecordSize) * bytesPerSector * sectorsPerCluster
+        let mftRecordSize = if rawRecordSize > 0 {
+            Int(rawRecordSize) * bytesPerSector * sectorsPerCluster
         } else {
-            mftRecordSize = 1 << abs(Int(rawRecordSize))
+            1 << abs(Int(rawRecordSize))
         }
 
-        guard bytesPerSector > 0 && sectorsPerCluster > 0 && mftRecordSize > 0 else {
+        guard bytesPerSector > 0, sectorsPerCluster > 0, mftRecordSize > 0 else {
             throw NTFSScanError.invalidBootSector
         }
 
@@ -193,6 +197,7 @@ struct NTFSScanner: Sendable {
 
     // MARK: - MFT Record Parsing
 
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     /// Parses a deleted MFT record to extract filename and verify data.
     private func parseDeletedRecord(
         record: [UInt8],
@@ -201,7 +206,7 @@ struct NTFSScanner: Sendable {
     ) -> RecoverableFile? {
         // First attribute offset is at record offset 20 (2 bytes, LE)
         let firstAttrOffset = Int(record[20]) | (Int(record[21]) << 8)
-        guard firstAttrOffset >= 56 && firstAttrOffset < record.count else { return nil }
+        guard firstAttrOffset >= 56, firstAttrOffset < record.count else { return nil }
 
         var fileName: String?
         var fileExtension: String?
@@ -213,19 +218,19 @@ struct NTFSScanner: Sendable {
         // Walk attributes
         while offset + 4 < record.count {
             let attrType = UInt32(record[offset]) |
-                           (UInt32(record[offset + 1]) << 8) |
-                           (UInt32(record[offset + 2]) << 16) |
-                           (UInt32(record[offset + 3]) << 24)
+                (UInt32(record[offset + 1]) << 8) |
+                (UInt32(record[offset + 2]) << 16) |
+                (UInt32(record[offset + 3]) << 24)
 
             if attrType == Self.endMarker { break }
 
             // Attribute length at offset+4 (4 bytes)
             let attrLength = Int(record[offset + 4]) |
-                             (Int(record[offset + 5]) << 8) |
-                             (Int(record[offset + 6]) << 16) |
-                             (Int(record[offset + 7]) << 24)
+                (Int(record[offset + 5]) << 8) |
+                (Int(record[offset + 6]) << 16) |
+                (Int(record[offset + 7]) << 24)
 
-            guard attrLength > 0 && offset + attrLength <= record.count else { break }
+            guard attrLength > 0, offset + attrLength <= record.count else { break }
 
             if attrType == Self.filenameAttributeType {
                 // Parse filename attribute
@@ -244,20 +249,20 @@ struct NTFSScanner: Sendable {
                 if isResident {
                     // Resident data — size at offset+16 (4 bytes)
                     fileSize = Int64(record[offset + 16]) |
-                               (Int64(record[offset + 17]) << 8) |
-                               (Int64(record[offset + 18]) << 16) |
-                               (Int64(record[offset + 19]) << 24)
+                        (Int64(record[offset + 17]) << 8) |
+                        (Int64(record[offset + 18]) << 16) |
+                        (Int64(record[offset + 19]) << 24)
                 } else {
                     // Non-resident — real size at offset+48 (8 bytes)
                     if offset + 56 <= record.count {
                         fileSize = 0
-                        for i in 0..<8 {
+                        for i in 0 ..< 8 {
                             fileSize |= Int64(record[offset + 48 + i]) << (i * 8)
                         }
 
                         // Data run offset at offset+32 (2 bytes)
                         let dataRunOffset = Int(record[offset + 32]) | (Int(record[offset + 33]) << 8)
-                        if dataRunOffset > 0 && offset + dataRunOffset + 1 < record.count {
+                        if dataRunOffset > 0, offset + dataRunOffset + 1 < record.count {
                             dataRunCluster = parseFirstDataRun(record: record, runOffset: offset + dataRunOffset)
                         }
                     }
@@ -353,7 +358,7 @@ struct NTFSScanner: Sendable {
         guard nameStart + nameLength * 2 <= record.count else { return nil }
 
         var utf16: [UInt16] = []
-        for i in 0..<nameLength {
+        for i in 0 ..< nameLength {
             let ch = UInt16(record[nameStart + i * 2]) | (UInt16(record[nameStart + i * 2 + 1]) << 8)
             utf16.append(ch)
         }
@@ -363,7 +368,7 @@ struct NTFSScanner: Sendable {
         let name = url.deletingPathExtension().lastPathComponent
         let ext = url.pathExtension.lowercased()
 
-        guard !name.isEmpty && !ext.isEmpty else { return nil }
+        guard !name.isEmpty, !ext.isEmpty else { return nil }
 
         return ParsedFilename(name: name, ext: ext, namespace: namespace)
     }
@@ -383,19 +388,19 @@ struct NTFSScanner: Sendable {
         let lengthBytes = Int(header & 0x0F)
         let offsetBytes = Int(header >> 4)
 
-        guard lengthBytes > 0 && offsetBytes > 0 else { return nil }
+        guard lengthBytes > 0, offsetBytes > 0 else { return nil }
         guard runOffset + 1 + lengthBytes + offsetBytes <= record.count else { return nil }
 
         // Skip length field, read offset field
         let offsetStart = runOffset + 1 + lengthBytes
         var cluster: Int64 = 0
-        for i in 0..<offsetBytes {
+        for i in 0 ..< offsetBytes {
             cluster |= Int64(record[offsetStart + i]) << (i * 8)
         }
 
         // Sign-extend if the highest bit is set
-        if offsetBytes > 0 && record[offsetStart + offsetBytes - 1] & 0x80 != 0 {
-            for i in offsetBytes..<8 {
+        if offsetBytes > 0, record[offsetStart + offsetBytes - 1] & 0x80 != 0 {
+            for i in offsetBytes ..< 8 {
                 cluster |= Int64(0xFF) << (i * 8)
             }
         }
@@ -408,15 +413,15 @@ struct NTFSScanner: Sendable {
     private func matchesSignature(_ header: [UInt8], signature: FileSignature) -> Bool {
         let magic = signature.magicBytes
         guard header.count >= magic.count else { return false }
-        for i in 0..<magic.count {
+        for i in 0 ..< magic.count {
             if header[i] != magic[i] { return false }
         }
 
         if signature == .avi || signature == .webp {
             guard header.count >= 12 else { return true }
-            let sub = String(bytes: header[8..<12], encoding: .ascii) ?? ""
+            let sub = String(bytes: header[8 ..< 12], encoding: .ascii) ?? ""
             switch signature {
-            case .avi:  return sub == "AVI "
+            case .avi: return sub == "AVI "
             case .webp: return sub == "WEBP"
             default: break
             }
@@ -425,7 +430,7 @@ struct NTFSScanner: Sendable {
         switch signature {
         case .mp4, .mov, .heic, .heif, .m4v, .threeGP:
             guard header.count >= 8 else { return true }
-            let ftyp = String(bytes: header[4..<8], encoding: .ascii) ?? ""
+            let ftyp = String(bytes: header[4 ..< 8], encoding: .ascii) ?? ""
             return ftyp == "ftyp"
         default:
             return true
@@ -441,10 +446,10 @@ enum NTFSScanError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .cannotOpenDevice(let path, let reason):
-            return "Cannot open \(path): \(reason)"
+        case let .cannotOpenDevice(path, reason):
+            "Cannot open \(path): \(reason)"
         case .invalidBootSector:
-            return "Invalid NTFS boot sector — this volume may not be NTFS formatted."
+            "Invalid NTFS boot sector — this volume may not be NTFS formatted."
         }
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
-import Security
 import os
+import Security
 
 /// Provides privileged read access to raw disk devices.
 ///
@@ -14,7 +14,6 @@ import os
 /// This approach works for Developer ID distribution and shows the
 /// standard macOS password dialog for authentication.
 final class PrivilegedDiskReader: @unchecked Sendable {
-
     private let devicePath: String
     private let logger = Logger(subsystem: "com.vivacity.app", category: "PrivilegedDiskReader")
 
@@ -54,14 +53,14 @@ final class PrivilegedDiskReader: @unchecked Sendable {
 
         // Save original permissions for later restoration
         var statBuf = Darwin.stat()
-        if stat(devicePath, &statBuf) == 0 {
+        if stat(self.devicePath, &statBuf) == 0 {
             originalPermissions = statBuf.st_mode
         }
 
         // Use osascript to temporarily add world-readable permission to the device.
         // This shows the standard macOS password dialog.
         // We use chmod o+r rather than changing ownership, as it's less invasive.
-        let script = "do shell script \"chmod o+r \(devicePath)\" with administrator privileges"
+        let script = "do shell script \"chmod o+r \(self.devicePath)\" with administrator privileges"
 
         let appleScript = NSAppleScript(source: script)
         var errorDict: NSDictionary?
@@ -77,7 +76,7 @@ final class PrivilegedDiskReader: @unchecked Sendable {
         logger.info("Temporarily granted read access to \(self.devicePath)")
 
         // Now try opening again
-        let newFd = open(devicePath, O_RDONLY)
+        let newFd = open(self.devicePath, O_RDONLY)
         guard newFd >= 0 else {
             let openErr = String(cString: strerror(errno))
             logger.error("Still cannot open \(self.devicePath) after chmod: \(openErr)")
@@ -118,7 +117,7 @@ final class PrivilegedDiskReader: @unchecked Sendable {
 
         // Use AppleScript to restore — no password dialog needed since
         // we're within the same authorization session.
-        let script = "do shell script \"chmod o-r \(devicePath)\" with administrator privileges"
+        let script = "do shell script \"chmod o-r \(self.devicePath)\" with administrator privileges"
         let appleScript = NSAppleScript(source: script)
         var errorDict: NSDictionary?
         appleScript?.executeAndReturnError(&errorDict)
@@ -139,8 +138,8 @@ enum PrivilegedReadError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .cannotStartReader(let reason):
-            return "Cannot access disk device: \(reason)"
+        case let .cannotStartReader(reason):
+            "Cannot access disk device: \(reason)"
         }
     }
 }

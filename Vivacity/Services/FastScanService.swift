@@ -14,13 +14,10 @@ import os
 ///
 /// Deep Scan (a separate service) handles the raw sector-by-sector physical search.
 struct FastScanService: Sendable {
-
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FastScan")
 
     /// Set of file extensions we care about (lowercased).
-    private static let supportedExtensions: Set<String> = {
-        Set(FileSignature.allCases.map(\.fileExtension))
-    }()
+    private static let supportedExtensions: Set<String> = Set(FileSignature.allCases.map(\.fileExtension))
 
     // MARK: - Public API
 
@@ -32,7 +29,7 @@ struct FastScanService: Sendable {
         AsyncThrowingStream { continuation in
             let task = Task.detached {
                 do {
-                    try await self.performScan(device: device, continuation: continuation)
+                    try await performScan(device: device, continuation: continuation)
                 } catch is CancellationError {
                     continuation.finish()
                 } catch {
@@ -60,6 +57,7 @@ struct FastScanService: Sendable {
         //
         // Raw disk I/O (FAT directory table parsing, MFT scanning, byte carving)
         // is deferred to Deep Scan, which will request elevated access if needed.
+        // swiftlint:disable:next line_length
         logger.info("Fast scan on \(volumeInfo.filesystemType.displayName) — using filesystem-level scan (no raw disk access)")
 
         try await performFilesystemScan(device: device, continuation: continuation)
@@ -164,6 +162,7 @@ struct FastScanService: Sendable {
         continuation.finish()
     }
 
+    // swiftlint:disable:next function_body_length
     /// Discovers and scans APFS local snapshots for media files that may have been
     /// deleted from the live filesystem but still exist in a snapshot.
     private func scanAPFSSnapshots(
@@ -303,7 +302,8 @@ struct FastScanService: Sendable {
 
         let headerSize = max(signature.magicBytes.count, 12) // Read enough for ftyp checks
         guard let headerData = try? fileHandle.read(upToCount: headerSize),
-              headerData.count >= signature.magicBytes.count else {
+              headerData.count >= signature.magicBytes.count
+        else {
             return nil
         }
 
@@ -312,12 +312,12 @@ struct FastScanService: Sendable {
         guard matchesSignature(headerBytes, signature: signature) else { return nil }
 
         // Get file size
-        let fileSize: Int64
-        if let resourceValues = try? url.resourceValues(forKeys: [.fileSizeKey]),
-           let size = resourceValues.fileSize {
-            fileSize = Int64(size)
+        let fileSize: Int64 = if let resourceValues = try? url.resourceValues(forKeys: [.fileSizeKey]),
+                                 let size = resourceValues.fileSize
+        {
+            Int64(size)
         } else {
-            fileSize = 0
+            0
         }
 
         let fileName = url.deletingPathExtension().lastPathComponent
@@ -340,16 +340,16 @@ struct FastScanService: Sendable {
 
         // Basic prefix check
         guard header.count >= magic.count else { return false }
-        for i in 0..<magic.count {
+        for i in 0 ..< magic.count {
             if header[i] != magic[i] { return false }
         }
 
         // For RIFF-based formats (AVI, WebP), check the sub-format at offset 8
         if signature == .avi || signature == .webp {
             guard header.count >= 12 else { return true }
-            let subType = String(bytes: header[8..<12], encoding: .ascii) ?? ""
+            let subType = String(bytes: header[8 ..< 12], encoding: .ascii) ?? ""
             switch signature {
-            case .avi:  return subType == "AVI "
+            case .avi: return subType == "AVI "
             case .webp: return subType == "WEBP"
             default: break
             }
@@ -359,7 +359,7 @@ struct FastScanService: Sendable {
         switch signature {
         case .mp4, .mov, .heic, .heif, .m4v, .threeGP:
             guard header.count >= 8 else { return true }
-            let ftypMarker = String(bytes: header[4..<8], encoding: .ascii) ?? ""
+            let ftypMarker = String(bytes: header[4 ..< 8], encoding: .ascii) ?? ""
             if ftypMarker != "ftyp" { return false }
             return true
         default:

@@ -8,7 +8,6 @@ import os
 @Observable
 @MainActor
 final class DeviceSelectionViewModel {
-
     // MARK: - Published State
 
     /// All discovered storage devices.
@@ -42,11 +41,11 @@ final class DeviceSelectionViewModel {
         errorMessage = nil
 
         do {
-            devices = try await deviceService.discoverDevices()
+            self.devices = try await deviceService.discoverDevices()
             logger.info("Discovered \(self.devices.count) device(s)")
 
             // Clear selection if the previously selected device is no longer available.
-            if let selected = selectedDevice, !devices.contains(selected) {
+            if let selected = selectedDevice, !self.devices.contains(selected) {
                 selectedDevice = nil
             }
         } catch {

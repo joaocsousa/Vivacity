@@ -6,7 +6,6 @@ import SwiftUI
 /// - "Try Again" — re-prompts the AuthorizationServices password dialog
 /// - "Continue with limited scan" — proceeds with Trash-only scanning
 struct PermissionDeniedView: View {
-
     let onTryAgain: () -> Void
     let onContinueLimited: () -> Void
 

@@ -24,7 +24,6 @@ enum ScanEvent: Sendable {
 
 /// A file on disk that can potentially be recovered.
 struct RecoverableFile: Identifiable, Hashable, Sendable {
-
     /// Unique identifier for this file.
     let id: UUID
 
