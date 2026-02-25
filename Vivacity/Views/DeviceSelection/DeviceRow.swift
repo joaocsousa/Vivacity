@@ -113,7 +113,7 @@ private struct CapacityBar: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.white.opacity(0.08))
+                    .fill(Color(.separatorColor).opacity(0.4))
 
                 RoundedRectangle(cornerRadius: 3)
                     .fill(barColor)
