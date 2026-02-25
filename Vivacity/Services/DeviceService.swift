@@ -62,6 +62,7 @@ struct DeviceService: Sendable {
             guard let device = try? storageDevice(from: url, keys: resourceKeys) else {
                 continue
             }
+            print("DISCOVERED: [\(device.name)] Ext:\(device.isExternal) UUID:\(device.volumeUUID) Path:\(device.volumePath.path)")
             devices.append(device)
         }
 

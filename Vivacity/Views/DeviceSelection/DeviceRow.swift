@@ -60,6 +60,11 @@ struct DeviceRow: View {
                 Text("\(device.formattedAvailable) available of \(device.formattedTotal) · \(Int(device.usageFraction * 100))% used")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                    
+                // DEBUG INFO
+                Text("Path: \(device.volumePath.path)\nUUID: \(device.volumeUUID)")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
             }
 
             Spacer()
