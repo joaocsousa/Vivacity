@@ -6,6 +6,16 @@
 
 ---
 
+## 🤖 AI Handoff Summary
+> **Welcome Codex (or next AI)!** Here's the current state of the project:
+> 
+> * **Just Completed**: Setup and full resolution of code quality tools (`SwiftLint`, `SwiftFormat`, `Xcode Static Analyzer`). The project has **0 warnings/violations** and builds perfectly. We also extracted deep scan loops into `ScanContext` chunks and refactored line lengths in the FS scanners.
+> * **Current Focus**: The app currently supports finding deleted files (Fast Scan) and carving magic bytes (Deep Scan), taking the user up to the preview screen. 
+> * **Next Up**: Your immediate assignment is **M4: Recovery Destination Screen (Tickets T-013 → T-015)**. This is missing and must be completed so the user can actually recover the found files.
+> * **After That**: See **M6: Scan Engine Hardening (T-019 → T-021)** to fix raw disk permissions and integrate the FAT/NTFS catalog scanners into the Fast Scan pipeline.
+
+---
+
 ## Milestones Overview
 
 | # | Milestone | Tickets | Status |
