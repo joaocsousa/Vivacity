@@ -136,6 +136,24 @@ struct DeviceService: Sendable {
             }
         }
 
+        // Ensure this is an actual mount point. macOS can fire didUnmountNotification
+        // while the volume is still unmounting, leaving a "zombie" directory in /Volumes.
+        // statfs reads the real filesystem mount point to filter these out.
+        var stat = statfs()
+        if statfs(path, &stat) == 0 {
+            let mountPoint = withUnsafePointer(to: stat.f_mntonname) { ptr in
+                ptr.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) { cString in
+                    String(cString: cString)
+                }
+            }
+            // `path` from URL usually drops trailing slashes unless it's `/`
+            if path != mountPoint && path != mountPoint + "/" {
+                return nil
+            }
+        } else {
+            return nil
+        }
+
         let resourceValues = try url.resourceValues(forKeys: keys)
 
         let name = resourceValues.volumeName ?? url.lastPathComponent
