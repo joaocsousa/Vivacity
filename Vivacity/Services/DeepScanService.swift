@@ -66,7 +66,14 @@ struct DeepScanService: Sendable {
 
     // MARK: - Scan Logic
 
-    // swiftlint:disable:next function_body_length
+    private struct ScanContext {
+        let buffer: [UInt8]
+        let scanLength: Int
+        let readOffset: Int
+        let bytesScanned: UInt64
+        let existingOffsets: Set<UInt64>
+    }
+
     private func performScan(
         device: StorageDevice,
         existingOffsets: Set<UInt64>,
@@ -124,54 +131,19 @@ struct DeepScanService: Sendable {
             guard bytesRead > 0 else { break }
 
             let scanLength = readOffset + bytesRead
+            let context = ScanContext(
+                buffer: buffer,
+                scanLength: scanLength,
+                readOffset: readOffset,
+                bytesScanned: bytesScanned,
+                existingOffsets: existingOffsets
+            )
 
-            // Scan the chunk for magic bytes
-            var i = 0
-            while i < scanLength - Self.maxSignatureLength {
-                let offset = bytesScanned + UInt64(i) - UInt64(readOffset)
-
-                // Skip if already found by fast scan
-                if existingOffsets.contains(offset) {
-                    i += Self.sectorSize
-                    continue
-                }
-
-                if let match = matchSignatureAt(buffer: buffer, position: i) {
-                    filesFound += 1
-
-                    var fileName = "recovered_\(String(format: "%04d", filesFound))"
-
-                    // Try to extract an EXIF date for better naming on photos
-                    if match.category == .image {
-                        let availableBytes = buffer.count - i
-                        let checkLength = min(availableBytes, 65536)
-                        let headerSlice = Array(buffer[i ..< i + checkLength])
-
-                        if let exifName = EXIFDateExtractor.extractFilenamePrefix(from: headerSlice) {
-                            fileName = "\(exifName)_\(String(format: "%04d", filesFound))"
-                        }
-                    }
-
-                    let file = RecoverableFile(
-                        id: UUID(),
-                        fileName: fileName,
-                        fileExtension: match.fileExtension,
-                        fileType: match.category,
-                        sizeInBytes: 0, // Unknown until we find the next header or EOF marker
-                        offsetOnDisk: offset,
-                        signatureMatch: match,
-                        source: .deepScan
-                    )
-                    continuation.yield(.fileFound(file))
-
-                    // Skip ahead past this header to avoid re-matching
-                    i += Self.sectorSize
-                    continue
-                }
-
-                // Move forward by sector alignment for efficiency
-                i += Self.sectorSize
-            }
+            scanChunk(
+                context: context,
+                filesFound: &filesFound,
+                continuation: continuation
+            )
 
             bytesScanned += UInt64(bytesRead)
 
@@ -198,6 +170,60 @@ struct DeepScanService: Sendable {
         logger.info("Deep scan complete: \(filesFound) file(s) found after scanning \(bytesScanned) bytes")
         continuation.yield(.completed)
         continuation.finish()
+    }
+
+    private func scanChunk(
+        context: ScanContext,
+        filesFound: inout Int,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
+    ) {
+        // Scan the chunk for magic bytes
+        var i = 0
+        while i < context.scanLength - Self.maxSignatureLength {
+            let offset = context.bytesScanned + UInt64(i) - UInt64(context.readOffset)
+
+            // Skip if already found by fast scan
+            if context.existingOffsets.contains(offset) {
+                i += Self.sectorSize
+                continue
+            }
+
+            if let match = matchSignatureAt(buffer: context.buffer, position: i) {
+                filesFound += 1
+
+                var fileName = "recovered_\(String(format: "%04d", filesFound))"
+
+                // Try to extract an EXIF date for better naming on photos
+                if match.category == .image {
+                    let availableBytes = context.buffer.count - i
+                    let checkLength = min(availableBytes, 65536)
+                    let headerSlice = Array(context.buffer[i ..< i + checkLength])
+
+                    if let exifName = EXIFDateExtractor.extractFilenamePrefix(from: headerSlice) {
+                        fileName = "\(exifName)_\(String(format: "%04d", filesFound))"
+                    }
+                }
+
+                let file = RecoverableFile(
+                    id: UUID(),
+                    fileName: fileName,
+                    fileExtension: match.fileExtension,
+                    fileType: match.category,
+                    sizeInBytes: 0, // Unknown until we find the next header or EOF marker
+                    offsetOnDisk: offset,
+                    signatureMatch: match,
+                    source: .deepScan
+                )
+                continuation.yield(.fileFound(file))
+
+                // Skip ahead past this header to avoid re-matching
+                i += Self.sectorSize
+                continue
+            }
+
+            // Move forward by sector alignment for efficiency
+            i += Self.sectorSize
+        }
     }
 
     // MARK: - Signature Matching

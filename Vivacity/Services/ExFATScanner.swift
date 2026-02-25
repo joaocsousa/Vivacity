@@ -85,8 +85,11 @@ struct ExFATScanner: Sendable {
         // Step 1: Parse boot sector
         let boot = try parseBootSector(fd: fd)
         logger.info(
-            // swiftlint:disable:next line_length
-            "ExFAT boot: \(boot.bytesPerSector) bytes/sector, \(boot.sectorsPerCluster) sectors/cluster, root cluster \(boot.rootDirCluster)"
+            """
+            ExFAT boot: \(boot.bytesPerSector) bytes/sector, \
+            \(boot.sectorsPerCluster) sectors/cluster, \
+            root cluster \(boot.rootDirCluster)
+            """
         )
 
         // Step 2: Scan directory tree starting from root

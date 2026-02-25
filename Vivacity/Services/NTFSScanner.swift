@@ -81,8 +81,12 @@ struct NTFSScanner: Sendable {
         // Step 1: Parse the boot sector
         let boot = try parseBootSector(fd: fd)
         logger.info(
-            // swiftlint:disable:next line_length
-            "NTFS boot: \(boot.bytesPerSector) bytes/sector, \(boot.sectorsPerCluster) sectors/cluster, MFT at cluster \(boot.mftClusterNumber), record size \(boot.mftRecordSize)"
+            """
+            NTFS boot: \(boot.bytesPerSector) bytes/sector, \
+            \(boot.sectorsPerCluster) sectors/cluster, \
+            MFT at cluster \(boot.mftClusterNumber), \
+            record size \(boot.mftRecordSize)
+            """
         )
 
         // Step 2: Read MFT records

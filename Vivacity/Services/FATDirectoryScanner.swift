@@ -74,8 +74,13 @@ struct FATDirectoryScanner: Sendable {
 
         // Step 1: Parse the BPB
         let bpb = try parseBPB(fd: fd)
-        // swiftlint:disable:next line_length
-        logger.info("BPB: \(bpb.bytesPerSector) bytes/sector, \(bpb.sectorsPerCluster) sectors/cluster, root cluster \(bpb.rootCluster)")
+        logger.info(
+            """
+            BPB: \(bpb.bytesPerSector) bytes/sector, \
+            \(bpb.sectorsPerCluster) sectors/cluster, \
+            root cluster \(bpb.rootCluster)
+            """
+        )
 
         // Step 2: Read the FAT table (first copy)
         let fat = try readFATTable(fd: fd, bpb: bpb)
