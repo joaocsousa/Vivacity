@@ -11,8 +11,8 @@
 > 
 > * **Just Completed**: Setup and full resolution of code quality tools (`SwiftLint`, `SwiftFormat`, `Xcode Static Analyzer`). The project has **0 warnings/violations** and builds perfectly. We also extracted deep scan loops into `ScanContext` chunks and refactored line lengths in the FS scanners.
 > * **Current Focus**: The app currently supports finding deleted files (Fast Scan) and carving magic bytes (Deep Scan), taking the user up to the preview screen. 
-> * **Next Up**: Your immediate assignment is **M4: Recovery Destination Screen (Tickets T-013 → T-015)**. This is missing and must be completed so the user can actually recover the found files.
-> * **After That**: See **M6: Scan Engine Hardening (T-019 → T-021)** to fix raw disk permissions and integrate the FAT/NTFS catalog scanners into the Fast Scan pipeline.
+> * **Next Up**: Your immediate assignment is **M7: Deep Scan FS-Aware Carving (Tickets T-025 → T-026)**. The user has explicitly prioritized scanning engine improvements (M7/M8/M9) over UI and recovery flow (M10/M11).
+> * **After That**: Continue with **M8: Advanced Features (T-027 → T-029)**.
 
 ---
 
@@ -23,13 +23,13 @@
 | M1 | Project Scaffolding | T-001 | ✅ DONE |
 | M2 | Device Selection Screen | T-002 → T-005 | ✅ DONE |
 | M3 | File Scan & Preview Screen | T-006 → T-012 (T-008 split into a/b) | ✅ DONE |
-| M4 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
-| M5 | Polish & Edge Cases | T-016 → T-018 | 🔶 IN PROGRESS |
-| M6 | Scan Engine Hardening | T-019 → T-021 | ⬜ TODO |
-| M7 | Scan Results UX | T-022 → T-024 | ⬜ TODO |
-| M8 | Deep Scan FS-Aware Carving | T-025 → T-026 | ⬜ TODO |
-| M9 | Advanced Features | T-027 → T-029 | ⬜ TODO |
-| M10 | Advanced Camera Recovery | T-030 → T-031 | ⬜ TODO |
+| M6 | Scan Engine Hardening | T-019 → T-021 | ✅ DONE |
+| M7 | Deep Scan FS-Aware Carving | T-025 → T-026 | ⬜ TODO |
+| M8 | Advanced Features | T-027 → T-029 | ⬜ TODO |
+| M9 | Advanced Camera Recovery | T-030 → T-031 | ⬜ TODO |
+| M10 | Scan Results UX | T-022 → T-024 | ⬜ TODO |
+| M11 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
+| M12 | Polish & Edge Cases | T-016 → T-018 | 🔶 IN PROGRESS |
 
 ---
 
@@ -260,7 +260,145 @@
 
 ---
 
-## M4 — Recovery Destination Screen
+
+
+## User Flows
+
+```mermaid
+flowchart LR
+    A["Launch App"] --> B["Device Selection"]
+    B -->|Select device + Start| C["Scan & Preview"]
+    C -->|Select files + Recover| D["Choose Destination"]
+    D -->|Enough space + Start| E["Recovery in Progress"]
+    E --> F["Recovery Complete ✅"]
+```
+
+---
+
+## Verification Plan
+
+### Build Verification
+```bash
+xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug build
+```
+
+### Manual Verification (per milestone)
+
+| Milestone | Manual Test |
+|-----------|-------------|
+| M1 | App launches and shows empty window |
+| M2 | Internal + external drives listed correctly, selection works |
+| M3 | Scan finds known deleted test files, preview loads, selection works |
+| M4 | Destination picker works, space check prevents recovery when insufficient |
+| M12 | Full end-to-end flow works in both light and dark mode |
+
+> [!TIP]
+> For testing M3 scanning, create a test USB drive with known deleted files to validate the scanner finds them.
+
+---
+
+## M6 — Scan Engine Hardening
+
+### T-019 ✅ Fix `PrivilegedDiskReader` security
+
+**Description**: Replace `chmod o+r` with a FIFO-based approach so the raw device is never world-readable.
+
+**Acceptance Criteria**:
+- FIFO created in `/tmp`, cleaned up on exit
+- Password dialog shown once via `NSAppleScript`
+- Device permissions never modified
+- Works with both direct access and privileged access paths
+
+**Files**: `Vivacity/Services/PrivilegedDiskReader.swift`
+
+---
+
+### T-020 ✅ Re-enable FAT32/ExFAT/NTFS catalog scanning in Fast Scan
+
+**Description**: Fast Scan should use the filesystem-specific catalog scanners (`FATDirectoryScanner`, `ExFATScanner`, `NTFSScanner`) in addition to the FileManager walk, so deleted files on cameras (marked with 0xE5) are found.
+
+**Acceptance Criteria**:
+- Phase A: FileManager walk (no permissions needed)
+- Phase B: Catalog scanner for the detected filesystem type
+- Deduplication between phases
+- Camera with deleted photos → Fast Scan finds them via 0xE5 markers
+
+**Files**: `FastScanService.swift`, `FATDirectoryScanner.swift`, `ExFATScanner.swift`, `NTFSScanner.swift`
+
+---
+
+### T-021 ✅ Clean up dead `PermissionService` code
+
+**Description**: Remove or consolidate `PermissionService` now that `PrivilegedDiskReader` handles authorization.
+
+**Files**: `PermissionService.swift`, `FileScanView.swift`
+
+---
+
+
+## M7 — Deep Scan: Filesystem-Aware Carving
+
+### T-025 ⬜ FAT32 filesystem-aware carving
+
+**Description**: Parse orphaned FAT directory entries and FAT chain fragments from raw sectors to reconstruct folder structures after formatting.
+
+**Files**: `Carvers/FATCarver.swift` [NEW], `DeepScanService.swift`
+
+---
+
+### T-026 ⬜ APFS/HFS+ metadata carving
+
+**Description**: Parse orphaned catalog B-tree nodes to recover files with original names and paths from formatted or damaged APFS/HFS+ volumes.
+
+**Files**: `Carvers/APFSCarver.swift` [NEW], `Carvers/HFSPlusCarver.swift` [NEW]
+
+---
+
+## M8 — Advanced Features
+
+### T-027 ⬜ Lost Partition Search
+
+**Description**: Scan entire disk for partition signatures (GPT, MBR, NTFS boot sectors, FAT boot sectors, HFS+/APFS headers) and present found partitions as scannable virtual volumes.
+
+**Files**: `PartitionSearchService.swift` [NEW], `DeviceSelectionView.swift`, `StorageDevice.swift`
+
+---
+
+### T-028 ⬜ Scan session save/resume
+
+**Description**: Save scan results to disk and resume later, including continuing Deep Scan from the last offset.
+
+**Files**: `ScanSession.swift` [NEW], `SessionManager.swift` [NEW], `FileScanViewModel.swift`
+
+---
+
+### T-029 ⬜ Byte-to-byte disk imaging
+
+**Description**: Create sector-level backup of a drive before scanning. Allow scanning the image file instead of the live device.
+
+**Files**: `DiskImageService.swift` [NEW], `DeviceSelectionView.swift`
+
+---
+
+## M9 — Advanced Camera Recovery
+
+### T-030 ⬜ Basic camera-aware recovery
+
+**Description**: Detect camera directory patterns (DCIM, GoPro, Canon, Sony) and optimize recovery for common camera formats.
+
+**Files**: `CameraRecoveryService.swift` [NEW], `CameraProfile.swift` [NEW]
+
+---
+
+### T-031 ⬜ Fragmented video reconstruction
+
+**Description**: Reassemble fragmented MP4/MOV files by analyzing container structure and camera-specific layout patterns.
+
+**Files**: `Carvers/MP4Reconstructor.swift` [NEW], `Carvers/FragmentedVideoAssembler.swift` [NEW]
+
+---
+
+## M11 — Recovery Destination Screen
 
 ### T-013 ⬜ Create `RecoveryDestinationViewModel`
 
@@ -313,7 +451,33 @@
 
 ---
 
-## M5 — Polish & Edge Cases
+## M10 — Scan Results UX
+
+### T-022 ⬜ Add result filtering
+
+**Description**: Filter toolbar (by type, size, filename search) above the file list, matching Disk Drill's UX.
+
+**Files**: `FileScanViewModel.swift`, `FileScanView.swift`, `FilterToolbar.swift` [NEW]
+
+---
+
+### T-023 ⬜ Add recovery confidence indicator
+
+**Description**: Green/yellow/red dot per file indicating estimated recovery chances based on scan source and contiguity.
+
+**Files**: `RecoverableFile.swift`, `FileRow.swift`, `FastScanService.swift`, `DeepScanService.swift`
+
+---
+
+### T-024 ⬜ File size estimation for Deep Scan results
+
+**Description**: Estimate file sizes by finding the next header or known footer bytes (e.g., JPEG `FF D9`, PNG `IEND`).
+
+**Files**: `DeepScanService.swift`, `FileFooterDetector.swift` [NEW]
+
+---
+
+## M12 — Polish & Edge Cases
 
 ### T-016 ✅ Permission handling — privileged disk access
 
@@ -363,165 +527,4 @@
 - Dark and light mode verified
 - App icon (placeholder acceptable)
 - Manual walkthrough of full flow: select device → scan → preview → recover
-
----
-
-## User Flows
-
-```mermaid
-flowchart LR
-    A["Launch App"] --> B["Device Selection"]
-    B -->|Select device + Start| C["Scan & Preview"]
-    C -->|Select files + Recover| D["Choose Destination"]
-    D -->|Enough space + Start| E["Recovery in Progress"]
-    E --> F["Recovery Complete ✅"]
-```
-
----
-
-## Verification Plan
-
-### Build Verification
-```bash
-xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug build
-```
-
-### Manual Verification (per milestone)
-
-| Milestone | Manual Test |
-|-----------|-------------|
-| M1 | App launches and shows empty window |
-| M2 | Internal + external drives listed correctly, selection works |
-| M3 | Scan finds known deleted test files, preview loads, selection works |
-| M4 | Destination picker works, space check prevents recovery when insufficient |
-| M5 | Full end-to-end flow works in both light and dark mode |
-
-> [!TIP]
-> For testing M3 scanning, create a test USB drive with known deleted files to validate the scanner finds them.
-
----
-
-## M6 — Scan Engine Hardening
-
-### T-019 ⬜ Fix `PrivilegedDiskReader` security
-
-**Description**: Replace `chmod o+r` with a FIFO-based approach so the raw device is never world-readable.
-
-**Acceptance Criteria**:
-- FIFO created in `/tmp`, cleaned up on exit
-- Password dialog shown once via `NSAppleScript`
-- Device permissions never modified
-- Works with both direct access and privileged access paths
-
-**Files**: `Vivacity/Services/PrivilegedDiskReader.swift`
-
----
-
-### T-020 ⬜ Re-enable FAT32/ExFAT/NTFS catalog scanning in Fast Scan
-
-**Description**: Fast Scan should use the filesystem-specific catalog scanners (`FATDirectoryScanner`, `ExFATScanner`, `NTFSScanner`) in addition to the FileManager walk, so deleted files on cameras (marked with 0xE5) are found.
-
-**Acceptance Criteria**:
-- Phase A: FileManager walk (no permissions needed)
-- Phase B: Catalog scanner for the detected filesystem type
-- Deduplication between phases
-- Camera with deleted photos → Fast Scan finds them via 0xE5 markers
-
-**Files**: `FastScanService.swift`, `FATDirectoryScanner.swift`, `ExFATScanner.swift`, `NTFSScanner.swift`
-
----
-
-### T-021 ⬜ Clean up dead `PermissionService` code
-
-**Description**: Remove or consolidate `PermissionService` now that `PrivilegedDiskReader` handles authorization.
-
-**Files**: `PermissionService.swift`, `FileScanView.swift`
-
----
-
-## M7 — Scan Results UX
-
-### T-022 ⬜ Add result filtering
-
-**Description**: Filter toolbar (by type, size, filename search) above the file list, matching Disk Drill's UX.
-
-**Files**: `FileScanViewModel.swift`, `FileScanView.swift`, `FilterToolbar.swift` [NEW]
-
----
-
-### T-023 ⬜ Add recovery confidence indicator
-
-**Description**: Green/yellow/red dot per file indicating estimated recovery chances based on scan source and contiguity.
-
-**Files**: `RecoverableFile.swift`, `FileRow.swift`, `FastScanService.swift`, `DeepScanService.swift`
-
----
-
-### T-024 ⬜ File size estimation for Deep Scan results
-
-**Description**: Estimate file sizes by finding the next header or known footer bytes (e.g., JPEG `FF D9`, PNG `IEND`).
-
-**Files**: `DeepScanService.swift`, `FileFooterDetector.swift` [NEW]
-
----
-
-## M8 — Deep Scan: Filesystem-Aware Carving
-
-### T-025 ⬜ FAT32 filesystem-aware carving
-
-**Description**: Parse orphaned FAT directory entries and FAT chain fragments from raw sectors to reconstruct folder structures after formatting.
-
-**Files**: `Carvers/FATCarver.swift` [NEW], `DeepScanService.swift`
-
----
-
-### T-026 ⬜ APFS/HFS+ metadata carving
-
-**Description**: Parse orphaned catalog B-tree nodes to recover files with original names and paths from formatted or damaged APFS/HFS+ volumes.
-
-**Files**: `Carvers/APFSCarver.swift` [NEW], `Carvers/HFSPlusCarver.swift` [NEW]
-
----
-
-## M9 — Advanced Features
-
-### T-027 ⬜ Lost Partition Search
-
-**Description**: Scan entire disk for partition signatures (GPT, MBR, NTFS boot sectors, FAT boot sectors, HFS+/APFS headers) and present found partitions as scannable virtual volumes.
-
-**Files**: `PartitionSearchService.swift` [NEW], `DeviceSelectionView.swift`, `StorageDevice.swift`
-
----
-
-### T-028 ⬜ Scan session save/resume
-
-**Description**: Save scan results to disk and resume later, including continuing Deep Scan from the last offset.
-
-**Files**: `ScanSession.swift` [NEW], `SessionManager.swift` [NEW], `FileScanViewModel.swift`
-
----
-
-### T-029 ⬜ Byte-to-byte disk imaging
-
-**Description**: Create sector-level backup of a drive before scanning. Allow scanning the image file instead of the live device.
-
-**Files**: `DiskImageService.swift` [NEW], `DeviceSelectionView.swift`
-
----
-
-## M10 — Advanced Camera Recovery
-
-### T-030 ⬜ Basic camera-aware recovery
-
-**Description**: Detect camera directory patterns (DCIM, GoPro, Canon, Sony) and optimize recovery for common camera formats.
-
-**Files**: `CameraRecoveryService.swift` [NEW], `CameraProfile.swift` [NEW]
-
----
-
-### T-031 ⬜ Fragmented video reconstruction
-
-**Description**: Reassemble fragmented MP4/MOV files by analyzing container structure and camera-specific layout patterns.
-
-**Files**: `Carvers/MP4Reconstructor.swift` [NEW], `Carvers/FragmentedVideoAssembler.swift` [NEW]
 

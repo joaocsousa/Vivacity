@@ -41,8 +41,9 @@ final class DeviceSelectionViewModel {
         errorMessage = nil
 
         do {
-            self.devices = try await deviceService.discoverDevices()
-            logger.info("Discovered \(self.devices.count) device(s)")
+            devices = try await deviceService.discoverDevices()
+            let count = devices.count
+            logger.info("Discovered \(count) device(s)")
 
             // Clear selection if the previously selected device is no longer available.
             if let selected = selectedDevice, !self.devices.contains(selected) {

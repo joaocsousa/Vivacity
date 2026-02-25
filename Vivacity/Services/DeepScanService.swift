@@ -74,6 +74,7 @@ struct DeepScanService: Sendable {
         let existingOffsets: Set<UInt64>
     }
 
+    // swiftlint:disable:next function_body_length
     private func performScan(
         device: StorageDevice,
         existingOffsets: Set<UInt64>,
@@ -96,6 +97,18 @@ struct DeepScanService: Sendable {
         }
         defer { reader.stop() }
 
+        var fatCarver: FATCarver?
+        if volumeInfo.filesystemType == .fat32 {
+            var bootSector = [UInt8](repeating: 0, count: 512)
+            let read = bootSector.withUnsafeMutableBytes { buf in
+                reader.read(into: buf.baseAddress!, offset: 0, length: 512)
+            }
+            if read == 512, let bpb = BPB(bootSector: bootSector) {
+                fatCarver = FATCarver(bpb: bpb)
+                logger.info("Initialized FATCarver with valid BPB")
+            }
+        }
+
         // Get total size for progress
         let totalBytes = UInt64(device.totalCapacity)
         guard totalBytes > 0 else {
@@ -111,6 +124,7 @@ struct DeepScanService: Sendable {
         var filesFound = 0
         var lastProgressReport: Double = -1
         var carryOver = 0 // Bytes carried over from previous read for cross-boundary matching
+        var allOffsets = existingOffsets
 
         logger.info("Deep scanning \(totalBytes) bytes (\(totalBytes / (1024 * 1024)) MB)")
 
@@ -131,19 +145,67 @@ struct DeepScanService: Sendable {
             guard bytesRead > 0 else { break }
 
             let scanLength = readOffset + bytesRead
+
+            // 1. Run Filesystem-Aware Carver (if active)
+            if fatCarver != nil {
+                buffer.withUnsafeBytes { rawBuffer in
+                    let chunkStart = bytesScanned > UInt64(readOffset) ? bytesScanned - UInt64(readOffset) : 0
+                    let carvedFiles = fatCarver!.carveChunk(
+                        buffer: UnsafeRawBufferPointer(rebasing: rawBuffer[0 ..< scanLength]),
+                        baseOffset: chunkStart
+                    )
+
+                    for carvedFile in carvedFiles {
+                        // Skip if we already mapped this exact offset
+                        if allOffsets.contains(carvedFile.offsetOnDisk) { continue }
+
+                        // Verify signature by reading the cluster from disk
+                        var header = [UInt8](repeating: 0, count: 16)
+                        let headRead = header.withUnsafeMutableBytes { hBuf in
+                            reader.read(into: hBuf.baseAddress!, offset: carvedFile.offsetOnDisk, length: 16)
+                        }
+
+                        if headRead == 16 {
+                            if let sig = verifyMagicBytes(header, expectedExtension: carvedFile.fileExtension) {
+                                allOffsets.insert(carvedFile.offsetOnDisk)
+
+                                let file = RecoverableFile(
+                                    id: UUID(),
+                                    fileName: carvedFile.fileName,
+                                    fileExtension: carvedFile.fileExtension,
+                                    fileType: sig.category,
+                                    sizeInBytes: carvedFile.sizeInBytes,
+                                    offsetOnDisk: carvedFile.offsetOnDisk,
+                                    signatureMatch: sig,
+                                    source: .deepScan
+                                )
+
+                                filesFound += 1
+                                continuation.yield(.fileFound(file))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Linear Magic Byte Scan
             let context = ScanContext(
                 buffer: buffer,
                 scanLength: scanLength,
                 readOffset: readOffset,
                 bytesScanned: bytesScanned,
-                existingOffsets: existingOffsets
+                existingOffsets: allOffsets
             )
 
-            scanChunk(
+            let newlyFoundOffsets = scanChunk(
                 context: context,
                 filesFound: &filesFound,
                 continuation: continuation
             )
+
+            for offset in newlyFoundOffsets {
+                allOffsets.insert(offset)
+            }
 
             bytesScanned += UInt64(bytesRead)
 
@@ -176,7 +238,9 @@ struct DeepScanService: Sendable {
         context: ScanContext,
         filesFound: inout Int,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
-    ) {
+    ) -> [UInt64] {
+        var newOffsets: [UInt64] = []
+
         // Scan the chunk for magic bytes
         var i = 0
         while i < context.scanLength - Self.maxSignatureLength {
@@ -217,6 +281,7 @@ struct DeepScanService: Sendable {
                 continuation.yield(.fileFound(file))
 
                 // Skip ahead past this header to avoid re-matching
+                newOffsets.append(offset)
                 i += Self.sectorSize
                 continue
             }
@@ -224,6 +289,8 @@ struct DeepScanService: Sendable {
             // Move forward by sector alignment for efficiency
             i += Self.sectorSize
         }
+
+        return newOffsets
     }
 
     // MARK: - Signature Matching
@@ -324,6 +391,61 @@ struct DeepScanService: Sendable {
             }
         }
         return nil
+    }
+
+    /// Reads the first 16 bytes at the given cluster and checks for a known signature.
+    private func verifyMagicBytes(
+        _ header: [UInt8],
+        expectedExtension: String
+    ) -> FileSignature? {
+        guard header.count >= 16 else { return nil }
+
+        // First try to match against the expected extension
+        if let expectedSig = FileSignature.from(extension: expectedExtension) {
+            if matchesSignature(header, signature: expectedSig) {
+                return expectedSig
+            }
+        }
+
+        // If extension didn't match, or couldn't map, test all known signatures
+        for signature in FileSignature.allCases {
+            if matchesSignature(header, signature: signature) {
+                return signature
+            }
+        }
+
+        return nil
+    }
+
+    /// Checks whether the header bytes match a file signature.
+    private func matchesSignature(_ header: [UInt8], signature: FileSignature) -> Bool {
+        let magic = signature.magicBytes
+        guard header.count >= magic.count else { return false }
+
+        for i in 0 ..< magic.count {
+            if header[i] != magic[i] { return false }
+        }
+
+        // Disambiguate RIFF-based formats
+        if signature == .avi || signature == .webp {
+            guard header.count >= 12 else { return true }
+            let sub = String(bytes: header[8 ..< 12], encoding: .ascii) ?? ""
+            switch signature {
+            case .avi: return sub == "AVI "
+            case .webp: return sub == "WEBP"
+            default: break
+            }
+        }
+
+        // Disambiguate ftyp-based formats
+        switch signature {
+        case .mp4, .mov, .heic, .heif, .m4v, .threeGP:
+            guard header.count >= 8 else { return true }
+            let ftyp = String(bytes: header[4 ..< 8], encoding: .ascii) ?? ""
+            return ftyp == "ftyp"
+        default:
+            return true
+        }
     }
 }
 

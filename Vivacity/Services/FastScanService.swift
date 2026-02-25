@@ -45,21 +45,118 @@ struct FastScanService: Sendable {
 
     // MARK: - Scan Logic
 
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private func performScan(
         device: StorageDevice,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let volumeInfo = VolumeInfo.detect(for: device)
 
-        // Fast Scan uses FileManager to walk the mounted filesystem.
-        // This requires NO special permissions — macOS grants read access to
-        // mounted external volumes at the user level.
-        //
-        // Raw disk I/O (FAT directory table parsing, MFT scanning, byte carving)
-        // is deferred to Deep Scan, which will request elevated access if needed.
-        logger.info("Fast scan on \(volumeInfo.filesystemType.displayName) — using filesystem-level scan (no raw disk access)")
+        logger.info("Fast scan Phase A (Filesystem) on \(volumeInfo.filesystemType.displayName)")
 
-        try await performFilesystemScan(device: device, continuation: continuation)
+        var foundFilenames = Set<String>()
+
+        // ── Phase A: Filesystem Walk ──
+        let phaseAStream = AsyncThrowingStream<ScanEvent, Error> { phaseAContinuation in
+            Task.detached {
+                do {
+                    try await performFilesystemScan(device: device, continuation: phaseAContinuation)
+                } catch {
+                    phaseAContinuation.finish(throwing: error)
+                }
+            }
+        }
+
+        for try await event in phaseAStream {
+            switch event {
+            case let .fileFound(file):
+                foundFilenames.insert(file.fileName)
+                continuation.yield(event)
+            case let .progress(p):
+                // Scale Phase A progress to 0-50%
+                continuation.yield(.progress(p * 0.5))
+            case .completed:
+                break // Wait for Phase B
+            }
+        }
+
+        // ── Phase B: Raw Catalog Scan ──
+        let needsPhaseB = volumeInfo.filesystemType == .fat32 ||
+            volumeInfo.filesystemType == .exfat ||
+            volumeInfo.filesystemType == .ntfs
+
+        if needsPhaseB {
+            logger.info("Fast scan Phase B (Raw Catalog) on \(volumeInfo.filesystemType.displayName)")
+            do {
+                let reader = PrivilegedDiskReader(devicePath: volumeInfo.devicePath)
+                try reader.start()
+                defer { reader.stop() }
+
+                if reader.isSeekable {
+                    let phaseBStream = AsyncThrowingStream<ScanEvent, Error> { phaseBContinuation in
+                        Task.detached {
+                            do {
+                                switch volumeInfo.filesystemType {
+                                case .fat32:
+                                    let scanner = FATDirectoryScanner()
+                                    try await scanner.scan(
+                                        volumeInfo: volumeInfo,
+                                        reader: reader,
+                                        continuation: phaseBContinuation
+                                    )
+                                case .exfat:
+                                    let scanner = ExFATScanner()
+                                    try await scanner.scan(
+                                        volumeInfo: volumeInfo,
+                                        reader: reader,
+                                        continuation: phaseBContinuation
+                                    )
+                                case .ntfs:
+                                    let scanner = NTFSScanner()
+                                    try await scanner.scan(
+                                        volumeInfo: volumeInfo,
+                                        reader: reader,
+                                        continuation: phaseBContinuation
+                                    )
+                                default:
+                                    break
+                                }
+                                phaseBContinuation.finish()
+                            } catch {
+                                phaseBContinuation.finish(throwing: error)
+                            }
+                        }
+                    }
+
+                    for try await event in phaseBStream {
+                        switch event {
+                        case let .fileFound(file):
+                            if !foundFilenames.contains(file.fileName) {
+                                foundFilenames.insert(file.fileName)
+                                continuation.yield(event)
+                            }
+                        case let .progress(p):
+                            // Scale Phase B progress 50-100%
+                            continuation.yield(.progress(0.5 + p * 0.5))
+                        case .completed:
+                            break
+                        }
+                    }
+                } else {
+                    logger.warning("Device is not seekable (using FIFO), skipping catalog scan Phase B")
+                    continuation.yield(.progress(1.0))
+                }
+            } catch {
+                logger.error("Phase B scan failed or access denied: \(error.localizedDescription)")
+                continuation.yield(.progress(1.0))
+            }
+        } else {
+            // For APFS/HFS+ jump to 100%
+            continuation.yield(.progress(1.0))
+        }
+
+        continuation.yield(.completed)
+        continuation.finish()
     }
 
     // MARK: - Filesystem-Level Scan (all FS types)
@@ -251,8 +348,13 @@ struct FastScanService: Sendable {
         }
 
         logger.info("Mounted snapshot \(snapshotName) at \(mountPoint.path)")
-        await enumerateSnapshot(mountPoint: mountPoint, volumeRoot: volumeRoot, continuation: continuation,
-                                filesFound: &filesFound, filesExamined: &filesExamined)
+        await enumerateSnapshot(
+            mountPoint: mountPoint,
+            volumeRoot: volumeRoot,
+            continuation: continuation,
+            filesFound: &filesFound,
+            filesExamined: &filesExamined
+        )
 
         let unmountProcess = Process()
         unmountProcess.executableURL = URL(fileURLWithPath: "/sbin/umount")

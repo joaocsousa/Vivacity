@@ -69,21 +69,14 @@ struct ExFATScanner: Sendable {
     /// Scans an ExFAT volume for deleted files.
     func scan(
         volumeInfo: VolumeInfo,
+        reader: PrivilegedDiskReader,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let devicePath = volumeInfo.devicePath
-        logger.info("Opening ExFAT device: \(devicePath)")
-
-        let fd = open(devicePath, O_RDONLY)
-        guard fd >= 0 else {
-            let err = String(cString: strerror(errno))
-            logger.error("Cannot open \(devicePath): \(err)")
-            throw ExFATScanError.cannotOpenDevice(path: devicePath, reason: err)
-        }
-        defer { close(fd) }
+        logger.info("Starting ExFAT raw catalog scan on: \(devicePath)")
 
         // Step 1: Parse boot sector
-        let boot = try parseBootSector(fd: fd)
+        let boot = try parseBootSector(reader: reader)
         logger.info(
             """
             ExFAT boot: \(boot.bytesPerSector) bytes/sector, \
@@ -107,7 +100,7 @@ struct ExFATScanner: Sendable {
             try Task.checkCancellation()
 
             let results = try scanDirectoryCluster(
-                fd: fd,
+                reader: reader,
                 cluster: cluster,
                 boot: boot
             )
@@ -138,10 +131,10 @@ struct ExFATScanner: Sendable {
 
     // MARK: - Boot Sector
 
-    private func parseBootSector(fd: Int32) throws -> ExFATBoot {
+    private func parseBootSector(reader: PrivilegedDiskReader) throws -> ExFATBoot {
         var sector = [UInt8](repeating: 0, count: 512)
         let bytesRead = sector.withUnsafeMutableBytes { buf in
-            pread(fd, buf.baseAddress!, 512, 0)
+            reader.read(into: buf.baseAddress!, offset: 0, length: 512)
         }
         guard bytesRead == 512 else {
             throw ExFATScanError.invalidBootSector
@@ -194,7 +187,7 @@ struct ExFATScanner: Sendable {
     }
 
     private func scanDirectoryCluster(
-        fd: Int32,
+        reader: PrivilegedDiskReader,
         cluster: UInt32,
         boot: ExFATBoot
     ) throws -> ScanResults {
@@ -203,7 +196,7 @@ struct ExFATScanner: Sendable {
         var buffer = [UInt8](repeating: 0, count: clusterSize)
 
         let bytesRead = buffer.withUnsafeMutableBytes { buf in
-            pread(fd, buf.baseAddress!, clusterSize, off_t(offset))
+            reader.read(into: buf.baseAddress!, offset: offset, length: clusterSize)
         }
         guard bytesRead == clusterSize else { return ScanResults() }
 
@@ -234,7 +227,7 @@ struct ExFATScanner: Sendable {
                     startIndex: i,
                     secondaryCount: secondaryCount,
                     boot: boot,
-                    fd: fd
+                    reader: reader
                 ) {
                     results.files.append(file)
                 }
@@ -279,7 +272,7 @@ struct ExFATScanner: Sendable {
         startIndex: Int,
         secondaryCount: Int,
         boot: ExFATBoot,
-        fd: Int32
+        reader: PrivilegedDiskReader
     ) -> RecoverableFile? {
         var startingCluster: UInt32 = 0
         var fileSize: Int64 = 0
@@ -331,7 +324,7 @@ struct ExFATScanner: Sendable {
         let clusterOffset = boot.clusterOffset(startingCluster)
         var header = [UInt8](repeating: 0, count: 16)
         let headerRead = header.withUnsafeMutableBytes { buf in
-            pread(fd, buf.baseAddress!, 16, off_t(clusterOffset))
+            reader.read(into: buf.baseAddress!, offset: clusterOffset, length: 16)
         }
         guard headerRead == 16 else { return nil }
 

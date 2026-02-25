@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		4155C6FBA2014067BFC7AD0C /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */; };
+		18DDB8736E8D384F2B052EFA /* FATCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */; };
 		53042BE3A8A7C4D7E26D1653 /* FATModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701C8C0145874A1017A1233A /* FATModels.swift */; };
 		AA000001 /* VivacityApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010 /* VivacityApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011 /* ContentView.swift */; };
@@ -35,7 +35,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
+		6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FATCarver.swift; path = Carvers/FATCarver.swift; sourceTree = "<group>"; };
 		701C8C0145874A1017A1233A /* FATModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FATModels.swift; sourceTree = "<group>"; };
 		85684069117F459BA261B91B /* PermissionDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionDeniedView.swift; sourceTree = "<group>"; };
 		AA000010 /* VivacityApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VivacityApp.swift; sourceTree = "<group>"; };
@@ -106,6 +106,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		ABF74D4EC834328576E9A7E6 /* Carvers */ = {
+			isa = PBXGroup;
+			children = (
+				6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */,
+			);
+			name = Carvers;
+			sourceTree = "<group>";
+		};
 		BB000020 /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -128,8 +136,8 @@
 				DD000014 /* EXIFDateExtractor.swift */,
 				DD000012 /* NTFSScanner.swift */,
 				DD000013 /* ExFATScanner.swift */,
-				32ADC0CF01034B5E9F3584F1 /* PermissionService.swift */,
 				EE000010 /* PrivilegedDiskReader.swift */,
+				ABF74D4EC834328576E9A7E6 /* Carvers */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -283,10 +291,10 @@
 				DD000005 /* EXIFDateExtractor.swift in Sources */,
 				DD000003 /* NTFSScanner.swift in Sources */,
 				DD000004 /* ExFATScanner.swift in Sources */,
-				4155C6FBA2014067BFC7AD0C /* PermissionService.swift in Sources */,
 				EE000001 /* PrivilegedDiskReader.swift in Sources */,
 				BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */,
 				53042BE3A8A7C4D7E26D1653 /* FATModels.swift in Sources */,
+				18DDB8736E8D384F2B052EFA /* FATCarver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
