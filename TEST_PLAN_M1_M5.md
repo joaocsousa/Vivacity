@@ -2,12 +2,23 @@
 
 > Scope: Validation of shipped functionality up through M5 (Scan Engine Hardening + FS-aware Deep Scan). This plan defines what to test; do **not** execute yet.
 
-## 0) Test Environments & Assets
+## 0) Test Environments & Assets (Device-Safe)
 - Hardware: Apple Silicon Mac (Sonoma 14.x or Sequoia 15.x), 16 GB+ RAM.
 - Build: Debug build via `xcodebuild -scheme Vivacity -destination 'platform=macOS'`.
-- External media: At least one USB/SD device (FAT32 or ExFAT) and one APFS external disk image.
-- Test images/videos: Known sample set including JPEG, PNG, HEIC, MP4 (H.264), MOV (HEVC).
-- Optional: Disk images with synthetic deleted files (created via `diskutil` + `newfs_msdos`/`hdiutil`) to avoid mutating live drives.
+- **No live device writes:** All tests use **disk images** (DMG/RAW) mounted read-only. Avoid interacting with real user disks.
+- Disk images to prepare:
+  - FAT32 image with deleted test files (create with `hdiutil create` + `newfs_msdos`; delete files to create 0xE5 entries).
+  - ExFAT image with deleted files.
+  - APFS image with deleted files (use snapshots, then delete).
+- Test media set: JPEG, PNG, HEIC, MP4 (H.264), MOV (HEVC).
+- Stub data for unit tests: small byte buffers containing signature headers for JPEG/PNG/MP4 to feed carvers without any disk IO.
+
+## 0b) Fakes/Stubs Strategy
+- **Services**: Wrap `DeviceService`, `FastScanService`, `DeepScanService`, and `PrivilegedDiskReader` behind protocols to allow in-memory fakes in unit tests.
+- **Device discovery**: Provide a fake that returns predefined `StorageDevice` objects pointing to temporary disk images.
+- **Disk reads**: Fake `PrivilegedDiskReader` that serves data from memory-mapped files or byte arrays; no raw `/dev/disk*` access.
+- **Carvers**: Unit-test carvers with static byte buffers; no device or file system needed.
+- **UI/ViewModels**: Inject fakes into view models to exercise state transitions without real IO.
 
 ## 1) M1 — App Scaffolding
 - Launch: App starts without crashes; window appears.
