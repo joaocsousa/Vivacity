@@ -11,9 +11,9 @@
 ## 🤖 AI Handoff Summary
 > **Welcome Codex (or next AI)!** Here's the current state of the project:
 >
-> * **Just Completed**: Scan engine hardening (M6) and filesystem-aware deep scan carving for FAT/APFS/HFS+ (M7). Code quality tools (`SwiftLint`, `SwiftFormat`, `Xcode Static Analyzer`) are clean.
-> * **Current Focus**: **M8 Advanced Features (T-027 → T-029)** — lost partition search, scan session save/resume, and disk imaging — plus **M12 polish/navigation (T-017)**.
-> * **Next Up**: **M9 camera recovery** followed by **M10 scan results UX** and **M11 recovery destination**.
+> * **Just Completed**: Scan engine hardening (M4) and filesystem-aware deep scan carving for FAT/APFS/HFS+ (M5). Code quality tools (`SwiftLint`, `SwiftFormat`, `Xcode Static Analyzer`) are clean.
+> * **Current Focus**: **M6 Advanced Features (T-027 → T-029)** — lost partition search, scan session save/resume, and disk imaging — plus **M10 polish/navigation (T-017)**.
+> * **Next Up**: **M7 camera recovery** followed by **M8 scan results UX** and **M9 recovery destination**.
 > * For status and tickets, treat this file as the single source of truth.
 
 ---
@@ -25,13 +25,13 @@
 | M1 | Project Scaffolding | T-001 | ✅ DONE |
 | M2 | Device Selection Screen | T-002 → T-005 | ✅ DONE |
 | M3 | File Scan & Preview Screen | T-006 → T-012 (T-008 split into a/b) | ✅ DONE |
-| M6 | Scan Engine Hardening | T-019 → T-021 | ✅ DONE |
-| M7 | Deep Scan FS-Aware Carving | T-025 → T-026 | ✅ DONE |
-| M8 | Advanced Features | T-027 → T-029 | ⬜ TODO |
-| M9 | Advanced Camera Recovery | T-030 → T-031 | ⬜ TODO |
-| M10 | Scan Results UX | T-022 → T-024 | ⬜ TODO |
-| M11 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
-| M12 | Polish & Edge Cases | T-016 → T-018 | 🔶 IN PROGRESS |
+| M4 | Scan Engine Hardening | T-019 → T-021 | ✅ DONE |
+| M5 | Deep Scan FS-Aware Carving | T-025 → T-026 | ✅ DONE |
+| M6 | Advanced Features | T-027 → T-029 | ⬜ TODO |
+| M7 | Advanced Camera Recovery | T-030 → T-031 | ⬜ TODO |
+| M8 | Scan Results UX | T-022 → T-024 | ⬜ TODO |
+| M9 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
+| M10 | Polish & Edge Cases | T-016 → T-018 | 🔶 IN PROGRESS |
 
 ---
 
@@ -291,15 +291,15 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 | M1 | App launches and shows empty window |
 | M2 | Internal + external drives listed correctly, selection works |
 | M3 | Scan finds known deleted test files, preview loads, selection works |
-| M4 | Destination picker works, space check prevents recovery when insufficient |
-| M12 | Full end-to-end flow works in both light and dark mode |
+| M9 | Destination picker works, space check prevents recovery when insufficient |
+| M10 | Full end-to-end flow works in both light and dark mode |
 
 > [!TIP]
 > For testing M3 scanning, create a test USB drive with known deleted files to validate the scanner finds them.
 
 ---
 
-## M6 — Scan Engine Hardening
+## M4 — Scan Engine Hardening
 
 ### T-019 ✅ Fix `PrivilegedDiskReader` security
 
@@ -338,7 +338,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 ---
 
 
-## M7 — Deep Scan: Filesystem-Aware Carving
+## M5 — Deep Scan: Filesystem-Aware Carving
 
 ### T-025 ✅ FAT32 filesystem-aware carving
 
@@ -356,7 +356,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-## M8 — Advanced Features
+## M6 — Advanced Features
 
 ### T-027 ⬜ Lost Partition Search
 
@@ -382,7 +382,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-## M9 — Advanced Camera Recovery
+## M7 — Advanced Camera Recovery
 
 ### T-030 ⬜ Basic camera-aware recovery
 
@@ -400,7 +400,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-## M11 — Recovery Destination Screen
+## M9 — Recovery Destination Screen
 
 ### T-013 ⬜ Create `RecoveryDestinationViewModel`
 
@@ -453,7 +453,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-## M10 — Scan Results UX
+## M8 — Scan Results UX
 
 ### T-022 ⬜ Add result filtering
 
@@ -479,7 +479,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-## M12 — Polish & Edge Cases
+## M10 — Polish & Edge Cases
 
 ### T-016 ✅ Permission handling — privileged disk access
 
