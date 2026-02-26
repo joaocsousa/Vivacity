@@ -1,5 +1,7 @@
 # Vivacity — Project Plan & Tickets
 
+> **Source of truth**: This file is the canonical roadmap, status, and handoff doc. Other files (README, .agents/PROJECT.md) point back here to avoid drift.
+
 > **Goal**: Build a native macOS SwiftUI app that lets users scan storage devices for deleted image/video files and recover them.
 >
 > **Minimum OS**: macOS 14.0 (Sonoma) — also compatible with macOS 15.x (Sequoia)
@@ -8,11 +10,11 @@
 
 ## 🤖 AI Handoff Summary
 > **Welcome Codex (or next AI)!** Here's the current state of the project:
-> 
-> * **Just Completed**: Setup and full resolution of code quality tools (`SwiftLint`, `SwiftFormat`, `Xcode Static Analyzer`). The project has **0 warnings/violations** and builds perfectly. We also extracted deep scan loops into `ScanContext` chunks and refactored line lengths in the FS scanners.
-> * **Current Focus**: The app currently supports finding deleted files (Fast Scan) and carving magic bytes (Deep Scan), taking the user up to the preview screen. 
-> * **Next Up**: Your immediate assignment is **M7: Deep Scan FS-Aware Carving (Tickets T-025 → T-026)**. The user has explicitly prioritized scanning engine improvements (M7/M8/M9) over UI and recovery flow (M10/M11).
-> * **After That**: Continue with **M8: Advanced Features (T-027 → T-029)**.
+>
+> * **Just Completed**: Scan engine hardening (M6) and filesystem-aware deep scan carving for FAT/APFS/HFS+ (M7). Code quality tools (`SwiftLint`, `SwiftFormat`, `Xcode Static Analyzer`) are clean.
+> * **Current Focus**: **M8 Advanced Features (T-027 → T-029)** — lost partition search, scan session save/resume, and disk imaging — plus **M12 polish/navigation (T-017)**.
+> * **Next Up**: **M9 camera recovery** followed by **M10 scan results UX** and **M11 recovery destination**.
+> * For status and tickets, treat this file as the single source of truth.
 
 ---
 
@@ -527,4 +529,3 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 - Dark and light mode verified
 - App icon (placeholder acceptable)
 - Manual walkthrough of full flow: select device → scan → preview → recover
-

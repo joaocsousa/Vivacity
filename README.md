@@ -4,6 +4,8 @@ A native macOS app for recovering deleted image and video files from storage dev
 
 Built with **SwiftUI** · Requires **macOS 14.0+** (Sonoma)
 
+For the canonical roadmap, status, and handoff details, see [PROJECT_PLAN.md](PROJECT_PLAN.md).
+
 ---
 
 ## Features
@@ -87,14 +89,16 @@ Vivacity/
 
 ## Roadmap
 
-See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the full roadmap. Current status:
+See [PROJECT_PLAN.md](PROJECT_PLAN.md) for details. Snapshot:
 
 | Milestone | Status |
 |-----------|--------|
 | M1–M3: Scaffolding, Device Selection, Scan & Preview | ✅ Done |
 | M6–M7: Scan Engine Hardening & FS Carving | ✅ Done |
-| M8–M10: Advanced Features, Camera Recovery & UX | ⬜ Planned |
-| M11: Recovery Destination Screen | ⬜ Planned |
+| M8: Advanced Features (partition search, resume, imaging) | ⬜ TODO |
+| M9: Advanced Camera Recovery | ⬜ TODO |
+| M10: Scan Results UX | ⬜ TODO |
+| M11: Recovery Destination Screen | ⬜ TODO |
 | M12: Polish & Edge Cases | 🔶 In Progress |
 
 ## License
