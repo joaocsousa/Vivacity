@@ -82,8 +82,8 @@ final class FileScanViewModel {
 
     // MARK: - Dependencies
 
-    private let fastScanService: FastScanService
-    private let deepScanService: DeepScanService
+    private let fastScanService: FastScanServicing
+    private let deepScanService: DeepScanServicing
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FileScan")
 
     /// Handle for the currently running scan task (for cancellation).
@@ -95,8 +95,8 @@ final class FileScanViewModel {
     // MARK: - Init
 
     init(
-        fastScanService: FastScanService = FastScanService(),
-        deepScanService: DeepScanService = DeepScanService()
+        fastScanService: FastScanServicing = FastScanService(),
+        deepScanService: DeepScanServicing = DeepScanService()
     ) {
         self.fastScanService = fastScanService
         self.deepScanService = deepScanService

@@ -13,7 +13,11 @@ import os
 /// - **APFS/HFS+**: Scans `.Trashes` directories and APFS local snapshots
 ///
 /// Deep Scan (a separate service) handles the raw sector-by-sector physical search.
-struct FastScanService: Sendable {
+protocol FastScanServicing: Sendable {
+    func scan(device: StorageDevice) -> AsyncThrowingStream<ScanEvent, Error>
+}
+
+struct FastScanService: FastScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FastScan")
 
     /// Set of file extensions we care about (lowercased).

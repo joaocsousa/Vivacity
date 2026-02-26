@@ -6,7 +6,11 @@ import os
 /// Opens the volume (or its raw device node) for reading and scans sequentially
 /// for magic-byte patterns. Generates file names for discovered files and
 /// deduplicates against offsets already found by `FastScanService`.
-struct DeepScanService: Sendable {
+protocol DeepScanServicing: Sendable {
+    func scan(device: StorageDevice, existingOffsets: Set<UInt64>) -> AsyncThrowingStream<ScanEvent, Error>
+}
+
+struct DeepScanService: DeepScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeepScan")
 
     /// Size of each read block (512 bytes = one disk sector).
