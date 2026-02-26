@@ -59,13 +59,10 @@ Do not use Xcode's GUI for regular development cycles; use the CLI tools configu
     ```bash
     xcodebuild build -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"
     ```
-*   **Format Code:**
+*   **Format & Lint Code (MANDATORY):**
+    You **MUST** run both `swiftformat .` and `swiftlint` when you believe you are finished with a task, before marking it as complete or notifying the user. Fix any warnings or errors that arise.
     ```bash
-    swiftformat .
-    ```
-*   **Lint Code:**
-    ```bash
-    swiftlint
+    swiftformat . && swiftlint
     ```
 *   **Static Analyzer:**
     Use this to catch memory and logic bugs before opening a Pull Request.

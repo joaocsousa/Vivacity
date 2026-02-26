@@ -56,24 +56,18 @@ struct FATDirectoryScanner: Sendable {
     ///
     /// - Parameters:
     ///   - volumeInfo: Volume metadata including device path and mount point.
+    ///   - reader: PrivilegedDiskReader for raw sector access.
     ///   - continuation: Stream continuation to yield scan events.
     func scan(
         volumeInfo: VolumeInfo,
+        reader: PrivilegedDiskReader,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let devicePath = volumeInfo.devicePath
-        logger.info("Opening FAT32 device: \(devicePath)")
-
-        let fd = open(devicePath, O_RDONLY)
-        guard fd >= 0 else {
-            let err = String(cString: strerror(errno))
-            logger.error("Cannot open \(devicePath): \(err)")
-            throw FATScanError.cannotOpenDevice(path: devicePath, reason: err)
-        }
-        defer { close(fd) }
+        logger.info("Starting FAT32 raw catalog scan on: \(devicePath)")
 
         // Step 1: Parse the BPB
-        let bpb = try parseBPB(fd: fd)
+        let bpb = try parseBPB(reader: reader)
         logger.info(
             """
             BPB: \(bpb.bytesPerSector) bytes/sector, \
@@ -83,7 +77,7 @@ struct FATDirectoryScanner: Sendable {
         )
 
         // Step 2: Read the FAT table (first copy)
-        let fat = try readFATTable(fd: fd, bpb: bpb)
+        let fat = try readFATTable(reader: reader, bpb: bpb)
         logger.info("FAT table loaded: \(fat.count) entries")
 
         // Step 3: Scan directory entries starting from root
@@ -106,7 +100,7 @@ struct FATDirectoryScanner: Sendable {
                 try Task.checkCancellation()
 
                 let entries = try readDirectoryEntries(
-                    fd: fd,
+                    reader: reader,
                     cluster: currentCluster,
                     bpb: bpb
                 )
@@ -115,7 +109,7 @@ struct FATDirectoryScanner: Sendable {
                     entries: entries,
                     bpb: bpb,
                     fat: fat,
-                    fd: fd,
+                    reader: reader,
                     continuation: continuation
                 )
 
@@ -162,7 +156,7 @@ struct FATDirectoryScanner: Sendable {
         entries: [FATDirectoryEntry],
         bpb: BPB,
         fat: [UInt32],
-        fd: Int32,
+        reader: PrivilegedDiskReader,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) -> ProcessResult {
         var newClusters: [UInt32] = []
@@ -190,7 +184,7 @@ struct FATDirectoryScanner: Sendable {
             guard confidence != .low else { continue }
 
             let signature = verifyMagicBytes(
-                fd: fd,
+                reader: reader,
                 cluster: entry.startingCluster,
                 bpb: bpb,
                 expectedExtension: entry.fileExtension
@@ -217,66 +211,30 @@ struct FATDirectoryScanner: Sendable {
 
     // MARK: - BPB Parsing
 
-    private func parseBPB(fd: Int32) throws -> BPB {
+    private func parseBPB(reader: PrivilegedDiskReader) throws -> BPB {
         var sector = [UInt8](repeating: 0, count: 512)
         let bytesRead = sector.withUnsafeMutableBytes { buf in
-            pread(fd, buf.baseAddress!, 512, 0)
+            reader.read(into: buf.baseAddress!, offset: 0, length: 512)
         }
         guard bytesRead == 512 else {
             throw FATScanError.invalidBootSector
         }
 
-        // Verify boot signature
-        guard sector[510] == 0x55, sector[511] == 0xAA else {
+        guard let bpb = BPB(bootSector: sector) else {
             throw FATScanError.invalidBootSector
         }
-
-        let bytesPerSector = Int(sector[11]) | (Int(sector[12]) << 8)
-        let sectorsPerCluster = Int(sector[13])
-        let reservedSectors = Int(sector[14]) | (Int(sector[15]) << 8)
-        let numberOfFATs = Int(sector[16])
-
-        // FAT32-specific: sectors per FAT at offset 36 (4 bytes)
-        let sectorsPerFAT = Int(sector[36]) | (Int(sector[37]) << 8) |
-            (Int(sector[38]) << 16) | (Int(sector[39]) << 24)
-
-        // Root directory cluster at offset 44 (4 bytes)
-        let rootCluster = UInt32(sector[44]) | (UInt32(sector[45]) << 8) |
-            (UInt32(sector[46]) << 16) | (UInt32(sector[47]) << 24)
-
-        // Total sectors: try 32-bit field first (offset 32), then 16-bit (offset 19)
-        var totalSectors = UInt64(sector[32]) | (UInt64(sector[33]) << 8) |
-            (UInt64(sector[34]) << 16) | (UInt64(sector[35]) << 24)
-        if totalSectors == 0 {
-            totalSectors = UInt64(sector[19]) | (UInt64(sector[20]) << 8)
-        }
-
-        guard bytesPerSector > 0, sectorsPerCluster > 0,
-              reservedSectors > 0, numberOfFATs > 0, sectorsPerFAT > 0
-        else {
-            throw FATScanError.invalidBootSector
-        }
-
-        return BPB(
-            bytesPerSector: bytesPerSector,
-            sectorsPerCluster: sectorsPerCluster,
-            reservedSectors: reservedSectors,
-            numberOfFATs: numberOfFATs,
-            sectorsPerFAT: sectorsPerFAT,
-            rootCluster: rootCluster,
-            totalSectors: totalSectors
-        )
+        return bpb
     }
 
     // MARK: - FAT Table
 
     /// Reads the entire first FAT table into memory as an array of UInt32 cluster values.
-    private func readFATTable(fd: Int32, bpb: BPB) throws -> [UInt32] {
+    private func readFATTable(reader: PrivilegedDiskReader, bpb: BPB) throws -> [UInt32] {
         let fatByteSize = bpb.fatSize
         var fatData = [UInt8](repeating: 0, count: fatByteSize)
 
         let bytesRead = fatData.withUnsafeMutableBytes { buf in
-            pread(fd, buf.baseAddress!, fatByteSize, off_t(bpb.fatOffset))
+            reader.read(into: buf.baseAddress!, offset: UInt64(bpb.fatOffset), length: fatByteSize)
         }
         guard bytesRead == fatByteSize else {
             throw FATScanError.cannotReadFAT
@@ -307,7 +265,7 @@ struct FATDirectoryScanner: Sendable {
     /// - Each LFN entry carries 13 UCS-2 characters across three byte ranges
     /// - The 8.3 entry that follows contains the actual file metadata
     private func readDirectoryEntries(
-        fd: Int32,
+        reader: PrivilegedDiskReader,
         cluster: UInt32,
         bpb: BPB
     ) throws -> [FATDirectoryEntry] {
@@ -316,7 +274,7 @@ struct FATDirectoryScanner: Sendable {
         var buffer = [UInt8](repeating: 0, count: clusterSize)
 
         let bytesRead = buffer.withUnsafeMutableBytes { buf in
-            pread(fd, buf.baseAddress!, clusterSize, off_t(offset))
+            reader.read(into: buf.baseAddress!, offset: offset, length: clusterSize)
         }
         guard bytesRead == clusterSize else {
             return []
@@ -354,7 +312,7 @@ struct FATDirectoryScanner: Sendable {
 
             // Collect LFN entry
             if attributes == Self.lfnAttribute {
-                let lfnChars = extractLFNCharacters(from: entryBytes)
+                let lfnChars = LFNParser.extractLFNCharacters(from: entryBytes)
                 let order = Int(firstByte & 0x3F) // Sequence number (1-based)
                 lfnSegments.append((order: order, chars: lfnChars))
                 continue
@@ -366,7 +324,7 @@ struct FATDirectoryScanner: Sendable {
             let isVolumeLabel = attributes & 0x08 != 0
 
             // Reconstruct LFN if we have segments
-            let longName = reconstructLFN(from: lfnSegments)
+            let longName = LFNParser.reconstructLFN(from: lfnSegments)
             lfnSegments.removeAll() // Reset for next file
 
             // Parse 8.3 filename as fallback
@@ -415,59 +373,6 @@ struct FATDirectoryScanner: Sendable {
         return entries
     }
 
-    // MARK: - LFN Helpers
-
-    /// Extracts 13 UCS-2 characters from a single LFN directory entry.
-    ///
-    /// Characters are stored at three disjoint byte ranges within the 32-byte entry:
-    /// - Bytes 1–10: characters 1–5 (5 chars × 2 bytes)
-    /// - Bytes 14–25: characters 6–11 (6 chars × 2 bytes)
-    /// - Bytes 28–31: characters 12–13 (2 chars × 2 bytes)
-    private func extractLFNCharacters(from entry: [UInt8]) -> [UInt16] {
-        var chars: [UInt16] = []
-
-        // Chars 1–5 at bytes 1–10
-        for j in stride(from: 1, to: 11, by: 2) {
-            let ch = UInt16(entry[j]) | (UInt16(entry[j + 1]) << 8)
-            if ch == 0x0000 || ch == 0xFFFF { return chars }
-            chars.append(ch)
-        }
-
-        // Chars 6–11 at bytes 14–25
-        for j in stride(from: 14, to: 26, by: 2) {
-            let ch = UInt16(entry[j]) | (UInt16(entry[j + 1]) << 8)
-            if ch == 0x0000 || ch == 0xFFFF { return chars }
-            chars.append(ch)
-        }
-
-        // Chars 12–13 at bytes 28–31
-        for j in stride(from: 28, to: 32, by: 2) {
-            let ch = UInt16(entry[j]) | (UInt16(entry[j + 1]) << 8)
-            if ch == 0x0000 || ch == 0xFFFF { return chars }
-            chars.append(ch)
-        }
-
-        return chars
-    }
-
-    /// Reconstructs the full Long File Name from collected LFN segments.
-    ///
-    /// Segments arrive in reverse order (last segment first), so we sort by
-    /// sequence number and concatenate the UCS-2 characters.
-    private func reconstructLFN(from segments: [(order: Int, chars: [UInt16])]) -> String? {
-        guard !segments.isEmpty else { return nil }
-
-        let sorted = segments.sorted { $0.order < $1.order }
-        var allChars: [UInt16] = []
-        for segment in sorted {
-            allChars.append(contentsOf: segment.chars)
-        }
-
-        // Convert UCS-2 to String
-        let result = String(utf16CodeUnits: allChars, count: allChars.count)
-        return result.isEmpty ? nil : result
-    }
-
     // MARK: - Cluster Validation
 
     /// Checks whether the starting cluster of a deleted file is marked as free.
@@ -488,7 +393,7 @@ struct FATDirectoryScanner: Sendable {
 
     /// Reads the first 16 bytes at the given cluster and checks for a known signature.
     private func verifyMagicBytes(
-        fd: Int32,
+        reader: PrivilegedDiskReader,
         cluster: UInt32,
         bpb: BPB,
         expectedExtension: String
@@ -497,7 +402,7 @@ struct FATDirectoryScanner: Sendable {
         var header = [UInt8](repeating: 0, count: 16)
 
         let bytesRead = header.withUnsafeMutableBytes { buf in
-            pread(fd, buf.baseAddress!, 16, off_t(offset))
+            reader.read(into: buf.baseAddress!, offset: offset, length: 16)
         }
         guard bytesRead == 16 else { return nil }
 

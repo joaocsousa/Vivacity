@@ -84,8 +84,8 @@ struct VolumeInfo: Sendable {
             } else if access(devicePath, R_OK) == 0 {
                 resolvedDevicePath = devicePath // block device is readable
             }
-            // else: neither is accessible without elevation — Deep Scan will
-            //        prompt for permissions via PermissionService
+            // else: neither is accessible without elevation — Deep Scan or Catalog Scan
+            //        will prompt for permissions via PrivilegedDiskReader
         }
 
         logger.info("Detected \(fsTypeName) filesystem on \(resolvedDevicePath) at \(volumePath)")

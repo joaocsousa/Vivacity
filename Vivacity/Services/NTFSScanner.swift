@@ -65,21 +65,14 @@ struct NTFSScanner: Sendable {
     /// Scans an NTFS volume for deleted files by reading MFT records.
     func scan(
         volumeInfo: VolumeInfo,
+        reader: PrivilegedDiskReader,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let devicePath = volumeInfo.devicePath
-        logger.info("Opening NTFS device: \(devicePath)")
-
-        let fd = open(devicePath, O_RDONLY)
-        guard fd >= 0 else {
-            let err = String(cString: strerror(errno))
-            logger.error("Cannot open \(devicePath): \(err)")
-            throw NTFSScanError.cannotOpenDevice(path: devicePath, reason: err)
-        }
-        defer { close(fd) }
+        logger.info("Starting NTFS raw catalog scan on: \(devicePath)")
 
         // Step 1: Parse the boot sector
-        let boot = try parseBootSector(fd: fd)
+        let boot = try parseBootSector(reader: reader)
         logger.info(
             """
             NTFS boot: \(boot.bytesPerSector) bytes/sector, \
@@ -102,7 +95,7 @@ struct NTFSScanner: Sendable {
             let recordOffset = boot.mftOffset + UInt64(recordIndex) * UInt64(boot.mftRecordSize)
 
             let bytesRead = recordBuffer.withUnsafeMutableBytes { buf in
-                pread(fd, buf.baseAddress!, boot.mftRecordSize, off_t(recordOffset))
+                reader.read(into: buf.baseAddress!, offset: recordOffset, length: boot.mftRecordSize)
             }
 
             // Stop if we can't read a full record
@@ -135,7 +128,7 @@ struct NTFSScanner: Sendable {
             if let file = parseDeletedRecord(
                 record: recordBuffer,
                 boot: boot,
-                fd: fd
+                reader: reader
             ) {
                 filesFound += 1
                 continuation.yield(.fileFound(file))
@@ -154,10 +147,10 @@ struct NTFSScanner: Sendable {
 
     // MARK: - Boot Sector Parsing
 
-    private func parseBootSector(fd: Int32) throws -> NTFSBoot {
+    private func parseBootSector(reader: PrivilegedDiskReader) throws -> NTFSBoot {
         var sector = [UInt8](repeating: 0, count: 512)
         let bytesRead = sector.withUnsafeMutableBytes { buf in
-            pread(fd, buf.baseAddress!, 512, 0)
+            reader.read(into: buf.baseAddress!, offset: 0, length: 512)
         }
         guard bytesRead == 512 else {
             throw NTFSScanError.invalidBootSector
@@ -200,11 +193,12 @@ struct NTFSScanner: Sendable {
     }
 
     // MARK: - MFT Record Parsing
+
     /// Parses a deleted MFT record to extract filename and verify data.
     private func parseDeletedRecord(
         record: [UInt8],
         boot: NTFSBoot,
-        fd: Int32
+        reader: PrivilegedDiskReader
     ) -> RecoverableFile? {
         let firstAttrOffset = Int(record[20]) | (Int(record[21]) << 8)
         guard firstAttrOffset >= 56, firstAttrOffset < record.count else { return nil }
@@ -242,7 +236,7 @@ struct NTFSScanner: Sendable {
             parsed: ParsedRecord(name: name, ext: ext, fileSize: fileSize, dataRunCluster: dataRunCluster),
             expectedSig: expectedSig,
             boot: boot,
-            fd: fd
+            reader: reader
         )
     }
 
@@ -295,12 +289,18 @@ struct NTFSScanner: Sendable {
         parsed: ParsedRecord,
         expectedSig: FileSignature,
         boot: NTFSBoot,
-        fd: Int32
+        reader: PrivilegedDiskReader
     ) -> RecoverableFile? {
         if let cluster = parsed.dataRunCluster {
             let byteOffset = cluster * UInt64(boot.clusterSize)
             var header = [UInt8](repeating: 0, count: 16)
-            let bytesRead = header.withUnsafeMutableBytes { buf in pread(fd, buf.baseAddress!, 16, off_t(byteOffset)) }
+            let bytesRead = header.withUnsafeMutableBytes { buf in
+                reader.read(
+                    into: buf.baseAddress!,
+                    offset: byteOffset,
+                    length: 16
+                )
+            }
             guard bytesRead == 16 else { return nil }
 
             var matchedSig: FileSignature?
