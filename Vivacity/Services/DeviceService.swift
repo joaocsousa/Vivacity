@@ -1,8 +1,13 @@
 import AppKit
 import Foundation
 
+protocol DeviceServicing: Sendable {
+    func discoverDevices() async throws -> [StorageDevice]
+    func volumeChanges() -> AsyncStream<Void>
+}
+
 /// Service responsible for discovering mounted storage devices (volumes).
-struct DeviceService: Sendable {
+struct DeviceService: DeviceServicing {
     // MARK: - Volume Paths to Exclude
 
     /// Path prefixes for system volumes that should never appear in the device list.

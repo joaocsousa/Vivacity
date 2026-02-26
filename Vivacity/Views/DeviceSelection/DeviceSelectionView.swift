@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Screen that lists all available storage devices and lets the user select one to scan.
 struct DeviceSelectionView: View {
-    @State private var viewModel = DeviceSelectionViewModel()
+    @State private var viewModel = AppEnvironment.makeDeviceSelectionViewModel()
     @State private var navigationTarget: StorageDevice?
 
     var body: some View {

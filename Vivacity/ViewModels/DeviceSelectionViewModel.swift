@@ -24,12 +24,12 @@ final class DeviceSelectionViewModel {
 
     // MARK: - Dependencies
 
-    private let deviceService: DeviceService
+    private let deviceService: DeviceServicing
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeviceSelection")
 
     // MARK: - Init
 
-    init(deviceService: DeviceService = DeviceService()) {
+    init(deviceService: DeviceServicing = DeviceService()) {
         self.deviceService = deviceService
     }
 

@@ -9,7 +9,7 @@ import SwiftUI
 /// 4. Footer with select all/deselect, file count, and recover button
 struct FileScanView: View {
     let device: StorageDevice
-    @State private var viewModel = FileScanViewModel()
+    @State private var viewModel = AppEnvironment.makeFileScanViewModel()
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
