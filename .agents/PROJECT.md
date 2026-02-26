@@ -10,12 +10,10 @@ description: Project context and status for AI agents working on the Vivacity co
 Vivacity is a **native macOS application** built with **SwiftUI** that allows users to recover deleted image and video files from internal and external storage devices connected to their Mac.
 
 ## AI Context & Handoff
-> **Note to next AI Assistant (Codex or others):**
-> Welcome to Vivacity! The codebase is set up, compiling cleanly, and fully linted with **SwiftLint**, **SwiftFormat**, and **Xcode Static Analyzer** (0 warnings). 
-> 
-> **Where we are:** We have successfully built the M1-M3 milestones. The app currently discovers devices (Fast Scan) and can perform raw sector-by-sector carving (Deep Scan) for predefined file signatures. The UI allows users to select a device, scan it, and preview found files.
-> 
-> **What to do next:** Your immediate next priority is **M4 (Recovery Destination Screen)** — checking `PROJECT_PLAN.md` for tickets T-013 through T-015. After M4 is complete, you should move on to M6 (Scan Engine Hardening) to fix scanning bugs on real devices. Please read `PROJECT_PLAN.md` for detailed technical implementation steps.
+> **Note to next AI Assistant (Codex or others):** Treat `PROJECT_PLAN.md` as the single source of truth for roadmap, status, and tickets.  
+> **Where we are:** M1–M3, M6, and M7 are complete. The app discovers devices, runs Fast Scan and filesystem-aware Deep Scan (FAT/APFS/HFS+), and streams previews. Code quality tools (`SwiftLint`, `SwiftFormat`, `Xcode Static Analyzer`) are clean.  
+> **Current focus:** M8 Advanced Features (T-027 → T-029: lost partition search, scan session save/resume, disk imaging) plus M12 polish/navigation (T-017).  
+> **Next up:** M9 camera recovery, then M10 scan results UX, then M11 recovery destination flow.
 
 ## Purpose
 
@@ -41,14 +39,18 @@ Users who accidentally delete photos or videos need a clean, modern macOS-native
 > [!IMPORTANT]
 > This section must be updated by any agent after completing work.
 
-| Milestone            | Status      |
-|----------------------|-------------|
-| Empty macOS app      | ✅ Done |
-| Device selection     | ✅ Done |
-| File scanning        | ✅ Done |
-| Preview & selection  | ✅ Done |
-| Recovery destination | ❌ Not started |
-| File recovery        | ❌ Not started |
+| Milestone                      | Status |
+|--------------------------------|--------|
+| M1 Empty macOS app             | ✅ Done |
+| M2 Device selection            | ✅ Done |
+| M3 File scanning & preview     | ✅ Done |
+| M6 Scan engine hardening       | ✅ Done |
+| M7 Deep scan FS-aware carving  | ✅ Done |
+| M8 Advanced features           | ⬜ TODO |
+| M9 Advanced camera recovery    | ⬜ TODO |
+| M10 Scan results UX            | ⬜ TODO |
+| M11 Recovery destination       | ⬜ TODO |
+| M12 Polish & edge cases        | 🔶 In progress |
 
 > **Minimum Supported OS**: macOS 14.0 (Sonoma). Also compatible with macOS 15.x (Sequoia).
 
