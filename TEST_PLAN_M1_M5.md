@@ -33,31 +33,28 @@
 - Selection: Row highlight toggles; Start Scanning disabled until a device is selected; navigation occurs when enabled.
 - Error handling: Simulate discovery failure (e.g., mock or deny permissions) → alert shown, UI recovers after retry.
 
-## 3) M3 — File Scan & Preview
-- Fast Scan happy path: Runs to completion on test volume with deleted files; progress advances; results populate live list.
-- Deep Scan prompt/flow: After Fast Scan completes, Deep Scan can be started, skipped, or cancelled.
-- Selection UX: Select/deselect all; selection count updates; Recover button enabled only when criteria met.
-- Preview: Selecting a file shows preview panel; image thumbnails render; video first-frame preview or fallback icon shown.
-- Cancellation: Stop button halts active scan and transitions to completed state without crashes.
-- Deduplication: Files found in Fast Scan not duplicated during Deep Scan (compare offsets/ids).
+## 3) M3 — File Scan & Preview (Automated)
+- Unit: FastScanService emits expected events for a fixture image; progress increases monotonically.
+- Unit: DeepScanService yields carved results from fixture buffers; deduplication skips existing offsets.
+- Unit: FileScanViewModel state machine transitions (idle → fastScanning → fastComplete → deepScanning → complete) with fakes.
+- UI (XCUITest with fakes): Launch app with injected fake services; verify list updates, selection toggles, and navigation to scan view. (No real device IO.)
 
-## 4) M4 — Scan Engine Hardening
-- Privileged access: When scanning external raw device, app prompts once for password; scan proceeds without chmod side effects.
-- Fallback behavior: If privilege denied, app surfaces the error and does not hang; limited scan path remains usable.
-- Catalog scanners: FAT/ExFAT/NTFS catalog passes run and return results (use synthetic deleted 0xE5 files for FAT).
-- Stability: Long-running scan (≥10 minutes) does not leak memory or crash; progress continues.
+## 4) M4 — Scan Engine Hardening (Automated)
+- Unit: PrivilegedDiskReader fake ensures no chmod performed; FIFO path creation invoked; reader respects offset sequencing.
+- Unit: VolumeInfo detects filesystem type for fake devices.
+- Unit: FAT/ExFAT/NTFS catalog scanners return expected synthetic entries from fixture buffers.
+- UI (XCUITest with fakes): Denied privilege scenario shows error banner/state; app remains responsive (fake injected to simulate denial).
 
-## 5) M5 — Filesystem-Aware Deep Scan
-- FAT carving: Deleted directory entries reconstructed with names and offsets; carved files readable.
-- APFS/HFS+ carving: Orphaned catalog nodes yield files with original names where present.
-- Dedup vs Fast Scan: Carved results with offsets overlapping Fast Scan entries are skipped.
-- Signature coverage: JPEG/PNG/HEIC/MP4/MOV headers detected in raw scan; estimated sizes plausible.
-- Performance: Chunked read size (128 KB) maintains steady throughput; UI remains responsive.
+## 5) M5 — Filesystem-Aware Deep Scan (Automated)
+- Unit: FATCarver parses fixture buffer with crafted directory entries; returns expected filenames/offsets.
+- Unit: APFSCarver/HFSPlusCarver parse fixture buffers with catalog nodes; produce expected carved file metadata.
+- Unit: DeepScanService dedupes carved offsets against provided existing offsets.
+- UI (XCUITest with fakes): Deep scan phase displays progress updates and appends carved rows supplied by fake service.
 
-## 6) Regression & Cross-Cutting
-- Concurrency: Multiple scans cancelled/started sequentially do not leave dangling tasks (no repeated prompts).
-- State reset: Navigating back from File Scan and re-entering resets scan state.
-- Localization/sizing: UI tolerates narrow widths (min window); text truncation acceptable.
+## 6) Regression & Cross-Cutting (Automated)
+- Unit: Cancellation propagates through view model and terminates fake streams; scanTask cleared.
+- Unit: Navigation/state reset helper resets selection and phase when re-entering scan view.
+- UI (XCUITest with fakes): Run cancel → restart flow to ensure UI returns to idle and progress resets.
 
 ## 7) Acceptance Criteria per Milestone
 - M1: Build + launch succeeds with empty root UI.
@@ -69,7 +66,7 @@
 ## 8) Out of Scope (for this phase)
 - Recovery destination flow (M9), file recovery write path, advanced camera recovery, UX filters, and full polish items.
 
-## 9) Evidence to Capture When Executing
-- Screenshots: Device list, scan in progress, preview panel.
-- Logs: App log excerpts showing device discovery, privilege escalation path, and carve findings.
-- Artifacts: List of recovered test files with sizes/offsets for later regression comparison.
+## 9) Evidence to Capture When Executing (Automated Artifacts)
+- Unit: Test logs and captured fixture inputs/outputs for carvers and services.
+- UI (XCUITest): XCResult bundle with screenshots/attachments from fake-driven flows.
+- Metrics: Optional timing logs for scan loops against fixture buffers (performance regressions).
