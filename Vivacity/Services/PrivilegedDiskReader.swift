@@ -4,15 +4,14 @@ import Security
 
 /// Provides privileged read access to raw disk devices.
 ///
-/// For direct access, uses `pread()` with a file descriptor. When the
-/// device is not directly readable (e.g. `/dev/disk17` owned by root),
-/// temporarily grants read access to the device node using `chmod` via
-/// AppleScript's `do shell script ... with administrator privileges`.
+/// - Preferred path: direct `open()`/`pread()` when the device node is readable.
+/// - Fallback path: start a privileged `dd` that streams the raw device into a
+///   per-run FIFO in `/tmp` (prompting once with the standard macOS password
+///   dialog), then read from the FIFO. No device permissions are modified.
 ///
-/// After the scan completes, the original permissions are restored.
-///
-/// This approach works for Developer ID distribution and shows the
-/// standard macOS password dialog for authentication.
+/// Closing the FIFO causes `dd` to receive SIGPIPE and exit, leaving the system
+/// in its original state. This approach works for Developer ID distribution and
+/// avoids persistent chmod changes on `/dev/disk*`.
 final class PrivilegedDiskReader: @unchecked Sendable {
     private let devicePath: String
     private let logger = Logger(subsystem: "com.vivacity.app", category: "PrivilegedDiskReader")
