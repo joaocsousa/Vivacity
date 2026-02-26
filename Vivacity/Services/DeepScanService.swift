@@ -98,6 +98,9 @@ struct DeepScanService: Sendable {
         defer { reader.stop() }
 
         var fatCarver: FATCarver?
+        var apfsCarver: APFSCarver?
+        var hfsCarver: HFSPlusCarver?
+
         if volumeInfo.filesystemType == .fat32 {
             var bootSector = [UInt8](repeating: 0, count: 512)
             let read = bootSector.withUnsafeMutableBytes { buf in
@@ -107,6 +110,12 @@ struct DeepScanService: Sendable {
                 fatCarver = FATCarver(bpb: bpb)
                 logger.info("Initialized FATCarver with valid BPB")
             }
+        } else if volumeInfo.filesystemType == .apfs {
+            apfsCarver = APFSCarver()
+            logger.info("Initialized APFSCarver for APFS volume")
+        } else if volumeInfo.filesystemType == .hfsPlus {
+            hfsCarver = HFSPlusCarver()
+            logger.info("Initialized HFSPlusCarver for HFS+ volume")
         }
 
         // Get total size for progress
@@ -147,44 +156,65 @@ struct DeepScanService: Sendable {
             let scanLength = readOffset + bytesRead
 
             // 1. Run Filesystem-Aware Carver (if active)
-            if fatCarver != nil {
-                buffer.withUnsafeBytes { rawBuffer in
-                    let chunkStart = bytesScanned > UInt64(readOffset) ? bytesScanned - UInt64(readOffset) : 0
-                    let carvedFiles = fatCarver!.carveChunk(
-                        buffer: UnsafeRawBufferPointer(rebasing: rawBuffer[0 ..< scanLength]),
-                        baseOffset: chunkStart
+            buffer.withUnsafeBytes { rawBuffer in
+                let chunkStart = bytesScanned > UInt64(readOffset) ? bytesScanned - UInt64(readOffset) : 0
+                let slice = UnsafeRawBufferPointer(rebasing: rawBuffer[0 ..< scanLength])
+
+                var carvedFiles: [FATCarver.CarvedFile] = []
+                var carvedAPFS: [APFSCarver.CarvedFile] = []
+                var carvedHFS: [HFSPlusCarver.CarvedFile] = []
+
+                if fatCarver != nil {
+                    carvedFiles = fatCarver!.carveChunk(buffer: slice, baseOffset: chunkStart)
+                } else if apfsCarver != nil {
+                    carvedAPFS = apfsCarver!.carveChunk(buffer: slice, baseOffset: chunkStart)
+                } else if hfsCarver != nil {
+                    carvedHFS = hfsCarver!.carveChunk(buffer: slice, baseOffset: chunkStart)
+                }
+
+                // Process FAT carved files
+                for carvedFile in carvedFiles {
+                    if allOffsets.contains(carvedFile.offsetOnDisk) { continue }
+                    processCarvedFile(
+                        fileName: carvedFile.fileName,
+                        fileExtension: carvedFile.fileExtension,
+                        sizeInBytes: carvedFile.sizeInBytes,
+                        offsetOnDisk: carvedFile.offsetOnDisk,
+                        reader: reader,
+                        allOffsets: &allOffsets,
+                        filesFound: &filesFound,
+                        continuation: continuation
                     )
+                }
 
-                    for carvedFile in carvedFiles {
-                        // Skip if we already mapped this exact offset
-                        if allOffsets.contains(carvedFile.offsetOnDisk) { continue }
+                // Process APFS carved files
+                for carvedFile in carvedAPFS {
+                    if allOffsets.contains(carvedFile.offsetOnDisk) { continue }
+                    processCarvedFile(
+                        fileName: carvedFile.fileName,
+                        fileExtension: carvedFile.fileExtension,
+                        sizeInBytes: carvedFile.sizeInBytes,
+                        offsetOnDisk: carvedFile.offsetOnDisk,
+                        reader: reader,
+                        allOffsets: &allOffsets,
+                        filesFound: &filesFound,
+                        continuation: continuation
+                    )
+                }
 
-                        // Verify signature by reading the cluster from disk
-                        var header = [UInt8](repeating: 0, count: 16)
-                        let headRead = header.withUnsafeMutableBytes { hBuf in
-                            reader.read(into: hBuf.baseAddress!, offset: carvedFile.offsetOnDisk, length: 16)
-                        }
-
-                        if headRead == 16 {
-                            if let sig = verifyMagicBytes(header, expectedExtension: carvedFile.fileExtension) {
-                                allOffsets.insert(carvedFile.offsetOnDisk)
-
-                                let file = RecoverableFile(
-                                    id: UUID(),
-                                    fileName: carvedFile.fileName,
-                                    fileExtension: carvedFile.fileExtension,
-                                    fileType: sig.category,
-                                    sizeInBytes: carvedFile.sizeInBytes,
-                                    offsetOnDisk: carvedFile.offsetOnDisk,
-                                    signatureMatch: sig,
-                                    source: .deepScan
-                                )
-
-                                filesFound += 1
-                                continuation.yield(.fileFound(file))
-                            }
-                        }
-                    }
+                // Process HFS+ carved files
+                for carvedFile in carvedHFS {
+                    if allOffsets.contains(carvedFile.offsetOnDisk) { continue }
+                    processCarvedFile(
+                        fileName: carvedFile.fileName,
+                        fileExtension: carvedFile.fileExtension,
+                        sizeInBytes: carvedFile.sizeInBytes,
+                        offsetOnDisk: carvedFile.offsetOnDisk,
+                        reader: reader,
+                        allOffsets: &allOffsets,
+                        filesFound: &filesFound,
+                        continuation: continuation
+                    )
                 }
             }
 
@@ -232,6 +262,43 @@ struct DeepScanService: Sendable {
         logger.info("Deep scan complete: \(filesFound) file(s) found after scanning \(bytesScanned) bytes")
         continuation.yield(.completed)
         continuation.finish()
+    }
+
+    private func processCarvedFile(
+        fileName: String,
+        fileExtension: String,
+        sizeInBytes: Int64,
+        offsetOnDisk: UInt64,
+        reader: PrivilegedDiskReader,
+        allOffsets: inout Set<UInt64>,
+        filesFound: inout Int,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
+    ) {
+        // Verify signature by reading the cluster from disk
+        var header = [UInt8](repeating: 0, count: 16)
+        let headRead = header.withUnsafeMutableBytes { hBuf in
+            reader.read(into: hBuf.baseAddress!, offset: offsetOnDisk, length: 16)
+        }
+
+        if headRead == 16 {
+            if let sig = verifyMagicBytes(header, expectedExtension: fileExtension) {
+                allOffsets.insert(offsetOnDisk)
+
+                let file = RecoverableFile(
+                    id: UUID(),
+                    fileName: fileName,
+                    fileExtension: fileExtension,
+                    fileType: sig.category,
+                    sizeInBytes: sizeInBytes,
+                    offsetOnDisk: offsetOnDisk,
+                    signatureMatch: sig,
+                    source: .deepScan
+                )
+
+                filesFound += 1
+                continuation.yield(.fileFound(file))
+            }
+        }
     }
 
     private func scanChunk(

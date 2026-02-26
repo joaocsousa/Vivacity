@@ -24,7 +24,7 @@
 | M2 | Device Selection Screen | T-002 → T-005 | ✅ DONE |
 | M3 | File Scan & Preview Screen | T-006 → T-012 (T-008 split into a/b) | ✅ DONE |
 | M6 | Scan Engine Hardening | T-019 → T-021 | ✅ DONE |
-| M7 | Deep Scan FS-Aware Carving | T-025 → T-026 | ⬜ TODO |
+| M7 | Deep Scan FS-Aware Carving | T-025 → T-026 | ✅ DONE |
 | M8 | Advanced Features | T-027 → T-029 | ⬜ TODO |
 | M9 | Advanced Camera Recovery | T-030 → T-031 | ⬜ TODO |
 | M10 | Scan Results UX | T-022 → T-024 | ⬜ TODO |
@@ -338,7 +338,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ## M7 — Deep Scan: Filesystem-Aware Carving
 
-### T-025 ⬜ FAT32 filesystem-aware carving
+### T-025 ✅ FAT32 filesystem-aware carving
 
 **Description**: Parse orphaned FAT directory entries and FAT chain fragments from raw sectors to reconstruct folder structures after formatting.
 
@@ -346,7 +346,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-### T-026 ⬜ APFS/HFS+ metadata carving
+### T-026 ✅ APFS/HFS+ metadata carving
 
 **Description**: Parse orphaned catalog B-tree nodes to recover files with original names and paths from formatted or damaged APFS/HFS+ volumes.
 

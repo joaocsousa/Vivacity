@@ -20,9 +20,15 @@ While working on a feature:
 *   Use internal AI artifacts (like `task.md` or `implementation_plan.md`) to organize your thoughts.
 *   If a ticket requires multiple steps across different files, update the ticket status in `PROJECT_PLAN.md` to `🔶 IN PROGRESS`.
 
-## 3. Post-Implementation Documentation
+## 3. Post-Implementation Verification & Documentation
 
-Once the code is written, builds successfully, and is linted, you **MUST** execute these documentation updates before committing:
+Once the primary coding is done for a ticket, you **MUST** execute these verification steps before committing or notifying the user:
+
+1.  **Format Code**: Run `swiftformat .` in the terminal to automatically format all Swift files.
+2.  **Lint Code**: Run `swiftlint` to ensure there are no lingering SwiftLint violations. Fix any violations before proceeding.
+3.  **Build Code**: Run `xcodebuild build -scheme Vivacity` and ensure it passes cleanly.
+
+After verification is complete, execute these documentation updates:
 
 1.  **Mark the Ticket Done**: Open `PROJECT_PLAN.md`, find your ticket, and change its state to `✅ DONE`.
 2.  **Update Milestone Status**: If your ticket completed a milestone, open `.agents/PROJECT.md` and change that milestone's status in the table to `✅ Done`.

@@ -92,11 +92,10 @@ See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the full roadmap. Current status:
 | Milestone | Status |
 |-----------|--------|
 | M1–M3: Scaffolding, Device Selection, Scan & Preview | ✅ Done |
-| M4: Recovery Destination | ⬜ Next |
-| M5: Polish & Edge Cases | 🔶 In Progress |
-| M6: Scan Engine Hardening | ⬜ Planned |
-| M7: Scan Results UX (filtering, confidence) | ⬜ Planned |
-| M8–M10: FS Carving, Advanced Features, Camera Recovery | ⬜ Future |
+| M6–M7: Scan Engine Hardening & FS Carving | ✅ Done |
+| M8–M10: Advanced Features, Camera Recovery & UX | ⬜ Planned |
+| M11: Recovery Destination Screen | ⬜ Planned |
+| M12: Polish & Edge Cases | 🔶 In Progress |
 
 ## License
 
