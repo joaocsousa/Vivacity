@@ -96,17 +96,7 @@ Vivacity/
 
 ## Roadmap
 
-See [PROJECT_PLAN.md](PROJECT_PLAN.md) for details. Snapshot:
-
-| Milestone | Status |
-|-----------|--------|
-| M1–M3: Scaffolding, Device Selection, Scan & Preview | ✅ Done |
-| M4–M5: Scan Engine Hardening & FS-Aware Carving | ✅ Done |
-| M6: Advanced Features (partition search, resume, imaging) | ⬜ TODO |
-| M7: Advanced Camera Recovery | ⬜ TODO |
-| M8: Scan Results UX | ⬜ TODO |
-| M9: Recovery Destination Screen | ⬜ TODO |
-| M10: Polish & Edge Cases | 🔶 In Progress |
+The canonical roadmap, status, and project plan are maintained exclusively in [PROJECT_PLAN.md](PROJECT_PLAN.md) to avoid drift. Please refer to that document for all milestone statuses and ticket details.
 
 ## License
 
