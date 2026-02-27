@@ -20,6 +20,7 @@
 		49971FA5A658E089F0216CB2 /* PrivilegedDiskReading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F72C99CDB009F0B10499058 /* PrivilegedDiskReading.swift */; };
 		53042BE3A8A7C4D7E26D1653 /* FATModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701C8C0145874A1017A1233A /* FATModels.swift */; };
 		702BC9CC6922EABB684E6289 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = D72ED180F0AD92F957FD37E1 /* AppEnvironment.swift */; };
+		7A262EA9E3725DD7AA12E5CE /* ImageReconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FFE5F19FEE9CB04CF674F2 /* ImageReconstructor.swift */; };
 		8196911B4649ACD2E9ABFC82 /* HFSPlusCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6026EEDF75109041E356905B /* HFSPlusCarver.swift */; };
 		8EB1D4218FEFD91EF71B930F /* FragmentedVideoAssemblerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E128C33742E42745F848C8 /* FragmentedVideoAssemblerTests.swift */; };
 		A60D8FD94410A8CB3F280066 /* MP4ReconstructorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20911F377875A190F5861FD7 /* MP4ReconstructorTests.swift */; };
@@ -82,6 +83,7 @@
 		15DB3BE95DBA2A386AB785A3 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		2088029C926601913E5DF08C /* CameraRecoveryServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CameraRecoveryServiceTests.swift; sourceTree = "<group>"; };
 		20911F377875A190F5861FD7 /* MP4ReconstructorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MP4ReconstructorTests.swift; path = VivacityTests/Carvers/MP4ReconstructorTests.swift; sourceTree = "<group>"; };
+		22FFE5F19FEE9CB04CF674F2 /* ImageReconstructor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageReconstructor.swift; sourceTree = "<group>"; };
 		2BE52ADF7980CA375B770CE3 /* VivacityUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VivacityUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		31C080987ACA5FEDE7E26580 /* SessionManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		31D64682A1FDC7E785D23022 /* FileScanViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileScanViewModelTests.swift; sourceTree = "<group>"; };
@@ -259,6 +261,7 @@
 			isa = PBXGroup;
 			children = (
 				6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */,
+				22FFE5F19FEE9CB04CF674F2 /* ImageReconstructor.swift */,
 			);
 			name = Carvers;
 			sourceTree = "<group>";
@@ -539,6 +542,7 @@
 				239EFD18DDF58EAB29C74CBA /* CameraRecoveryService.swift in Sources */,
 				C53E93D12892ED1C6F64FDD8 /* MP4Reconstructor.swift in Sources */,
 				D980A369EB18B4CA88551E40 /* FragmentedVideoAssembler.swift in Sources */,
+				7A262EA9E3725DD7AA12E5CE /* ImageReconstructor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
