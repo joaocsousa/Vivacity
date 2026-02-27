@@ -20,7 +20,7 @@
 | M4 | Scan Engine Hardening | T-019 → T-021 | ✅ DONE |
 | M5 | Deep Scan FS-Aware Carving | T-025 → T-026 | ✅ DONE |
 | M6 | Advanced Features | T-027 → T-029 | ✅ DONE |
-| M7 | Advanced Camera Recovery | T-030 → T-031 | ⬜ TODO |
+| M7 | Advanced Camera Recovery | T-030 → T-031 | 🔶 IN PROGRESS |
 | M8 | Scan Results UX | T-022 → T-024 | ⬜ TODO |
 | M9 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
 | M10 | Polish & Edge Cases | T-016 → T-018 | 🔶 IN PROGRESS |
@@ -376,7 +376,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ## M7 — Advanced Camera Recovery
 
-### T-030 ⬜ Basic camera-aware recovery
+### T-030 ✅ Basic camera-aware recovery
 
 **Description**: Detect camera directory patterns (DCIM, GoPro, Canon, Sony) and optimize recovery for common camera formats.
 

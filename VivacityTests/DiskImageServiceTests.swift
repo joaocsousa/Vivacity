@@ -5,7 +5,7 @@ final class DiskImageServiceTests: XCTestCase {
     func testCreateImageSuccessfully() async throws {
         // Create 1MB of synthetic data
         let testData = Data(count: 1024 * 1024)
-        let fakeReader = FakePrivilegedDiskReader(mockData: testData)
+        let fakeReader = FakePrivilegedDiskReader(buffer: testData)
         let service = DiskImageService(diskReader: fakeReader)
 
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".dd")

@@ -48,6 +48,9 @@ struct RecoverableFile: Identifiable, Hashable, Sendable, Codable {
     /// Which scan phase found this file.
     let source: ScanSource
 
+    /// The original file path on the volume, if discovered via filesystem scan.
+    var filePath: String? = nil
+
     // MARK: - Computed
 
     /// Human-readable file size string (e.g. "3.2 MB").
