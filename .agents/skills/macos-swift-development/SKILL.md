@@ -59,9 +59,10 @@ Do not use Xcode's GUI for regular development cycles; use the CLI tools configu
     ```bash
     xcodebuild build -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"
     ```
-*   **Format & Lint Code (MANDATORY):**
-    You **MUST** run both `swiftformat .` and `swiftlint` when you believe you are finished with a task, before marking it as complete or notifying the user. Fix any warnings or errors that arise.
+*   **Test, Format, & Lint Code (MANDATORY):**
+    You **MUST** run the test suite, `swiftformat .`, and `swiftlint` when you believe you are finished with a task, before marking it as complete or notifying the user. Fix any failing tests, warnings, or errors that arise.
     ```bash
+    xcodebuild test -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"
     swiftformat . && swiftlint
     ```
 *   **Static Analyzer:**

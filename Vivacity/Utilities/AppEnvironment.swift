@@ -1,12 +1,13 @@
 import Foundation
 
 /// Simple dependency container to allow tests to inject fake services/view models.
+@MainActor
 enum AppEnvironment {
-    static var makeDeviceSelectionViewModel: () -> DeviceSelectionViewModel = {
+    static var makeDeviceSelectionViewModel: @MainActor () -> DeviceSelectionViewModel = {
         DeviceSelectionViewModel()
     }
 
-    static var makeFileScanViewModel: () -> FileScanViewModel = {
+    static var makeFileScanViewModel: @MainActor () -> FileScanViewModel = {
         FileScanViewModel()
     }
 

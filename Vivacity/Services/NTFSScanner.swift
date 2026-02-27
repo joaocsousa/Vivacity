@@ -65,7 +65,7 @@ struct NTFSScanner: Sendable {
     /// Scans an NTFS volume for deleted files by reading MFT records.
     func scan(
         volumeInfo: VolumeInfo,
-        reader: PrivilegedDiskReader,
+        reader: any PrivilegedDiskReading,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let devicePath = volumeInfo.devicePath
@@ -147,7 +147,7 @@ struct NTFSScanner: Sendable {
 
     // MARK: - Boot Sector Parsing
 
-    private func parseBootSector(reader: PrivilegedDiskReader) throws -> NTFSBoot {
+    private func parseBootSector(reader: any PrivilegedDiskReading) throws -> NTFSBoot {
         var sector = [UInt8](repeating: 0, count: 512)
         let bytesRead = sector.withUnsafeMutableBytes { buf in
             reader.read(into: buf.baseAddress!, offset: 0, length: 512)
@@ -198,7 +198,7 @@ struct NTFSScanner: Sendable {
     private func parseDeletedRecord(
         record: [UInt8],
         boot: NTFSBoot,
-        reader: PrivilegedDiskReader
+        reader: any PrivilegedDiskReading
     ) -> RecoverableFile? {
         let firstAttrOffset = Int(record[20]) | (Int(record[21]) << 8)
         guard firstAttrOffset >= 56, firstAttrOffset < record.count else { return nil }
@@ -289,7 +289,7 @@ struct NTFSScanner: Sendable {
         parsed: ParsedRecord,
         expectedSig: FileSignature,
         boot: NTFSBoot,
-        reader: PrivilegedDiskReader
+        reader: any PrivilegedDiskReading
     ) -> RecoverableFile? {
         if let cluster = parsed.dataRunCluster {
             let byteOffset = cluster * UInt64(boot.clusterSize)

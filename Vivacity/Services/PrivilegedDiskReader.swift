@@ -11,8 +11,8 @@ import Security
 ///
 /// Closing the FIFO causes `dd` to receive SIGPIPE and exit, leaving the system
 /// in its original state. This approach works for Developer ID distribution and
-/// avoids persistent chmod changes on `/dev/disk*`.
-final class PrivilegedDiskReader: @unchecked Sendable {
+/// persistent chmod changes on `/dev/disk*`.
+final class PrivilegedDiskReader: PrivilegedDiskReading, @unchecked Sendable {
     private let devicePath: String
     private let logger = Logger(subsystem: "com.vivacity.app", category: "PrivilegedDiskReader")
 

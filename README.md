@@ -37,7 +37,14 @@ open build/Debug/Vivacity.app
 
 Or open `Vivacity.xcodeproj` in Xcode and press ⌘R.
 
-### Code Quality
+### Testing & Code Quality
+
+Vivacity includes a suite of unit and UI tests. You are expected to run the test suite and linters to ensure your code is consistently formatted and robust.
+
+**Run Tests:**
+```bash
+xcodebuild test -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"
+```
 
 Vivacity uses **SwiftFormat** and **SwiftLint** to maintain code quality. 
 

@@ -69,7 +69,7 @@ struct ExFATScanner: Sendable {
     /// Scans an ExFAT volume for deleted files.
     func scan(
         volumeInfo: VolumeInfo,
-        reader: PrivilegedDiskReader,
+        reader: any PrivilegedDiskReading,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let devicePath = volumeInfo.devicePath
@@ -131,7 +131,7 @@ struct ExFATScanner: Sendable {
 
     // MARK: - Boot Sector
 
-    private func parseBootSector(reader: PrivilegedDiskReader) throws -> ExFATBoot {
+    private func parseBootSector(reader: any PrivilegedDiskReading) throws -> ExFATBoot {
         var sector = [UInt8](repeating: 0, count: 512)
         let bytesRead = sector.withUnsafeMutableBytes { buf in
             reader.read(into: buf.baseAddress!, offset: 0, length: 512)
@@ -187,7 +187,7 @@ struct ExFATScanner: Sendable {
     }
 
     private func scanDirectoryCluster(
-        reader: PrivilegedDiskReader,
+        reader: any PrivilegedDiskReading,
         cluster: UInt32,
         boot: ExFATBoot
     ) throws -> ScanResults {
@@ -272,7 +272,7 @@ struct ExFATScanner: Sendable {
         startIndex: Int,
         secondaryCount: Int,
         boot: ExFATBoot,
-        reader: PrivilegedDiskReader
+        reader: any PrivilegedDiskReading
     ) -> RecoverableFile? {
         var startingCluster: UInt32 = 0
         var fileSize: Int64 = 0

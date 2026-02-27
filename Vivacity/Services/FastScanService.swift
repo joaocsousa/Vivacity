@@ -19,6 +19,22 @@ protocol FastScanServicing: Sendable {
 
 struct FastScanService: FastScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FastScan")
+    private let diskReaderFactory: @Sendable (String) -> any PrivilegedDiskReading
+    private let runTMUtilClosure: @Sendable (URL, Logger) -> String?
+    private let mountSnapshotClosure: @Sendable (String, URL, Logger) throws -> URL
+    private let unmountSnapshotClosure: @Sendable (URL, Logger) -> Void
+
+    init(
+        diskReaderFactory: @escaping @Sendable (String) -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading },
+        runTMUtilClosure: @escaping @Sendable (URL, Logger) -> String? = FastScanService.defaultRunTMUtil,
+        mountSnapshotClosure: @escaping @Sendable (String, URL, Logger) throws -> URL = FastScanService.defaultMountSnapshot,
+        unmountSnapshotClosure: @escaping @Sendable (URL, Logger) -> Void = FastScanService.defaultUnmountSnapshot
+    ) {
+        self.diskReaderFactory = diskReaderFactory
+        self.runTMUtilClosure = runTMUtilClosure
+        self.mountSnapshotClosure = mountSnapshotClosure
+        self.unmountSnapshotClosure = unmountSnapshotClosure
+    }
 
     /// Set of file extensions we care about (lowercased).
     private static let supportedExtensions: Set<String> = Set(FileSignature.allCases.map(\.fileExtension))
@@ -92,7 +108,7 @@ struct FastScanService: FastScanServicing {
         if needsPhaseB {
             logger.info("Fast scan Phase B (Raw Catalog) on \(volumeInfo.filesystemType.displayName)")
             do {
-                let reader = PrivilegedDiskReader(devicePath: volumeInfo.devicePath)
+                let reader = diskReaderFactory(volumeInfo.devicePath)
                 try reader.start()
                 defer { reader.stop() }
 
@@ -270,7 +286,7 @@ struct FastScanService: FastScanServicing {
         filesFound: inout Int,
         filesExamined: inout Int
     ) async throws {
-        guard let output = runTMUtil(volumeRoot: volumeRoot) else { return }
+        guard let output = runTMUtilClosure(volumeRoot, logger) else { return }
 
         // Parse snapshot names (format: "com.apple.TimeMachine.YYYY-MM-DD-HHMMSS.local")
         let snapshotNames = output.components(separatedBy: "\n")
@@ -299,7 +315,8 @@ struct FastScanService: FastScanServicing {
         }
     }
 
-    private func runTMUtil(volumeRoot: URL) -> String? {
+    @Sendable
+    private static func defaultRunTMUtil(volumeRoot: URL, logger: Logger) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tmutil")
         process.arguments = ["listlocalsnapshots", volumeRoot.path]
@@ -327,6 +344,28 @@ struct FastScanService: FastScanServicing {
         filesExamined: inout Int
     ) async throws {
         try Task.checkCancellation()
+        
+        let mountPoint: URL
+        do {
+            mountPoint = try mountSnapshotClosure(snapshotName, volumeRoot, logger)
+        } catch {
+            return
+        }
+
+        logger.info("Mounted snapshot \(snapshotName) at \(mountPoint.path)")
+        await enumerateSnapshot(
+            mountPoint: mountPoint,
+            volumeRoot: volumeRoot,
+            continuation: continuation,
+            filesFound: &filesFound,
+            filesExamined: &filesExamined
+        )
+
+        unmountSnapshotClosure(mountPoint, logger)
+    }
+
+    @Sendable
+    private static func defaultMountSnapshot(snapshotName: String, volumeRoot: URL, logger: Logger) throws -> URL {
         let fm = FileManager.default
         let mountPoint = fm.temporaryDirectory.appendingPathComponent("vivacity_snapshot_\(UUID().uuidString)")
         try? fm.createDirectory(at: mountPoint, withIntermediateDirectories: true)
@@ -343,23 +382,18 @@ struct FastScanService: FastScanServicing {
             guard mountProcess.terminationStatus == 0 else {
                 logger.info("mount_apfs returned non-zero for snapshot \(snapshotName)")
                 try? fm.removeItem(at: mountPoint)
-                return
+                throw NSError(domain: "FastScan", code: Int(mountProcess.terminationStatus))
             }
         } catch {
             logger.info("Failed to mount snapshot \(snapshotName): \(error.localizedDescription)")
             try? fm.removeItem(at: mountPoint)
-            return
+            throw error
         }
+        return mountPoint
+    }
 
-        logger.info("Mounted snapshot \(snapshotName) at \(mountPoint.path)")
-        await enumerateSnapshot(
-            mountPoint: mountPoint,
-            volumeRoot: volumeRoot,
-            continuation: continuation,
-            filesFound: &filesFound,
-            filesExamined: &filesExamined
-        )
-
+    @Sendable
+    private static func defaultUnmountSnapshot(mountPoint: URL, logger: Logger) {
         let unmountProcess = Process()
         unmountProcess.executableURL = URL(fileURLWithPath: "/sbin/umount")
         unmountProcess.arguments = [mountPoint.path]
@@ -368,7 +402,7 @@ struct FastScanService: FastScanServicing {
         try? unmountProcess.run()
         unmountProcess.waitUntilExit()
 
-        try? fm.removeItem(at: mountPoint)
+        try? FileManager.default.removeItem(at: mountPoint)
     }
 
     private func enumerateSnapshot(
