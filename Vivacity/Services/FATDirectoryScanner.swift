@@ -56,11 +56,11 @@ struct FATDirectoryScanner: Sendable {
     ///
     /// - Parameters:
     ///   - volumeInfo: Volume metadata including device path and mount point.
-    ///   - reader: PrivilegedDiskReader for raw sector access.
+    ///   - reader: PrivilegedDiskReading for raw sector access.
     ///   - continuation: Stream continuation to yield scan events.
     func scan(
         volumeInfo: VolumeInfo,
-        reader: PrivilegedDiskReader,
+        reader: any PrivilegedDiskReading,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let devicePath = volumeInfo.devicePath
@@ -156,7 +156,7 @@ struct FATDirectoryScanner: Sendable {
         entries: [FATDirectoryEntry],
         bpb: BPB,
         fat: [UInt32],
-        reader: PrivilegedDiskReader,
+        reader: any PrivilegedDiskReading,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) -> ProcessResult {
         var newClusters: [UInt32] = []
@@ -211,7 +211,7 @@ struct FATDirectoryScanner: Sendable {
 
     // MARK: - BPB Parsing
 
-    private func parseBPB(reader: PrivilegedDiskReader) throws -> BPB {
+    private func parseBPB(reader: any PrivilegedDiskReading) throws -> BPB {
         var sector = [UInt8](repeating: 0, count: 512)
         let bytesRead = sector.withUnsafeMutableBytes { buf in
             reader.read(into: buf.baseAddress!, offset: 0, length: 512)
@@ -229,7 +229,7 @@ struct FATDirectoryScanner: Sendable {
     // MARK: - FAT Table
 
     /// Reads the entire first FAT table into memory as an array of UInt32 cluster values.
-    private func readFATTable(reader: PrivilegedDiskReader, bpb: BPB) throws -> [UInt32] {
+    private func readFATTable(reader: any PrivilegedDiskReading, bpb: BPB) throws -> [UInt32] {
         let fatByteSize = bpb.fatSize
         var fatData = [UInt8](repeating: 0, count: fatByteSize)
 
@@ -265,7 +265,7 @@ struct FATDirectoryScanner: Sendable {
     /// - Each LFN entry carries 13 UCS-2 characters across three byte ranges
     /// - The 8.3 entry that follows contains the actual file metadata
     private func readDirectoryEntries(
-        reader: PrivilegedDiskReader,
+        reader: any PrivilegedDiskReading,
         cluster: UInt32,
         bpb: BPB
     ) throws -> [FATDirectoryEntry] {
@@ -393,7 +393,7 @@ struct FATDirectoryScanner: Sendable {
 
     /// Reads the first 16 bytes at the given cluster and checks for a known signature.
     private func verifyMagicBytes(
-        reader: PrivilegedDiskReader,
+        reader: any PrivilegedDiskReading,
         cluster: UInt32,
         bpb: BPB,
         expectedExtension: String

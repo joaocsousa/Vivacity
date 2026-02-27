@@ -26,7 +26,8 @@ Once the primary coding is done for a ticket, you **MUST** execute these verific
 
 1.  **Format Code**: Run `swiftformat .` in the terminal to automatically format all Swift files.
 2.  **Lint Code**: Run `swiftlint` to ensure there are no lingering SwiftLint violations. Fix any violations before proceeding.
-3.  **Build Code**: Run `xcodebuild build -scheme Vivacity` and ensure it passes cleanly.
+3.  **Run Tests**: Run `xcodebuild test -scheme Vivacity -destination 'platform=macOS'` and ensure all unit and UI tests pass cleanly. Never notify the user or mark a ticket done if tests are failing.
+4.  **Build Code**: Run `xcodebuild build -scheme Vivacity` and ensure it passes cleanly.
 
 After verification is complete, execute these documentation updates:
 

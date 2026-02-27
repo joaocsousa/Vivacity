@@ -28,6 +28,28 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "E504D5F17D16B013A99BC2D8"
+               BuildableName = "VivacityTests.xctest"
+               BlueprintName = "VivacityTests"
+               ReferencedContainer = "container:Vivacity.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "69F4E17C7B971D23F9BC3B5C"
+               BuildableName = "VivacityUITests.xctest"
+               BlueprintName = "VivacityUITests"
+               ReferencedContainer = "container:Vivacity.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

@@ -12,6 +12,11 @@ protocol DeepScanServicing: Sendable {
 
 struct DeepScanService: DeepScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeepScan")
+    private let diskReaderFactory: @Sendable (String) -> any PrivilegedDiskReading
+
+    init(diskReaderFactory: @escaping @Sendable (String) -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading }) {
+        self.diskReaderFactory = diskReaderFactory
+    }
 
     /// Size of each read block (512 bytes = one disk sector).
     private static let sectorSize = 512
@@ -89,10 +94,10 @@ struct DeepScanService: DeepScanServicing {
 
         logger.info("Starting deep scan on \(device.name) using device \(devicePath)")
 
-        // Use PrivilegedDiskReader which handles authorization and privilege
+        // Use injected reader which handles authorization and privilege
         // escalation transparently — tries direct open() first, then falls
         // back to AuthorizationExecuteWithPrivileges for root-level dd.
-        let reader = PrivilegedDiskReader(devicePath: devicePath)
+        let reader = diskReaderFactory(devicePath)
         do {
             try reader.start()
         } catch {
@@ -273,7 +278,7 @@ struct DeepScanService: DeepScanServicing {
         fileExtension: String,
         sizeInBytes: Int64,
         offsetOnDisk: UInt64,
-        reader: PrivilegedDiskReader,
+        reader: PrivilegedDiskReading,
         allOffsets: inout Set<UInt64>,
         filesFound: inout Int,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation

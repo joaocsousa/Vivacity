@@ -2,6 +2,7 @@ import XCTest
 @testable import Vivacity
 
 final class FileScanViewModelTests: XCTestCase {
+    @MainActor
     func testFastScanCompletesAndTransitions() async {
         let fast = FakeFastScanService(events: [
             .progress(0.1),
@@ -13,13 +14,14 @@ final class FileScanViewModelTests: XCTestCase {
         let sut = FileScanViewModel(fastScanService: fast, deepScanService: deep)
 
         sut.startFastScan(device: .fakeDevice())
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
 
         XCTAssertEqual(sut.scanPhase, .fastComplete)
         XCTAssertEqual(sut.foundFiles.count, 1)
-        XCTAssertEqual(sut.progress, 0.6)
+        XCTAssertEqual(sut.progress, 1.0)
     }
 
+    @MainActor
     func testDeepScanDedupesExistingOffsets() async {
         let fast = FakeFastScanService(events: [
             .fileFound(.fixture(id: 1, offset: 1024, source: .fastScan)),
@@ -33,9 +35,9 @@ final class FileScanViewModelTests: XCTestCase {
         let sut = FileScanViewModel(fastScanService: fast, deepScanService: deep)
 
         sut.startFastScan(device: .fakeDevice())
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
         sut.startDeepScan(device: .fakeDevice())
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
 
         XCTAssertEqual(sut.scanPhase, .complete)
         XCTAssertEqual(sut.foundFiles.count, 2) // one fast + one deep

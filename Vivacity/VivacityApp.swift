@@ -2,8 +2,11 @@ import SwiftUI
 
 @main
 struct VivacityApp: App {
-    var body: some Scene {
+    init() {
         AppEnvironment.configureForTestingIfNeeded()
+    }
+
+    var body: some Scene {
         WindowGroup {
             ContentView()
         }
