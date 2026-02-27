@@ -417,6 +417,8 @@ extension FileScanView {
             volumeUUID: "preview-samsung",
             filesystemType: .exfat,
             isExternal: true,
+            partitionOffset: nil,
+            partitionSize: nil,
             totalCapacity: 2_000_000_000_000,
             availableCapacity: 1_200_000_000_000
         )

@@ -136,6 +136,8 @@ private struct CapacityBar: View {
                 volumeUUID: "preview-mac-hd",
                 filesystemType: .apfs,
                 isExternal: false,
+                partitionOffset: nil,
+                partitionSize: nil,
                 totalCapacity: 500_000_000_000,
                 availableCapacity: 120_000_000_000
             ),
@@ -149,6 +151,8 @@ private struct CapacityBar: View {
                 volumeUUID: "preview-samsung",
                 filesystemType: .exfat,
                 isExternal: true,
+                partitionOffset: nil,
+                partitionSize: nil,
                 totalCapacity: 2_000_000_000_000,
                 availableCapacity: 1_200_000_000_000
             ),
@@ -162,6 +166,8 @@ private struct CapacityBar: View {
                 volumeUUID: "preview-wd",
                 filesystemType: .fat32,
                 isExternal: true,
+                partitionOffset: nil,
+                partitionSize: nil,
                 totalCapacity: 1_000_000_000_000,
                 availableCapacity: 50_000_000_000
             ),

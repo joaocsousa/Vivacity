@@ -186,6 +186,8 @@ struct DeviceService: DeviceServicing {
             volumeUUID: uuid,
             filesystemType: .other, // temp
             isExternal: isExternal,
+            partitionOffset: nil,
+            partitionSize: nil,
             totalCapacity: totalCapacity,
             availableCapacity: availableCapacity
         ))
@@ -197,6 +199,8 @@ struct DeviceService: DeviceServicing {
             volumeUUID: uuid,
             filesystemType: volumeInfo.filesystemType,
             isExternal: isExternal,
+            partitionOffset: nil,
+            partitionSize: nil,
             totalCapacity: totalCapacity,
             availableCapacity: availableCapacity
         )
