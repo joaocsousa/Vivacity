@@ -39,7 +39,7 @@ struct HFSPlusCarver {
                 results.append(contentsOf: parsedFiles)
 
                 // If we found a valid node, we can skip ahead a bit (often 4KB),
-                // but to be safe against varying node sizes, we just move by the 
+                // but to be safe against varying node sizes, we just move by the
                 // typical minimum node size.
                 i += 4096
             } else {
@@ -89,28 +89,29 @@ struct HFSPlusCarver {
 
         var currentOffset = 14 // Start after BTNodeDescriptor
 
-        for _ in 0..<numRecords {
+        for _ in 0 ..< numRecords {
             // Ensure we have enough space for a key length and some data
             if currentOffset + 6 > slice.count { break }
 
             // HFSPlusCatalogKey
-            let keyLength = Int(UInt16(slice[currentOffset]) << 8 | UInt16(slice[currentOffset+1]))
+            let keyLength = Int(UInt16(slice[currentOffset]) << 8 | UInt16(slice[currentOffset + 1]))
             if keyLength < 6 || currentOffset + 2 + keyLength > slice.count { break }
 
             // Parent ID is 4 bytes at offset 2
-            // let parentID = UInt32(slice[currentOffset+2]) << 24 | UInt32(slice[currentOffset+3]) << 16 | UInt32(slice[currentOffset+4]) << 8 | UInt32(slice[currentOffset+5])
+            // let parentID = UInt32(slice[currentOffset+2]) << 24 | UInt32(slice[currentOffset+3]) << 16 |
+            // UInt32(slice[currentOffset+4]) << 8 | UInt32(slice[currentOffset+5])
 
             // Node Name is a Unicode string (HFSUniStr255) at offset 6
-            let nameLength = Int(UInt16(slice[currentOffset+6]) << 8 | UInt16(slice[currentOffset+7]))
+            let nameLength = Int(UInt16(slice[currentOffset + 6]) << 8 | UInt16(slice[currentOffset + 7]))
 
             var fileName = ""
-            if nameLength > 0 && nameLength <= 255 {
+            if nameLength > 0, nameLength <= 255 {
                 let nameStart = currentOffset + 8
                 let nameEnd = nameStart + (nameLength * 2)
                 if nameEnd <= currentOffset + 2 + keyLength {
                     var chars: [unichar] = []
                     for k in stride(from: nameStart, to: nameEnd, by: 2) {
-                        let char = unichar(slice[k]) << 8 | unichar(slice[k+1])
+                        let char = unichar(slice[k]) << 8 | unichar(slice[k + 1])
                         chars.append(char)
                     }
                     fileName = String(utf16CodeUnits: chars, count: chars.count)
@@ -124,10 +125,10 @@ struct HFSPlusCarver {
             // but the leaf nodes contain HFSPlusCatalogFolder or HFSPlusCatalogFile records.
             if currentOffset + 2 > slice.count { break }
 
-            let recordType = UInt16(slice[currentOffset]) << 8 | UInt16(slice[currentOffset+1])
+            let recordType = UInt16(slice[currentOffset]) << 8 | UInt16(slice[currentOffset + 1])
 
             // 0x0002 is kHFSPlusFileRecord
-            if recordType == 2 && currentOffset + 248 <= slice.count && !fileName.isEmpty {
+            if recordType == 2, currentOffset + 248 <= slice.count, !fileName.isEmpty {
                 // Parse HFSPlusCatalogFile
                 // struct HFSPlusCatalogFile {
                 //      SInt16      recordType;       // == kHFSPlusFileRecord (2)
@@ -156,14 +157,14 @@ struct HFSPlusCarver {
                 //      HFSPlusExtentRecord     extents;        // 104 (8 extent descriptors, 8 bytes each = 64 bytes)
                 // }
 
-                let logicalSizeHigh = UInt32(slice[currentOffset+88]) << 24 |
-                                      UInt32(slice[currentOffset+89]) << 16 |
-                                      UInt32(slice[currentOffset+90]) << 8 |
-                                      UInt32(slice[currentOffset+91])
-                let logicalSizeLow = UInt32(slice[currentOffset+92]) << 24 |
-                                     UInt32(slice[currentOffset+93]) << 16 |
-                                     UInt32(slice[currentOffset+94]) << 8 |
-                                     UInt32(slice[currentOffset+95])
+                let logicalSizeHigh = UInt32(slice[currentOffset + 88]) << 24 |
+                    UInt32(slice[currentOffset + 89]) << 16 |
+                    UInt32(slice[currentOffset + 90]) << 8 |
+                    UInt32(slice[currentOffset + 91])
+                let logicalSizeLow = UInt32(slice[currentOffset + 92]) << 24 |
+                    UInt32(slice[currentOffset + 93]) << 16 |
+                    UInt32(slice[currentOffset + 94]) << 8 |
+                    UInt32(slice[currentOffset + 95])
                 let logicalSize = UInt64(logicalSizeHigh) << 32 | UInt64(logicalSizeLow)
 
                 // Extents start at 104
@@ -171,13 +172,13 @@ struct HFSPlusCarver {
                 //      UInt32                  startBlock;
                 //      UInt32                  blockCount;
                 // }
-                let startBlock = UInt32(slice[currentOffset+104]) << 24 |
-                                 UInt32(slice[currentOffset+105]) << 16 |
-                                 UInt32(slice[currentOffset+106]) << 8 |
-                                 UInt32(slice[currentOffset+107])
+                let startBlock = UInt32(slice[currentOffset + 104]) << 24 |
+                    UInt32(slice[currentOffset + 105]) << 16 |
+                    UInt32(slice[currentOffset + 106]) << 8 |
+                    UInt32(slice[currentOffset + 107])
 
                 // If it has a data fork and it starts somewhere
-                if logicalSize > 0 && startBlock > 0 {
+                if logicalSize > 0, startBlock > 0 {
                     // Note: We need the HFS+ Allocation Block Size to convert startBlock to a physical disk offset.
                     // Since we are carving orphaned nodes, we don't have the Volume Header.
                     // HFS+ default block size is 4096 bytes. We will assume 4096 as a heuristic.

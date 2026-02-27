@@ -8,15 +8,7 @@
 
 ---
 
-## 🤖 AI Handoff Summary
-> **Welcome Codex (or next AI)!** Here's the current state of the project:
->
-> * **Just Completed**: Scan engine hardening (M4) and filesystem-aware deep scan carving for FAT/APFS/HFS+ (M5). Code quality tools (`SwiftLint`, `SwiftFormat`, `Xcode Static Analyzer`) are clean.
-> * **Current Focus**: **M6 Advanced Features (T-027 → T-029)** — lost partition search, scan session save/resume, and disk imaging — plus **M10 polish/navigation (T-017)**.
-> * **Next Up**: **M7 camera recovery** followed by **M8 scan results UX** and **M9 recovery destination**.
-> * For status and tickets, treat this file as the single source of truth.
 
----
 
 ## Milestones Overview
 
@@ -27,7 +19,7 @@
 | M3 | File Scan & Preview Screen | T-006 → T-012 (T-008 split into a/b) | ✅ DONE |
 | M4 | Scan Engine Hardening | T-019 → T-021 | ✅ DONE |
 | M5 | Deep Scan FS-Aware Carving | T-025 → T-026 | ✅ DONE |
-| M6 | Advanced Features | T-027 → T-029 | 🔶 IN PROGRESS |
+| M6 | Advanced Features | T-027 → T-029 | ✅ DONE |
 | M7 | Advanced Camera Recovery | T-030 → T-031 | ⬜ TODO |
 | M8 | Scan Results UX | T-022 → T-024 | ⬜ TODO |
 | M9 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
@@ -374,7 +366,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-### T-029 ⬜ Byte-to-byte disk imaging
+### T-029 ✅ Byte-to-byte disk imaging
 
 **Description**: Create sector-level backup of a drive before scanning. Allow scanning the image file instead of the live device.
 

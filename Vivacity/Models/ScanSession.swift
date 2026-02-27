@@ -8,13 +8,15 @@ struct ScanSession: Codable, Identifiable, Equatable, Sendable, Hashable {
     let deviceTotalCapacity: Int64
     let lastScannedOffset: Int64
     let discoveredFiles: [RecoverableFile]
-    
-    init(id: UUID = UUID(),
-         dateSaved: Date = Date(),
-         deviceID: String,
-         deviceTotalCapacity: Int64,
-         lastScannedOffset: Int64,
-         discoveredFiles: [RecoverableFile]) {
+
+    init(
+        id: UUID = UUID(),
+        dateSaved: Date = Date(),
+        deviceID: String,
+        deviceTotalCapacity: Int64,
+        lastScannedOffset: Int64,
+        discoveredFiles: [RecoverableFile]
+    ) {
         self.id = id
         self.dateSaved = dateSaved
         self.deviceID = deviceID

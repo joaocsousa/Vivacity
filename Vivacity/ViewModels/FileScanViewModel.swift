@@ -111,6 +111,14 @@ final class FileScanViewModel {
     func startFastScan(device: StorageDevice) {
         guard scanPhase == .idle else { return }
 
+        // Raw disk images are not mounted, so we can't use FileManager fast scan.
+        // Jump straight to the deep scan prompt phase.
+        if device.isDiskImage {
+            logger.info("Skipping fast scan for disk image: \(device.name)")
+            scanPhase = .fastComplete
+            return
+        }
+
         scanPhase = .fastScanning
         progress = 0
         foundFiles = []
@@ -208,12 +216,12 @@ final class FileScanViewModel {
     /// Saves the current scan progress for the given device.
     func saveSession(device: StorageDevice) async {
         guard isScanning || scanPhase == .fastComplete || scanPhase == .complete else { return }
-        
+
         // Convert progress percentage back to approximate offset
-        let activeOffset = scanPhase == .deepScanning 
+        let activeOffset = scanPhase == .deepScanning
             ? UInt64(progress * Double(device.totalCapacity))
             : (scanPhase == .complete ? UInt64(device.totalCapacity) : 0)
-        
+
         let session = ScanSession(
             id: UUID(),
             dateSaved: Date(),
@@ -222,7 +230,7 @@ final class FileScanViewModel {
             lastScannedOffset: Int64(activeOffset),
             discoveredFiles: foundFiles
         )
-        
+
         do {
             try await sessionManager.save(session)
             logger.info("Session saved successfully")
@@ -235,15 +243,15 @@ final class FileScanViewModel {
     /// Loads a saved session and resumes deep scanning.
     func resumeSession(_ session: ScanSession, device: StorageDevice) {
         guard scanPhase == .idle else { return }
-        
+
         scanPhase = .deepScanning
         foundFiles = session.discoveredFiles
         progress = Double(session.lastScannedOffset) / Double(device.totalCapacity)
         selectedFileIDs = []
         errorMessage = nil
-        
+
         let existingOffsets = Set(foundFiles.map(\.offsetOnDisk).filter { $0 > 0 })
-        
+
         scanTask = Task {
             do {
                 let stream = deepScanService.scan(

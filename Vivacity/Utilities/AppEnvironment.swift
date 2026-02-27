@@ -37,6 +37,7 @@ enum AppEnvironment {
 }
 
 #if DEBUG
+
 // MARK: - App fakes (compiled in Debug for UI tests)
 
 struct FakeDeviceService: DeviceServicing {
@@ -78,7 +79,11 @@ struct FakeFastScanService: FastScanServicing {
 
 struct FakeDeepScanService: DeepScanServicing {
     let events: [ScanEvent]
-    func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64) -> AsyncThrowingStream<ScanEvent, Error> {
+    func scan(
+        device: StorageDevice,
+        existingOffsets: Set<UInt64>,
+        startOffset: UInt64
+    ) -> AsyncThrowingStream<ScanEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 for event in events {
@@ -90,8 +95,8 @@ struct FakeDeepScanService: DeepScanServicing {
     }
 }
 
-private extension RecoverableFile {
-    static func fixture(id: Int, offset: UInt64, source: ScanSource) -> RecoverableFile {
+extension RecoverableFile {
+    fileprivate static func fixture(id: Int, offset: UInt64, source: ScanSource) -> RecoverableFile {
         RecoverableFile(
             id: UUID(uuidString: "00000000-0000-0000-0000-0000000000\(String(format: "%02d", id))") ?? UUID(),
             fileName: "file\(id)",

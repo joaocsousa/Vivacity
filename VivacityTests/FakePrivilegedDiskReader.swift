@@ -17,7 +17,7 @@ final class FakePrivilegedDiskReader: PrivilegedDiskReading, @unchecked Sendable
     func read(into destBuffer: UnsafeMutableRawPointer, offset: UInt64, length: Int) -> Int {
         let copyOffset = min(Int(offset), buffer.count)
         let copyLength = min(length, buffer.count - copyOffset)
-        
+
         guard copyLength > 0 else { return 0 }
 
         buffer.withUnsafeBytes { rawBuffer in
@@ -25,7 +25,7 @@ final class FakePrivilegedDiskReader: PrivilegedDiskReading, @unchecked Sendable
                 destBuffer.copyMemory(from: srcBase + copyOffset, byteCount: copyLength)
             }
         }
-        
+
         return copyLength
     }
 

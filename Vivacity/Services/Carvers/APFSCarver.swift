@@ -54,7 +54,7 @@ struct APFSCarver {
         // More specifically, APFS object types often have flags in the top 16 bits.
         // Type 2 is B-Tree node.
         let oType = UInt32(slice[24]) | UInt32(slice[25]) << 8 | UInt32(slice[26]) << 16 | UInt32(slice[27]) << 24
-        let baseType = oType & 0x0000FFFF
+        let baseType = oType & 0x0000_FFFF
 
         // 2 == OBJECT_TYPE_BTREE_NODE
         if baseType != 2 { return false }
@@ -100,14 +100,14 @@ struct APFSCarver {
         // Values are built forwards after the table space.
         let nodeSize = slice.count // Assuming standard 4KB node
 
-        for k in 0..<Int(btnNKeys) {
+        for k in 0 ..< Int(btnNKeys) {
             let tocOffset = 40 + (k * 8)
             if tocOffset + 8 > nodeSize { break }
 
-            let keyOff = Int(UInt16(slice[tocOffset]) | UInt16(slice[tocOffset+1]) << 8)
-            let keyLen = Int(UInt16(slice[tocOffset+2]) | UInt16(slice[tocOffset+3]) << 8)
-            let valOff = Int(UInt16(slice[tocOffset+4]) | UInt16(slice[tocOffset+5]) << 8)
-            let valLen = Int(UInt16(slice[tocOffset+6]) | UInt16(slice[tocOffset+7]) << 8)
+            let keyOff = Int(UInt16(slice[tocOffset]) | UInt16(slice[tocOffset + 1]) << 8)
+            let keyLen = Int(UInt16(slice[tocOffset + 2]) | UInt16(slice[tocOffset + 3]) << 8)
+            let valOff = Int(UInt16(slice[tocOffset + 4]) | UInt16(slice[tocOffset + 5]) << 8)
+            let valLen = Int(UInt16(slice[tocOffset + 6]) | UInt16(slice[tocOffset + 7]) << 8)
 
             // In APFS B-Trees, key offsets are from the end of the TOC (which we don't know exactly without node size)
             // or from the END of the node minus the offset.
@@ -124,14 +124,14 @@ struct APFSCarver {
         // Heuristic fallback: Naive string scanning for APFS Directory Records (j_drec_t)
         // A directory record key starts with:
         // UInt8  hdr_type; (type 0x30 for j_dir_rec / j_drec_key)
-        // UInt32 name_len_and_hash; 
+        // UInt32 name_len_and_hash;
         // [name bytes]
 
         // To avoid excessive false positives, we scan for strings ending in known extensions.
-        // It's a "carving" heuristic after all. Extracting exact file extents without the Extent B-Tree 
+        // It's a "carving" heuristic after all. Extracting exact file extents without the Extent B-Tree
         // is extremely difficult on APFS, so we'll leave size and offset 0, meaning deep scan
         // signature matching is *required* to actually recover it if it just gives us a name.
-        // 
+        //
         // Note: For full recovery we need the j_inode_val_t and j_phys_ext_val_t.
         // We will just return empty file sizes here to let DeepScanService find the actual signatures
         // near this location, providing the filename as context.
