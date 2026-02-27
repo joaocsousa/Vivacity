@@ -249,6 +249,7 @@ struct DeepScanService: DeepScanServicing {
 
             let newlyFoundOffsets = scanChunk(
                 context: context,
+                reader: reader,
                 filesFound: &filesFound,
                 continuation: continuation
             )
@@ -323,6 +324,7 @@ struct DeepScanService: DeepScanServicing {
 
     private func scanChunk(
         context: ScanContext,
+        reader: PrivilegedDiskReading,
         filesFound: inout Int,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) -> [UInt64] {
@@ -355,12 +357,20 @@ struct DeepScanService: DeepScanServicing {
                     }
                 }
 
+                var sizeInBytes: Int64 = 0
+                if match == .mp4 || match == .mov || match == .m4v || match == .threeGP {
+                    let mp4Reconstructor = MP4Reconstructor()
+                    if let contiguousSize = mp4Reconstructor.calculateContiguousSize(startingAt: offset, reader: reader) {
+                        sizeInBytes = Int64(contiguousSize)
+                    }
+                }
+
                 let file = RecoverableFile(
                     id: UUID(),
                     fileName: fileName,
                     fileExtension: match.fileExtension,
                     fileType: match.category,
-                    sizeInBytes: 0, // Unknown until we find the next header or EOF marker
+                    sizeInBytes: sizeInBytes,
                     offsetOnDisk: offset,
                     signatureMatch: match,
                     source: .deepScan

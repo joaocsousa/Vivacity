@@ -384,7 +384,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-### T-031 ⬜ Fragmented video reconstruction
+### T-031 ✅ Fragmented video reconstruction
 
 **Description**: Reassemble fragmented MP4/MOV files by analyzing container structure and camera-specific layout patterns.
 
