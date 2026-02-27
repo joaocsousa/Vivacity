@@ -107,6 +107,8 @@ private extension StorageDevice {
             volumeUUID: "FAKE-UUID",
             filesystemType: .fat32,
             isExternal: true,
+            partitionOffset: nil,
+            partitionSize: nil,
             totalCapacity: 10_000,
             availableCapacity: 5_000
         )

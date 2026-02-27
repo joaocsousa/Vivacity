@@ -27,7 +27,7 @@
 | M3 | File Scan & Preview Screen | T-006 → T-012 (T-008 split into a/b) | ✅ DONE |
 | M4 | Scan Engine Hardening | T-019 → T-021 | ✅ DONE |
 | M5 | Deep Scan FS-Aware Carving | T-025 → T-026 | ✅ DONE |
-| M6 | Advanced Features | T-027 → T-029 | ⬜ TODO |
+| M6 | Advanced Features | T-027 → T-029 | 🔶 IN PROGRESS |
 | M7 | Advanced Camera Recovery | T-030 → T-031 | ⬜ TODO |
 | M8 | Scan Results UX | T-022 → T-024 | ⬜ TODO |
 | M9 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
@@ -358,7 +358,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ## M6 — Advanced Features
 
-### T-027 ⬜ Lost Partition Search
+### T-027 ✅ Lost Partition Search
 
 **Description**: Scan entire disk for partition signatures (GPT, MBR, NTFS boot sectors, FAT boot sectors, HFS+/APFS headers) and present found partitions as scannable virtual volumes.
 

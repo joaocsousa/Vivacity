@@ -25,12 +25,15 @@ final class DeviceSelectionViewModel {
     // MARK: - Dependencies
 
     private let deviceService: DeviceServicing
+    private let partitionSearchService: PartitionSearchService
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeviceSelection")
 
     // MARK: - Init
 
-    init(deviceService: DeviceServicing = DeviceService()) {
+    init(deviceService: DeviceServicing = DeviceService(),
+         partitionSearchService: PartitionSearchService = PartitionSearchService()) {
         self.deviceService = deviceService
+        self.partitionSearchService = partitionSearchService
     }
 
     // MARK: - Actions
@@ -67,5 +70,44 @@ final class DeviceSelectionViewModel {
             try? await Task.sleep(nanoseconds: 500_000_000)
             await loadDevices()
         }
+    }
+
+    /// Scans the physical disk backing the given device for lost partitions.
+    func searchForLostPartitions(on device: StorageDevice) async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let volumeInfo = VolumeInfo.detect(for: device)
+            var physicalDevicePath = volumeInfo.devicePath
+
+            // Extract the whole disk path (e.g. `/dev/rdisk4` from `/dev/rdisk4s1`)
+            let deviceRegex = try NSRegularExpression(pattern: "^(/dev/r?disk\\d+)")
+            let range = NSRange(physicalDevicePath.startIndex..<physicalDevicePath.endIndex, in: physicalDevicePath)
+            if let match = deviceRegex.firstMatch(in: physicalDevicePath, options: [], range: range) {
+                if let swiftRange = Range(match.range(at: 1), in: physicalDevicePath) {
+                    physicalDevicePath = String(physicalDevicePath[swiftRange])
+                }
+            }
+
+            logger.info("Starting partition search on physical device: \(physicalDevicePath)")
+            
+            let reader = PrivilegedDiskReader(devicePath: physicalDevicePath)
+            let newPartitions = try await partitionSearchService.findPartitions(on: physicalDevicePath, reader: reader)
+
+            // Add virtual partitions to the list, removing any old ones for this path just in case
+            devices.removeAll { $0.id.starts(with: physicalDevicePath + "-part-") }
+            devices.append(contentsOf: newPartitions)
+            
+            if newPartitions.isEmpty {
+                errorMessage = "No lost partitions found on this disk."
+            }
+
+        } catch {
+            logger.error("Partition search failed: \(error.localizedDescription)")
+            errorMessage = "Failed to search for partitions: \(error.localizedDescription)"
+        }
+
+        isLoading = false
     }
 }

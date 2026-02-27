@@ -103,6 +103,13 @@ extension DeviceSelectionView {
                                     }
                                 }
                             }
+                            .contextMenu {
+                                Button {
+                                    Task { await viewModel.searchForLostPartitions(on: device) }
+                                } label: {
+                                    Label("Find Lost Partitions", systemImage: "magnifyingglass")
+                                }
+                            }
                         }
                     }
                     .padding(16)
@@ -133,6 +140,18 @@ extension DeviceSelectionView {
 
             Spacer()
 
+            if let selected = viewModel.selectedDevice {
+                Button {
+                    Task { await viewModel.searchForLostPartitions(on: selected) }
+                } label: {
+                    Text("Find Lost Partitions")
+                }
+                .disabled(viewModel.isLoading)
+                .buttonStyle(.plain)
+                .foregroundStyle(.blue)
+                .padding(.trailing, 8)
+            }
+
             Button {
                 navigationTarget = viewModel.selectedDevice
             } label: {
@@ -144,7 +163,7 @@ extension DeviceSelectionView {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(viewModel.selectedDevice == nil)
+            .disabled(viewModel.selectedDevice == nil || viewModel.isLoading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

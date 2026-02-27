@@ -21,6 +21,13 @@ struct StorageDevice: Identifiable, Hashable, Sendable {
     /// Whether the volume is on an external (removable) device.
     let isExternal: Bool
 
+    /// The offset in bytes from the start of the physical disk where this partition begins.
+    /// If non-nil, this device represents a virtual "lost" partition found by a raw disk scan.
+    let partitionOffset: UInt64?
+
+    /// The total size of the partition in bytes, as defined by its boot sector or partition table.
+    let partitionSize: Int64?
+
     /// Total capacity of the volume in bytes.
     let totalCapacity: Int64
 
