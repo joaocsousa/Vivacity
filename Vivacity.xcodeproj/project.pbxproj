@@ -57,6 +57,7 @@
 		DD000003 /* NTFSScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000012 /* NTFSScanner.swift */; };
 		DD000004 /* ExFATScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000013 /* ExFATScanner.swift */; };
 		DD000005 /* EXIFDateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000014 /* EXIFDateExtractor.swift */; };
+		DEBE1D2B6A956E1C67765455 /* LivePreviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */; };
 		EE000001 /* PrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000010 /* PrivilegedDiskReader.swift */; };
 		F868D76B41326B7A26617210 /* SessionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7249DFA6A6FA50A7404EB3 /* SessionManagerTests.swift */; };
 /* End PBXBuildFile section */
@@ -91,7 +92,7 @@
 		5F72C99CDB009F0B10499058 /* PrivilegedDiskReading.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReading.swift; sourceTree = "<group>"; };
 		6026EEDF75109041E356905B /* HFSPlusCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HFSPlusCarver.swift; path = Services/Carvers/HFSPlusCarver.swift; sourceTree = "<group>"; };
 		695CF217F55C97CD24D30DF3 /* FragmentedVideoAssembler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FragmentedVideoAssembler.swift; path = Vivacity/Services/Carvers/FragmentedVideoAssembler.swift; sourceTree = "<group>"; };
-		6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FATCarver.swift; path = Carvers/FATCarver.swift; sourceTree = "<group>"; };
+		6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FATCarver.swift; path = FATCarver.swift; sourceTree = "<group>"; };
 		6C1B11E2F3AF898154D08CA6 /* FakePrivilegedDiskReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FakePrivilegedDiskReader.swift; sourceTree = "<group>"; };
 		701C8C0145874A1017A1233A /* FATModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FATModels.swift; sourceTree = "<group>"; };
 		765344A29DF87B5DEA1EB788 /* APFSCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = APFSCarver.swift; path = Services/Carvers/APFSCarver.swift; sourceTree = "<group>"; };
@@ -131,6 +132,7 @@
 		DD000014 /* EXIFDateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFDateExtractor.swift; sourceTree = "<group>"; };
 		E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartitionSearchServiceTests.swift; sourceTree = "<group>"; };
 		E5FDF8909316E71A2C41052F /* DiskImageService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskImageService.swift; sourceTree = "<group>"; };
+		E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LivePreviewService.swift; sourceTree = "<group>"; };
 		EE000010 /* PrivilegedDiskReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReader.swift; sourceTree = "<group>"; };
 		F90DAE936670A0F95A138FD9 /* DeepScanServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeepScanServiceTests.swift; sourceTree = "<group>"; };
 		F9AE38D76593EBF1B3F64048 /* CarverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CarverTests.swift; sourceTree = "<group>"; };
@@ -264,6 +266,7 @@
 				22FFE5F19FEE9CB04CF674F2 /* ImageReconstructor.swift */,
 			);
 			name = Carvers;
+			path = Carvers;
 			sourceTree = "<group>";
 		};
 		BB000020 /* Models */ = {
@@ -297,6 +300,7 @@
 				31C080987ACA5FEDE7E26580 /* SessionManager.swift */,
 				E5FDF8909316E71A2C41052F /* DiskImageService.swift */,
 				CC38108B7516FEE3C928A42B /* CameraRecoveryService.swift */,
+				E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -543,6 +547,7 @@
 				C53E93D12892ED1C6F64FDD8 /* MP4Reconstructor.swift in Sources */,
 				D980A369EB18B4CA88551E40 /* FragmentedVideoAssembler.swift in Sources */,
 				7A262EA9E3725DD7AA12E5CE /* ImageReconstructor.swift in Sources */,
+				DEBE1D2B6A956E1C67765455 /* LivePreviewService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
