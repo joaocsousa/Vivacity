@@ -41,7 +41,7 @@ Welcome! This guide tells you everything you need to get productive on **Vivacit
 - **Always build** after changes: `xcodebuild -project Vivacity.xcodeproj -scheme Vivacity build`
 - **Follow MVVM** — Views must not contain business logic.
 - **Use structured concurrency** — `async`/`await`, not GCD/DispatchQueue.
-- **Keep this documentation in sync** — update status after every ticket.
+- **Keep documentation in sync** — update status in `PROJECT_PLAN.md` after every ticket. Ensure `README.md` and other high-level docs do not duplicate granular ticket status to avoid drift, and explicitly check that `PROJECT_PLAN.md` reflects the current reality.
 
 ## Screenshots & Recordings
 

@@ -33,7 +33,7 @@ After verification is complete, execute these documentation updates:
 
 1.  **Mark the Ticket Done**: Open `PROJECT_PLAN.md`, find your ticket, and change its state to `✅ DONE`.
 2.  **Update Milestone Status**: If your ticket completed a milestone, open `.agents/PROJECT.md` and change that milestone's status in the table to `✅ Done`.
-3.  **Update READMEs**: If you added a major new overarching feature (e.g., Deep Scan is finally working, or Dark Mode was added), summarize it briefly in the top-level `README.md`.
+3.  **Update READMEs**: If you added a major new overarching feature (e.g., Deep Scan is finally working, or Dark Mode was added), summarize it briefly in the top-level `README.md`. **CRITICAL**: Do not duplicate the milestone or ticket tables in `README.md`. `PROJECT_PLAN.md` is the single source of truth for the roadmap. Always ensure `README.md` and `PROJECT_PLAN.md` are correctly synced and do not contain contradictory roadmap information.
 4.  **Code Comments**: Ensure any new `public` or `internal` struct/class/function has standard Swift `///` doc comments explaining its purpose.
 
 ## 4. Creating New Tickets
