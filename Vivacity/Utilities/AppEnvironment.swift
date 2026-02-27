@@ -78,7 +78,7 @@ struct FakeFastScanService: FastScanServicing {
 
 struct FakeDeepScanService: DeepScanServicing {
     let events: [ScanEvent]
-    func scan(device: StorageDevice, existingOffsets: Set<UInt64>) -> AsyncThrowingStream<ScanEvent, Error> {
+    func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64) -> AsyncThrowingStream<ScanEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 for event in events {

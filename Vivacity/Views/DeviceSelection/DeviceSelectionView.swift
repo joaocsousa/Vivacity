@@ -3,7 +3,12 @@ import SwiftUI
 /// Screen that lists all available storage devices and lets the user select one to scan.
 struct DeviceSelectionView: View {
     @State private var viewModel = AppEnvironment.makeDeviceSelectionViewModel()
-    @State private var navigationTarget: StorageDevice?
+    @State private var navigationTarget: NavigationDestination?
+    
+    enum NavigationDestination: Hashable {
+        case device(StorageDevice)
+        case deviceWithSession(StorageDevice, ScanSession)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,8 +20,13 @@ struct DeviceSelectionView: View {
         }
         .frame(minWidth: 520, minHeight: 540)
         .background(Color(.windowBackgroundColor))
-        .navigationDestination(item: $navigationTarget) { device in
-            FileScanView(device: device)
+        .navigationDestination(item: $navigationTarget) { destination in
+            switch destination {
+            case .device(let device):
+                FileScanView(device: device)
+            case .deviceWithSession(let device, let session):
+                FileScanView(device: device, sessionToResume: session)
+            }
         }
         .task {
             await viewModel.loadDevices()
@@ -150,20 +160,57 @@ extension DeviceSelectionView {
                 .buttonStyle(.plain)
                 .foregroundStyle(.blue)
                 .padding(.trailing, 8)
-            }
-
-            Button {
-                navigationTarget = viewModel.selectedDevice
-            } label: {
-                HStack(spacing: 4) {
-                    Text("Start Scanning")
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 11, weight: .semibold))
+                
+                if let session = viewModel.savedSessions[selected.id] {
+                    Button {
+                        navigationTarget = .device(selected)
+                    } label: {
+                        Text("New Scan")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .disabled(viewModel.isLoading)
+                    
+                    Button {
+                        navigationTarget = .deviceWithSession(selected, session)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Resume Scan")
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(viewModel.isLoading)
+                } else {
+                    Button {
+                        navigationTarget = .device(selected)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Start Scanning")
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(viewModel.isLoading)
                 }
+            } else {
+                Button {
+                    // Disabled state
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Start Scanning")
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(true)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(viewModel.selectedDevice == nil || viewModel.isLoading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

@@ -28,8 +28,10 @@
 		BB000003 /* DeviceSelectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000012 /* DeviceSelectionViewModel.swift */; };
 		BB000004 /* DeviceSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000013 /* DeviceSelectionView.swift */; };
 		BB000005 /* DeviceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000014 /* DeviceRow.swift */; };
+		BD297BEA662DAFEF20262A63 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C080987ACA5FEDE7E26580 /* SessionManager.swift */; };
 		BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85684069117F459BA261B91B /* PermissionDeniedView.swift */; };
 		C20F471C0D5544F7E17D075F /* FakePrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1B11E2F3AF898154D08CA6 /* FakePrivilegedDiskReader.swift */; };
+		C9D70560A62EA3B78A99B80A /* ScanSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0ADEBE5D623AB329A92699C /* ScanSession.swift */; };
 		CC000001 /* FileSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000010 /* FileSignature.swift */; };
 		CC000002 /* RecoverableFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000011 /* RecoverableFile.swift */; };
 		CC000003 /* FastScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000012 /* FastScanService.swift */; };
@@ -44,6 +46,7 @@
 		DD000004 /* ExFATScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000013 /* ExFATScanner.swift */; };
 		DD000005 /* EXIFDateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000014 /* EXIFDateExtractor.swift */; };
 		EE000001 /* PrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000010 /* PrivilegedDiskReader.swift */; };
+		F868D76B41326B7A26617210 /* SessionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7249DFA6A6FA50A7404EB3 /* SessionManagerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +70,7 @@
 		05A02025A207FE742FDDB8D8 /* PartitionSearchService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartitionSearchService.swift; sourceTree = "<group>"; };
 		15DB3BE95DBA2A386AB785A3 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		2BE52ADF7980CA375B770CE3 /* VivacityUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VivacityUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		31C080987ACA5FEDE7E26580 /* SessionManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		31D64682A1FDC7E785D23022 /* FileScanViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileScanViewModelTests.swift; sourceTree = "<group>"; };
 		5F72C99CDB009F0B10499058 /* PrivilegedDiskReading.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReading.swift; sourceTree = "<group>"; };
 		6026EEDF75109041E356905B /* HFSPlusCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HFSPlusCarver.swift; path = Services/Carvers/HFSPlusCarver.swift; sourceTree = "<group>"; };
@@ -81,11 +85,13 @@
 		AA000012 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA000013 /* Vivacity.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vivacity.entitlements; sourceTree = "<group>"; };
 		AA000020 /* Vivacity.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vivacity.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0ADEBE5D623AB329A92699C /* ScanSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScanSession.swift; sourceTree = "<group>"; };
 		BB000010 /* StorageDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDevice.swift; sourceTree = "<group>"; };
 		BB000011 /* DeviceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceService.swift; sourceTree = "<group>"; };
 		BB000012 /* DeviceSelectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionViewModel.swift; sourceTree = "<group>"; };
 		BB000013 /* DeviceSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionView.swift; sourceTree = "<group>"; };
 		BB000014 /* DeviceRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRow.swift; sourceTree = "<group>"; };
+		CB7249DFA6A6FA50A7404EB3 /* SessionManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionManagerTests.swift; sourceTree = "<group>"; };
 		CC000010 /* FileSignature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSignature.swift; sourceTree = "<group>"; };
 		CC000011 /* RecoverableFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoverableFile.swift; sourceTree = "<group>"; };
 		CC000012 /* FastScanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastScanService.swift; sourceTree = "<group>"; };
@@ -148,6 +154,7 @@
 				6C1B11E2F3AF898154D08CA6 /* FakePrivilegedDiskReader.swift */,
 				31D64682A1FDC7E785D23022 /* FileScanViewModelTests.swift */,
 				E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */,
+				CB7249DFA6A6FA50A7404EB3 /* SessionManagerTests.swift */,
 			);
 			name = VivacityTests;
 			path = VivacityTests;
@@ -234,6 +241,7 @@
 				CC000011 /* RecoverableFile.swift */,
 				DD000010 /* VolumeInfo.swift */,
 				701C8C0145874A1017A1233A /* FATModels.swift */,
+				B0ADEBE5D623AB329A92699C /* ScanSession.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -252,6 +260,7 @@
 				ABF74D4EC834328576E9A7E6 /* Carvers */,
 				5F72C99CDB009F0B10499058 /* PrivilegedDiskReading.swift */,
 				05A02025A207FE742FDDB8D8 /* PartitionSearchService.swift */,
+				31C080987ACA5FEDE7E26580 /* SessionManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -447,6 +456,7 @@
 				C20F471C0D5544F7E17D075F /* FakePrivilegedDiskReader.swift in Sources */,
 				AF9D9F74FA517ECD01D20E30 /* FileScanViewModelTests.swift in Sources */,
 				01CA7678C5E49342FBEC6DD7 /* PartitionSearchServiceTests.swift in Sources */,
+				F868D76B41326B7A26617210 /* SessionManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -483,6 +493,8 @@
 				49971FA5A658E089F0216CB2 /* PrivilegedDiskReading.swift in Sources */,
 				702BC9CC6922EABB684E6289 /* AppEnvironment.swift in Sources */,
 				0465723FD557A47A36FFB4AF /* PartitionSearchService.swift in Sources */,
+				C9D70560A62EA3B78A99B80A /* ScanSession.swift in Sources */,
+				BD297BEA662DAFEF20262A63 /* SessionManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

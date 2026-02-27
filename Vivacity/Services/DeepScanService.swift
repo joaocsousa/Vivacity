@@ -7,7 +7,7 @@ import os
 /// for magic-byte patterns. Generates file names for discovered files and
 /// deduplicates against offsets already found by `FastScanService`.
 protocol DeepScanServicing: Sendable {
-    func scan(device: StorageDevice, existingOffsets: Set<UInt64>) -> AsyncThrowingStream<ScanEvent, Error>
+    func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64) -> AsyncThrowingStream<ScanEvent, Error>
 }
 
 struct DeepScanService: DeepScanServicing {
@@ -50,7 +50,8 @@ struct DeepScanService: DeepScanServicing {
     /// - Returns: An `AsyncThrowingStream` of ``ScanEvent`` values.
     func scan(
         device: StorageDevice,
-        existingOffsets: Set<UInt64>
+        existingOffsets: Set<UInt64>,
+        startOffset: UInt64 = 0
     ) -> AsyncThrowingStream<ScanEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task.detached {
@@ -58,6 +59,7 @@ struct DeepScanService: DeepScanServicing {
                     try await performScan(
                         device: device,
                         existingOffsets: existingOffsets,
+                        startOffset: startOffset,
                         continuation: continuation
                     )
                 } catch is CancellationError {
@@ -87,6 +89,7 @@ struct DeepScanService: DeepScanServicing {
     private func performScan(
         device: StorageDevice,
         existingOffsets: Set<UInt64>,
+        startOffset: UInt64,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let volumeInfo = VolumeInfo.detect(for: device)
@@ -138,7 +141,7 @@ struct DeepScanService: DeepScanServicing {
 
         let chunkSize = Self.sectorSize * Self.readChunkSectors
         var buffer = [UInt8](repeating: 0, count: chunkSize + Self.maxSignatureLength)
-        var bytesScanned: UInt64 = 0
+        var bytesScanned: UInt64 = startOffset - (startOffset % UInt64(Self.sectorSize))
         var filesFound = 0
         var lastProgressReport: Double = -1
         var carryOver = 0 // Bytes carried over from previous read for cross-boundary matching
