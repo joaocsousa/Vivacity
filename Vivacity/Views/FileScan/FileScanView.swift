@@ -9,8 +9,15 @@ import SwiftUI
 /// 4. Footer with select all/deselect, file count, and recover button
 struct FileScanView: View {
     let device: StorageDevice
+    let sessionToResume: ScanSession?
+    
     @State private var viewModel = AppEnvironment.makeFileScanViewModel()
     @Environment(\.dismiss) private var dismiss
+
+    init(device: StorageDevice, sessionToResume: ScanSession? = nil) {
+        self.device = device
+        self.sessionToResume = sessionToResume
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,7 +67,11 @@ struct FileScanView: View {
         .frame(minWidth: 620, minHeight: 580)
         .background(Color(.windowBackgroundColor))
         .task {
-            checkPermissionsAndScan()
+            if let session = sessionToResume {
+                viewModel.resumeSession(session, device: device)
+            } else {
+                checkPermissionsAndScan()
+            }
         }
         .alert(
             "Scan Error",
@@ -129,6 +140,20 @@ extension FileScanView {
                     }
                     .buttonStyle(.bordered)
                     .tint(.red)
+                } else if viewModel.scanPhase == .fastComplete || viewModel.scanPhase == .complete {
+                    Button {
+                        Task {
+                            await viewModel.saveSession(device: device)
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 11))
+                            Text("Save Session")
+                                .font(.system(size: 13))
+                        }
+                    }
+                    .buttonStyle(.bordered)
                 }
             }
 

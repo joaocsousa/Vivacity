@@ -16,6 +16,9 @@ final class DeviceSelectionViewModel {
     /// The device the user has selected (if any).
     var selectedDevice: StorageDevice?
 
+    /// Sessions available for resuming, keyed by deviceID.
+    private(set) var savedSessions: [String: ScanSession] = [:]
+
     /// Whether a device discovery is in progress.
     private(set) var isLoading = false
 
@@ -26,14 +29,17 @@ final class DeviceSelectionViewModel {
 
     private let deviceService: DeviceServicing
     private let partitionSearchService: PartitionSearchService
+    private let sessionManager: SessionManaging
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeviceSelection")
 
     // MARK: - Init
 
     init(deviceService: DeviceServicing = DeviceService(),
-         partitionSearchService: PartitionSearchService = PartitionSearchService()) {
+         partitionSearchService: PartitionSearchService = PartitionSearchService(),
+         sessionManager: SessionManaging = SessionManager()) {
         self.deviceService = deviceService
         self.partitionSearchService = partitionSearchService
+        self.sessionManager = sessionManager
     }
 
     // MARK: - Actions
@@ -44,20 +50,52 @@ final class DeviceSelectionViewModel {
         errorMessage = nil
 
         do {
-            devices = try await deviceService.discoverDevices()
+            async let fetchDevices = deviceService.discoverDevices()
+            async let fetchSessions = sessionManager.loadAll()
+            
+            let (discoveredDevices, loadedSessions) = try await (fetchDevices, fetchSessions)
+
+            devices = discoveredDevices
+            
+            // Map sessions by device ID
+            var sessionMap: [String: ScanSession] = [:]
+            for session in loadedSessions {
+                // If there are multiple sessions for a device, keep the newest one
+                if let existing = sessionMap[session.deviceID] {
+                    if session.dateSaved > existing.dateSaved {
+                        sessionMap[session.deviceID] = session
+                    }
+                } else {
+                    sessionMap[session.deviceID] = session
+                }
+            }
+            savedSessions = sessionMap
+            
             let count = devices.count
-            logger.info("Discovered \(count) device(s)")
+            logger.info("Discovered \(count) device(s) and \(loadedSessions.count) session(s)")
 
             // Clear selection if the previously selected device is no longer available.
             if let selected = selectedDevice, !self.devices.contains(selected) {
                 selectedDevice = nil
             }
         } catch {
-            logger.error("Device discovery failed: \(error.localizedDescription)")
-            errorMessage = "Failed to discover devices: \(error.localizedDescription)"
+            logger.error("Device discovery or session loading failed: \(error.localizedDescription)")
+            errorMessage = "Failed to discover devices or sessions: \(error.localizedDescription)"
         }
 
         isLoading = false
+    }
+
+    /// Deletes the saved session for the given device ID.
+    func deleteSession(forDeviceID deviceID: String) async {
+        guard let session = savedSessions[deviceID] else { return }
+        do {
+            try await sessionManager.deleteSession(id: session.id)
+            savedSessions.removeValue(forKey: deviceID)
+        } catch {
+            logger.error("Failed to delete session: \(error.localizedDescription)")
+            errorMessage = "Failed to delete old session."
+        }
     }
 
     /// Observes volume mount/unmount events and refreshes the device list automatically.

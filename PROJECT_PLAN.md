@@ -366,7 +366,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-### T-028 ⬜ Scan session save/resume
+### T-028 ✅ Scan session save/resume
 
 **Description**: Save scan results to disk and resume later, including continuing Deep Scan from the last offset.
 

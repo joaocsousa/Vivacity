@@ -84,6 +84,7 @@ final class FileScanViewModel {
 
     private let fastScanService: FastScanServicing
     private let deepScanService: DeepScanServicing
+    private let sessionManager: SessionManaging
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FileScan")
 
     /// Handle for the currently running scan task (for cancellation).
@@ -96,10 +97,12 @@ final class FileScanViewModel {
 
     init(
         fastScanService: FastScanServicing = FastScanService(),
-        deepScanService: DeepScanServicing = DeepScanService()
+        deepScanService: DeepScanServicing = DeepScanService(),
+        sessionManager: SessionManaging = SessionManager()
     ) {
         self.fastScanService = fastScanService
         self.deepScanService = deepScanService
+        self.sessionManager = sessionManager
     }
 
     // MARK: - Actions
@@ -153,7 +156,8 @@ final class FileScanViewModel {
             do {
                 let stream = deepScanService.scan(
                     device: device,
-                    existingOffsets: existingOffsets
+                    existingOffsets: existingOffsets,
+                    startOffset: 0
                 )
                 for try await event in stream {
                     handleScanEvent(event)
@@ -197,6 +201,71 @@ final class FileScanViewModel {
     func skipDeepScan() {
         guard scanPhase == .fastComplete else { return }
         scanPhase = .complete
+    }
+
+    // MARK: - Session Management
+
+    /// Saves the current scan progress for the given device.
+    func saveSession(device: StorageDevice) async {
+        guard isScanning || scanPhase == .fastComplete || scanPhase == .complete else { return }
+        
+        // Convert progress percentage back to approximate offset
+        let activeOffset = scanPhase == .deepScanning 
+            ? UInt64(progress * Double(device.totalCapacity))
+            : (scanPhase == .complete ? UInt64(device.totalCapacity) : 0)
+        
+        let session = ScanSession(
+            id: UUID(),
+            dateSaved: Date(),
+            deviceID: device.id,
+            deviceTotalCapacity: device.totalCapacity,
+            lastScannedOffset: Int64(activeOffset),
+            discoveredFiles: foundFiles
+        )
+        
+        do {
+            try await sessionManager.save(session)
+            logger.info("Session saved successfully")
+        } catch {
+            logger.error("Failed to save session: \(error.localizedDescription)")
+            errorMessage = "Failed to save session: \(error.localizedDescription)"
+        }
+    }
+
+    /// Loads a saved session and resumes deep scanning.
+    func resumeSession(_ session: ScanSession, device: StorageDevice) {
+        guard scanPhase == .idle else { return }
+        
+        scanPhase = .deepScanning
+        foundFiles = session.discoveredFiles
+        progress = Double(session.lastScannedOffset) / Double(device.totalCapacity)
+        selectedFileIDs = []
+        errorMessage = nil
+        
+        let existingOffsets = Set(foundFiles.map(\.offsetOnDisk).filter { $0 > 0 })
+        
+        scanTask = Task {
+            do {
+                let stream = deepScanService.scan(
+                    device: device,
+                    existingOffsets: existingOffsets,
+                    startOffset: UInt64(session.lastScannedOffset)
+                )
+                for try await event in stream {
+                    handleScanEvent(event)
+                }
+                if scanPhase == .deepScanning {
+                    scanPhase = .complete
+                }
+            } catch is CancellationError {
+                logger.info("Deep scan cancelled by user")
+                scanPhase = .complete
+            } catch {
+                logger.error("Deep scan error: \(error.localizedDescription)")
+                errorMessage = "Deep scan error: \(error.localizedDescription)"
+                scanPhase = .complete
+            }
+        }
     }
 
     // MARK: - Selection
