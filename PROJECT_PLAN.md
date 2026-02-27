@@ -392,6 +392,14 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
+### T-032 ✅ Fragmented image reconstruction
+
+**Description**: Reassemble fragmented JPEG and RAW image files by identifying metadata (e.g. EXIF headers) and locating missing image data blocks, commonly caused by filesystem fragmentation.
+
+**Files**: `Carvers/ImageReconstructor.swift` [NEW]
+
+---
+
 ## M9 — Recovery Destination Screen
 
 ### T-013 ⬜ Create `RecoveryDestinationViewModel`
