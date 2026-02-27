@@ -21,6 +21,9 @@ struct StorageDevice: Identifiable, Hashable, Sendable {
     /// Whether the volume is on an external (removable) device.
     let isExternal: Bool
 
+    /// Whether this device is actually an unmounted raw disk image file.
+    var isDiskImage: Bool = false
+
     /// The offset in bytes from the start of the physical disk where this partition begins.
     /// If non-nil, this device represents a virtual "lost" partition found by a raw disk scan.
     let partitionOffset: UInt64?

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		01CA7678C5E49342FBEC6DD7 /* PartitionSearchServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */; };
 		0465723FD557A47A36FFB4AF /* PartitionSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05A02025A207FE742FDDB8D8 /* PartitionSearchService.swift */; };
+		04C55D61D29BEF9F556574FD /* DiskImageServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79DB19E6CFA8AE3C81367F05 /* DiskImageServiceTests.swift */; };
 		11A73B5D24096FBDF2C0A314 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 15DB3BE95DBA2A386AB785A3 /* Foundation.framework */; };
 		18DDB8736E8D384F2B052EFA /* FATCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */; };
 		19FD47F9859C4CF27B0654BC /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 15DB3BE95DBA2A386AB785A3 /* Foundation.framework */; };
@@ -31,6 +32,7 @@
 		BD297BEA662DAFEF20262A63 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C080987ACA5FEDE7E26580 /* SessionManager.swift */; };
 		BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85684069117F459BA261B91B /* PermissionDeniedView.swift */; };
 		C20F471C0D5544F7E17D075F /* FakePrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1B11E2F3AF898154D08CA6 /* FakePrivilegedDiskReader.swift */; };
+		C3DAFCD9A0FDF3E1CC6C39D1 /* DiskImageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FDF8909316E71A2C41052F /* DiskImageService.swift */; };
 		C9D70560A62EA3B78A99B80A /* ScanSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0ADEBE5D623AB329A92699C /* ScanSession.swift */; };
 		CC000001 /* FileSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000010 /* FileSignature.swift */; };
 		CC000002 /* RecoverableFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000011 /* RecoverableFile.swift */; };
@@ -78,6 +80,7 @@
 		6C1B11E2F3AF898154D08CA6 /* FakePrivilegedDiskReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FakePrivilegedDiskReader.swift; sourceTree = "<group>"; };
 		701C8C0145874A1017A1233A /* FATModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FATModels.swift; sourceTree = "<group>"; };
 		765344A29DF87B5DEA1EB788 /* APFSCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = APFSCarver.swift; path = Services/Carvers/APFSCarver.swift; sourceTree = "<group>"; };
+		79DB19E6CFA8AE3C81367F05 /* DiskImageServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskImageServiceTests.swift; sourceTree = "<group>"; };
 		85684069117F459BA261B91B /* PermissionDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionDeniedView.swift; sourceTree = "<group>"; };
 		89CF8379179BDF91F511A062 /* VivacityTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VivacityTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000010 /* VivacityApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VivacityApp.swift; sourceTree = "<group>"; };
@@ -108,6 +111,7 @@
 		DD000013 /* ExFATScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATScanner.swift; sourceTree = "<group>"; };
 		DD000014 /* EXIFDateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFDateExtractor.swift; sourceTree = "<group>"; };
 		E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartitionSearchServiceTests.swift; sourceTree = "<group>"; };
+		E5FDF8909316E71A2C41052F /* DiskImageService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskImageService.swift; sourceTree = "<group>"; };
 		EE000010 /* PrivilegedDiskReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReader.swift; sourceTree = "<group>"; };
 		F9AE38D76593EBF1B3F64048 /* CarverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CarverTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -155,6 +159,7 @@
 				31D64682A1FDC7E785D23022 /* FileScanViewModelTests.swift */,
 				E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */,
 				CB7249DFA6A6FA50A7404EB3 /* SessionManagerTests.swift */,
+				79DB19E6CFA8AE3C81367F05 /* DiskImageServiceTests.swift */,
 			);
 			name = VivacityTests;
 			path = VivacityTests;
@@ -261,6 +266,7 @@
 				5F72C99CDB009F0B10499058 /* PrivilegedDiskReading.swift */,
 				05A02025A207FE742FDDB8D8 /* PartitionSearchService.swift */,
 				31C080987ACA5FEDE7E26580 /* SessionManager.swift */,
+				E5FDF8909316E71A2C41052F /* DiskImageService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -457,6 +463,7 @@
 				AF9D9F74FA517ECD01D20E30 /* FileScanViewModelTests.swift in Sources */,
 				01CA7678C5E49342FBEC6DD7 /* PartitionSearchServiceTests.swift in Sources */,
 				F868D76B41326B7A26617210 /* SessionManagerTests.swift in Sources */,
+				04C55D61D29BEF9F556574FD /* DiskImageServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -495,6 +502,7 @@
 				0465723FD557A47A36FFB4AF /* PartitionSearchService.swift in Sources */,
 				C9D70560A62EA3B78A99B80A /* ScanSession.swift in Sources */,
 				BD297BEA662DAFEF20262A63 /* SessionManager.swift in Sources */,
+				C3DAFCD9A0FDF3E1CC6C39D1 /* DiskImageService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

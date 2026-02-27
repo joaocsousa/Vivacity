@@ -5,7 +5,7 @@ final class VivacityUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testFlowWithFakesShowsScanResults() throws {
+    func testFlowWithFakesShowsScanResults() {
         let app = XCUIApplication()
         app.launchEnvironment["VIVACITY_USE_FAKE_SERVICES"] = "1"
         app.launch()

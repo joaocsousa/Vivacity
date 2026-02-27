@@ -7,14 +7,17 @@ import os
 /// for magic-byte patterns. Generates file names for discovered files and
 /// deduplicates against offsets already found by `FastScanService`.
 protocol DeepScanServicing: Sendable {
-    func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64) -> AsyncThrowingStream<ScanEvent, Error>
+    func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64)
+        -> AsyncThrowingStream<ScanEvent, Error>
 }
 
 struct DeepScanService: DeepScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeepScan")
     private let diskReaderFactory: @Sendable (String) -> any PrivilegedDiskReading
 
-    init(diskReaderFactory: @escaping @Sendable (String) -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading }) {
+    init(diskReaderFactory: @escaping @Sendable (String)
+        -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading })
+    {
         self.diskReaderFactory = diskReaderFactory
     }
 

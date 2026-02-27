@@ -46,6 +46,15 @@ struct VolumeInfo: Sendable {
     static func detect(for device: StorageDevice) -> VolumeInfo {
         let volumePath = device.volumePath.path
 
+        if device.isDiskImage {
+            logger.info("Skipping statfs for disk image file at \(volumePath)")
+            return VolumeInfo(
+                filesystemType: .other,
+                devicePath: volumePath,
+                mountPoint: device.volumePath
+            )
+        }
+
         var stat = statfs()
         guard statfs(volumePath, &stat) == 0 else {
             logger.warning("statfs failed for \(volumePath), defaulting to 'other'")

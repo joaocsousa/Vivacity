@@ -4,7 +4,7 @@ import SwiftUI
 struct DeviceSelectionView: View {
     @State private var viewModel = AppEnvironment.makeDeviceSelectionViewModel()
     @State private var navigationTarget: NavigationDestination?
-    
+
     enum NavigationDestination: Hashable {
         case device(StorageDevice)
         case deviceWithSession(StorageDevice, ScanSession)
@@ -22,9 +22,9 @@ struct DeviceSelectionView: View {
         .background(Color(.windowBackgroundColor))
         .navigationDestination(item: $navigationTarget) { destination in
             switch destination {
-            case .device(let device):
+            case let .device(device):
                 FileScanView(device: device)
-            case .deviceWithSession(let device, let session):
+            case let .deviceWithSession(device, session):
                 FileScanView(device: device, sessionToResume: session)
             }
         }
@@ -119,6 +119,22 @@ extension DeviceSelectionView {
                                 } label: {
                                     Label("Find Lost Partitions", systemImage: "magnifyingglass")
                                 }
+
+                                if !device.isDiskImage {
+                                    Divider()
+                                    Button {
+                                        let panel = NSSavePanel()
+                                        panel.allowedContentTypes = [.data]
+                                        panel.nameFieldStringValue = "\(device.name)_Image.dd"
+                                        panel.title = "Save Disk Image"
+
+                                        if panel.runModal() == .OK, let url = panel.url {
+                                            Task { await viewModel.createImage(for: device, to: url) }
+                                        }
+                                    } label: {
+                                        Label("Create Disk Image...", systemImage: "opticaldiscdrive")
+                                    }
+                                }
                             }
                         }
                     }
@@ -127,6 +143,32 @@ extension DeviceSelectionView {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay {
+            if viewModel.isCreatingImage {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ProgressView(value: viewModel.imageCreationProgress, total: 1.0)
+                            .progressViewStyle(.linear)
+                            .frame(width: 200)
+
+                        Text("Creating Byte-to-Byte Disk Image...")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+
+                        Text("\(Int(viewModel.imageCreationProgress * 100))%")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .padding(32)
+                    .background(Color(.windowBackgroundColor))
+                    .cornerRadius(12)
+                    .shadow(radius: 10)
+                }
+            }
+        }
     }
 
     private var footer: some View {
@@ -138,6 +180,24 @@ extension DeviceSelectionView {
                     .font(.system(size: 13))
             }
             .buttonStyle(.borderless)
+
+            Button {
+                let panel = NSOpenPanel()
+                panel.allowsMultipleSelection = false
+                panel.canChooseDirectories = false
+                panel.canCreateDirectories = false
+                panel.allowedContentTypes = [.data, .diskImage, .rawImage]
+                panel.title = "Select Disk Image"
+
+                if panel.runModal() == .OK, let url = panel.url {
+                    viewModel.loadDiskImage(at: url)
+                }
+            } label: {
+                Label("Load Image...", systemImage: "doc.badge.plus")
+                    .font(.system(size: 13))
+            }
+            .buttonStyle(.borderless)
+            .padding(.leading, 8)
 
             Spacer()
 
@@ -160,7 +220,7 @@ extension DeviceSelectionView {
                 .buttonStyle(.plain)
                 .foregroundStyle(.blue)
                 .padding(.trailing, 8)
-                
+
                 if let session = viewModel.savedSessions[selected.id] {
                     Button {
                         navigationTarget = .device(selected)
@@ -170,7 +230,7 @@ extension DeviceSelectionView {
                     .buttonStyle(.bordered)
                     .controlSize(.large)
                     .disabled(viewModel.isLoading)
-                    
+
                     Button {
                         navigationTarget = .deviceWithSession(selected, session)
                     } label: {

@@ -25,9 +25,11 @@ struct FastScanService: FastScanServicing {
     private let unmountSnapshotClosure: @Sendable (URL, Logger) -> Void
 
     init(
-        diskReaderFactory: @escaping @Sendable (String) -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading },
+        diskReaderFactory: @escaping @Sendable (String)
+            -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading },
         runTMUtilClosure: @escaping @Sendable (URL, Logger) -> String? = FastScanService.defaultRunTMUtil,
-        mountSnapshotClosure: @escaping @Sendable (String, URL, Logger) throws -> URL = FastScanService.defaultMountSnapshot,
+        mountSnapshotClosure: @escaping @Sendable (String, URL, Logger) throws -> URL = FastScanService
+            .defaultMountSnapshot,
         unmountSnapshotClosure: @escaping @Sendable (URL, Logger) -> Void = FastScanService.defaultUnmountSnapshot
     ) {
         self.diskReaderFactory = diskReaderFactory
@@ -344,7 +346,7 @@ struct FastScanService: FastScanServicing {
         filesExamined: inout Int
     ) async throws {
         try Task.checkCancellation()
-        
+
         let mountPoint: URL
         do {
             mountPoint = try mountSnapshotClosure(snapshotName, volumeRoot, logger)

@@ -62,7 +62,11 @@ struct FakeFastScanService: FastScanServicing {
 
 struct FakeDeepScanService: DeepScanServicing {
     let events: [ScanEvent]
-    func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64) -> AsyncThrowingStream<ScanEvent, Error> {
+    func scan(
+        device: StorageDevice,
+        existingOffsets: Set<UInt64>,
+        startOffset: UInt64
+    ) -> AsyncThrowingStream<ScanEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 for event in events where !shouldSkip(event: event, existingOffsets: existingOffsets) {
@@ -83,8 +87,8 @@ struct FakeDeepScanService: DeepScanServicing {
 
 // MARK: - Fixtures
 
-private extension RecoverableFile {
-    static func fixture(id: Int, offset: UInt64 = 0, source: ScanSource) -> RecoverableFile {
+extension RecoverableFile {
+    fileprivate static func fixture(id: Int, offset: UInt64 = 0, source: ScanSource) -> RecoverableFile {
         RecoverableFile(
             id: UUID(uuidString: "00000000-0000-0000-0000-0000000000\(String(format: "%02d", id))") ?? UUID(),
             fileName: "file\(id)",
@@ -98,8 +102,8 @@ private extension RecoverableFile {
     }
 }
 
-private extension StorageDevice {
-    static func fakeDevice() -> StorageDevice {
+extension StorageDevice {
+    fileprivate static func fakeDevice() -> StorageDevice {
         StorageDevice(
             id: "fake",
             name: "FakeDisk",
@@ -109,8 +113,8 @@ private extension StorageDevice {
             isExternal: true,
             partitionOffset: nil,
             partitionSize: nil,
-            totalCapacity: 10_000,
-            availableCapacity: 5_000
+            totalCapacity: 10000,
+            availableCapacity: 5000
         )
     }
 }

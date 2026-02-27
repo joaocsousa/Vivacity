@@ -10,7 +10,7 @@ import SwiftUI
 struct FileScanView: View {
     let device: StorageDevice
     let sessionToResume: ScanSession?
-    
+
     @State private var viewModel = AppEnvironment.makeFileScanViewModel()
     @Environment(\.dismiss) private var dismiss
 
