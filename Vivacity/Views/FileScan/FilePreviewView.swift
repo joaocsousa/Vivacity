@@ -10,6 +10,10 @@ struct FilePreviewView: View {
     let file: RecoverableFile?
     let device: StorageDevice
 
+    @State private var previewURL: URL?
+    @State private var isExtracting = false
+    @State private var previewService = LivePreviewService()
+
     var body: some View {
         Group {
             if let file {
@@ -20,6 +24,43 @@ struct FilePreviewView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.windowBackgroundColor))
+        .task(id: file?.id) {
+            await loadPreviewURL()
+        }
+    }
+
+    private func loadPreviewURL() async {
+        guard let file else {
+            previewURL = nil
+            isExtracting = false
+            return
+        }
+
+        isExtracting = true
+        defer { isExtracting = false }
+
+        // Fast Scan files that still exist at offset 0
+        if file.source == .fastScan, file.offsetOnDisk == 0 {
+            previewURL = resolveFileURL(for: file)
+            return
+        }
+
+        // Deep Scan files
+        if file.source == .deepScan {
+            do {
+                let volumeInfo = VolumeInfo.detect(for: device)
+                let reader = PrivilegedDiskReader(devicePath: volumeInfo.devicePath)
+                try reader.start()
+                defer { reader.stop() }
+
+                previewURL = try await previewService.generatePreviewURL(for: file, reader: reader)
+            } catch {
+                print("Failed to extract preview: \(error)")
+                previewURL = nil
+            }
+        } else {
+            previewURL = nil
+        }
     }
 }
 
@@ -41,10 +82,16 @@ extension FilePreviewView {
 
     @ViewBuilder
     private func previewMedia(for file: RecoverableFile) -> some View {
-        // For filesystem-found files, try to load from the volume path
-        let fileURL = resolveFileURL(for: file)
-
-        if let url = fileURL, FileManager.default.isReadableFile(atPath: url.path) {
+        if isExtracting {
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.large)
+                Text("Extracting file for preview...")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let url = previewURL, FileManager.default.isReadableFile(atPath: url.path) {
             switch file.fileType {
             case .image:
                 AsyncImagePreview(url: url)
@@ -53,7 +100,7 @@ extension FilePreviewView {
                 VideoPlayerPreview(url: url)
             }
         } else {
-            // File not directly accessible (deep scan / deleted file)
+            // File not directly accessible or extraction failed
             unavailablePreview(for: file)
         }
     }
@@ -68,7 +115,7 @@ extension FilePreviewView {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
 
-            Text("Preview unavailable — file must be recovered first")
+            Text("Preview unavailable — file might be severely fragmented")
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

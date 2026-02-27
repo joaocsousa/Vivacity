@@ -20,7 +20,7 @@
 | M4 | Scan Engine Hardening | T-019 → T-021 | ✅ DONE |
 | M5 | Deep Scan FS-Aware Carving | T-025 → T-026 | ✅ DONE |
 | M6 | Advanced Features | T-027 → T-029 | ✅ DONE |
-| M7 | Advanced Camera Recovery | T-030 → T-031 | 🔶 IN PROGRESS |
+| M7 | Advanced Camera Recovery | T-030 → T-033 | ✅ DONE |
 | M8 | Scan Results UX | T-022 → T-024 | ⬜ TODO |
 | M9 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
 | M10 | Polish & Edge Cases | T-016 → T-018 | 🔶 IN PROGRESS |
@@ -455,7 +455,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-### T-033 ⬜ Deep Scan live previews
+### T-033 ✅ Deep Scan live previews
 
 **Description**: Enable live previewing of files discovered via Deep Scan before recovery runs. 
 This requires extracting the raw bytes from `/dev/disk` using the discovered `offsetOnDisk` and `sizeInBytes` into an `NSTemporaryDirectory()` on-the-fly when the user clicks a row in the UI, and constructing an `NSImage` or `AVPlayer` from that temporary location.
