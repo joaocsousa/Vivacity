@@ -417,6 +417,13 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 **Files**:
 - `Vivacity/ViewModels/RecoveryDestinationViewModel.swift`
 
+**Subtasks**:
+- Define view model API and state (`destinationURL`, `requiredSpace`, `availableSpace`, `hasEnoughSpace`).
+- Implement `selectDestination()` using `NSOpenPanel` and restrict to directories.
+- Add storage-volume comparison logic to block destinations on scanned device.
+- Implement `updateAvailableSpace()` using volume resource values.
+- Add async `startRecovery()` stub to call `FileRecoveryService` once implemented.
+
 ---
 
 ### T-014 ⬜ Create `RecoveryDestinationView`
@@ -435,6 +442,13 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 **Files**:
 - `Vivacity/Views/RecoveryDestination/RecoveryDestinationView.swift`
 
+**Subtasks**:
+- Build layout: header, destination picker button, and path display.
+- Show space required/available with clear error state when insufficient.
+- Render “same device” warning and disable selection when invalid.
+- Wire “Start Recovery” button to view model and show progress state.
+- Add previews and verify disabled/enabled states visually.
+
 ---
 
 ### T-015 ⬜ Create `FileRecoveryService`
@@ -451,6 +465,13 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 **Files**:
 - `Vivacity/Services/FileRecoveryService.swift`
 
+**Subtasks**:
+- Define recovery API (async function + progress callback/stream).
+- Read raw bytes at `offsetOnDisk` for each selected `RecoverableFile`.
+- Write files to destination with collision-safe naming.
+- Handle per-file errors without aborting the batch.
+- Support cancellation and emit final completion status.
+
 ---
 
 ---
@@ -464,11 +485,20 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
+## M8 — Scan Results UX
+
 ### T-022 ⬜ Add result filtering
 
 **Description**: Filter toolbar (by type, size, filename search) above the file list, matching Disk Drill's UX.
 
 **Files**: `FileScanViewModel.swift`, `FileScanView.swift`, `FilterToolbar.swift` [NEW]
+
+**Subtasks**:
+- Define filter state (type, size range, filename query) in view model.
+- Add filtering logic to derived list without mutating `foundFiles`.
+- Implement `FilterToolbar` UI and bind to view model state.
+- Ensure selection count updates reflect filtered vs total lists.
+- Add lightweight unit tests for filter combinations.
 
 ---
 
@@ -478,6 +508,13 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 **Files**: `RecoverableFile.swift`, `FileRow.swift`, `FastScanService.swift`, `DeepScanService.swift`
 
+**Subtasks**:
+- Define confidence rules based on scan source and contiguity signals.
+- Add confidence field or computed property to `RecoverableFile`.
+- Render colored indicator in `FileRow` with accessible label.
+- Update scan services to compute confidence where possible.
+- Add tests for confidence classification.
+
 ---
 
 ### T-024 ⬜ File size estimation for Deep Scan results
@@ -485,6 +522,13 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 **Description**: Estimate file sizes by finding the next header or known footer bytes (e.g., JPEG `FF D9`, PNG `IEND`).
 
 **Files**: `DeepScanService.swift`, `FileFooterDetector.swift` [NEW]
+
+**Subtasks**:
+- Implement footer/header detection for JPEG/PNG at minimum.
+- Add a scanning window to estimate size without reading full disk.
+- Integrate size estimation into Deep Scan result creation.
+- Ensure size estimation is bounded and cancellation-aware.
+- Add unit tests for footer detection and size estimation.
 
 ---
 
@@ -527,6 +571,13 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 **Files**:
 - Update `ContentView.swift`
 
+**Subtasks**:
+- Define navigation routes (device → scan → destination → recovery).
+- Ensure back navigation resets scan state appropriately.
+- Pass selected files and device into destination screen.
+- Add recovery completion state and success view placeholder.
+- Update previews to reflect navigation flow.
+
 ---
 
 ### T-018 ⬜ Final visual polish & testing
@@ -538,3 +589,9 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - Dark and light mode verified
 - App icon (placeholder acceptable)
 - Manual walkthrough of full flow: select device → scan → preview → recover
+
+**Subtasks**:
+- Audit spacing and typography for each screen (device, scan, destination).
+- Verify light/dark appearance and fix contrast issues.
+- Add placeholder app icon and confirm in Dock/Launchpad.
+- Run manual end-to-end walkthrough and document issues.
