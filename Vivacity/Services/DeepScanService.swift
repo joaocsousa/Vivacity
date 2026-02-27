@@ -246,8 +246,7 @@ struct DeepScanService: DeepScanServicing {
                 existingOffsets: allOffsets,
                 cameraProfile: cameraProfile
             )
-
-            let newlyFoundOffsets = scanChunk(
+            let newlyFoundOffsets = await scanChunk(
                 context: context,
                 reader: reader,
                 filesFound: &filesFound,
@@ -327,7 +326,7 @@ struct DeepScanService: DeepScanServicing {
         reader: PrivilegedDiskReading,
         filesFound: inout Int,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
-    ) -> [UInt64] {
+    ) async -> [UInt64] {
         var newOffsets: [UInt64] = []
 
         // Scan the chunk for magic bytes
@@ -363,6 +362,20 @@ struct DeepScanService: DeepScanServicing {
                     if let contiguousSize = mp4Reconstructor.calculateContiguousSize(startingAt: offset, reader: reader) {
                         sizeInBytes = Int64(contiguousSize)
                     }
+                } else if match == .jpeg {
+                    let imageReconstructor = ImageReconstructor()
+                    
+                    // We need to pass the header slice we have so far
+                    let availableBytes = context.buffer.count - i
+                    let checkLength = min(availableBytes, 65536)
+                    let headerSlice = Data(context.buffer[i ..< i + checkLength])
+                    
+                    if let result = await imageReconstructor.reconstruct(headerOffset: offset, initialChunk: headerSlice, reader: reader) {
+                        sizeInBytes = Int64(result.count)
+                    }
+                    
+                    // If the chunk was fragmented, we should update the UI with a specific fragmented badge if we had one
+                    // For now, we just accurately report the discovered stitched size
                 }
 
                 let file = RecoverableFile(

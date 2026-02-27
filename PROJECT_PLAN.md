@@ -392,6 +392,14 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
+### T-032 ✅ Fragmented image reconstruction
+
+**Description**: Reassemble fragmented JPEG and RAW image files by identifying metadata (e.g. EXIF headers) and locating missing image data blocks, commonly caused by filesystem fragmentation.
+
+**Files**: `Carvers/ImageReconstructor.swift` [NEW]
+
+---
+
 ## M9 — Recovery Destination Screen
 
 ### T-013 ⬜ Create `RecoveryDestinationViewModel`
@@ -445,7 +453,16 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ---
 
-## M8 — Scan Results UX
+---
+
+### T-033 ⬜ Deep Scan live previews
+
+**Description**: Enable live previewing of files discovered via Deep Scan before recovery runs. 
+This requires extracting the raw bytes from `/dev/disk` using the discovered `offsetOnDisk` and `sizeInBytes` into an `NSTemporaryDirectory()` on-the-fly when the user clicks a row in the UI, and constructing an `NSImage` or `AVPlayer` from that temporary location.
+
+**Files**: `FilePreviewView.swift`, `LivePreviewService.swift` [NEW]
+
+---
 
 ### T-022 ⬜ Add result filtering
 
