@@ -65,7 +65,8 @@ struct FakeDeepScanService: DeepScanServicing {
     func scan(
         device: StorageDevice,
         existingOffsets: Set<UInt64>,
-        startOffset: UInt64
+        startOffset: UInt64,
+        cameraProfile: CameraProfile
     ) -> AsyncThrowingStream<ScanEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {

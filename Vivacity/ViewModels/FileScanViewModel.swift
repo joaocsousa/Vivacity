@@ -26,6 +26,9 @@ final class FileScanViewModel {
     /// Current scan phase.
     private(set) var scanPhase: ScanPhase = .idle
 
+    /// The detected camera profile of the scanned device.
+    private(set) var cameraProfile: CameraProfile = .generic
+
     /// All recoverable files found across both phases.
     private(set) var foundFiles: [RecoverableFile] = []
 
@@ -85,6 +88,7 @@ final class FileScanViewModel {
     private let fastScanService: FastScanServicing
     private let deepScanService: DeepScanServicing
     private let sessionManager: SessionManaging
+    private let cameraRecoveryService: CameraRecoveryServicing
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FileScan")
 
     /// Handle for the currently running scan task (for cancellation).
@@ -98,11 +102,13 @@ final class FileScanViewModel {
     init(
         fastScanService: FastScanServicing = FastScanService(),
         deepScanService: DeepScanServicing = DeepScanService(),
-        sessionManager: SessionManaging = SessionManager()
+        sessionManager: SessionManaging = SessionManager(),
+        cameraRecoveryService: CameraRecoveryServicing = CameraRecoveryService()
     ) {
         self.fastScanService = fastScanService
         self.deepScanService = deepScanService
         self.sessionManager = sessionManager
+        self.cameraRecoveryService = cameraRecoveryService
     }
 
     // MARK: - Actions
@@ -134,10 +140,12 @@ final class FileScanViewModel {
                 }
                 // If we reach here without .completed, mark as complete
                 if scanPhase == .fastScanning {
+                    cameraProfile = cameraRecoveryService.detectProfile(from: foundFiles)
                     finishFastScan()
                 }
             } catch is CancellationError {
                 logger.info("Fast scan cancelled by user")
+                cameraProfile = cameraRecoveryService.detectProfile(from: foundFiles)
                 scanPhase = .fastComplete
             } catch {
                 logger.error("Fast scan error: \(error.localizedDescription)")
@@ -165,7 +173,8 @@ final class FileScanViewModel {
                 let stream = deepScanService.scan(
                     device: device,
                     existingOffsets: existingOffsets,
-                    startOffset: 0
+                    startOffset: 0,
+                    cameraProfile: cameraProfile
                 )
                 for try await event in stream {
                     handleScanEvent(event)
@@ -251,13 +260,15 @@ final class FileScanViewModel {
         errorMessage = nil
 
         let existingOffsets = Set(foundFiles.map(\.offsetOnDisk).filter { $0 > 0 })
+        cameraProfile = cameraRecoveryService.detectProfile(from: foundFiles)
 
         scanTask = Task {
             do {
                 let stream = deepScanService.scan(
                     device: device,
                     existingOffsets: existingOffsets,
-                    startOffset: UInt64(session.lastScannedOffset)
+                    startOffset: UInt64(session.lastScannedOffset),
+                    cameraProfile: cameraProfile
                 )
                 for try await event in stream {
                     handleScanEvent(event)

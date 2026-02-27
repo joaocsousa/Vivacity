@@ -7,7 +7,7 @@ import os
 /// for magic-byte patterns. Generates file names for discovered files and
 /// deduplicates against offsets already found by `FastScanService`.
 protocol DeepScanServicing: Sendable {
-    func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64)
+    func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64, cameraProfile: CameraProfile)
         -> AsyncThrowingStream<ScanEvent, Error>
 }
 
@@ -54,7 +54,8 @@ struct DeepScanService: DeepScanServicing {
     func scan(
         device: StorageDevice,
         existingOffsets: Set<UInt64>,
-        startOffset: UInt64 = 0
+        startOffset: UInt64 = 0,
+        cameraProfile: CameraProfile = .generic
     ) -> AsyncThrowingStream<ScanEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task.detached {
@@ -63,6 +64,7 @@ struct DeepScanService: DeepScanServicing {
                         device: device,
                         existingOffsets: existingOffsets,
                         startOffset: startOffset,
+                        cameraProfile: cameraProfile,
                         continuation: continuation
                     )
                 } catch is CancellationError {
@@ -86,6 +88,7 @@ struct DeepScanService: DeepScanServicing {
         let readOffset: Int
         let bytesScanned: UInt64
         let existingOffsets: Set<UInt64>
+        let cameraProfile: CameraProfile
     }
 
     // swiftlint:disable:next function_body_length
@@ -93,6 +96,7 @@ struct DeepScanService: DeepScanServicing {
         device: StorageDevice,
         existingOffsets: Set<UInt64>,
         startOffset: UInt64,
+        cameraProfile: CameraProfile,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let volumeInfo = VolumeInfo.detect(for: device)
@@ -239,7 +243,8 @@ struct DeepScanService: DeepScanServicing {
                 scanLength: scanLength,
                 readOffset: readOffset,
                 bytesScanned: bytesScanned,
-                existingOffsets: allOffsets
+                existingOffsets: allOffsets,
+                cameraProfile: cameraProfile
             )
 
             let newlyFoundOffsets = scanChunk(
@@ -334,10 +339,10 @@ struct DeepScanService: DeepScanServicing {
                 continue
             }
 
-            if let match = matchSignatureAt(buffer: context.buffer, position: i) {
+            if let match = matchSignatureAt(buffer: context.buffer, position: i, cameraProfile: context.cameraProfile) {
                 filesFound += 1
 
-                var fileName = "recovered_\(String(format: "%04d", filesFound))"
+                var fileName = "\(context.cameraProfile.defaultFilePrefix)\(String(format: "%04d", filesFound))"
 
                 // Try to extract an EXIF date for better naming on photos
                 if match.category == .image {
@@ -378,7 +383,7 @@ struct DeepScanService: DeepScanServicing {
     // MARK: - Signature Matching
 
     /// Checks the buffer at the given position for any known file signature.
-    private func matchSignatureAt(buffer: [UInt8], position: Int) -> FileSignature? {
+    private func matchSignatureAt(buffer: [UInt8], position: Int, cameraProfile: CameraProfile) -> FileSignature? {
         let remaining = buffer.count - position
         guard remaining >= 4 else { return nil }
 
@@ -386,7 +391,12 @@ struct DeepScanService: DeepScanServicing {
             return direct
         }
 
-        if let tiff = matchTIFFSignatures(buffer: buffer, position: position, remaining: remaining) {
+        if let tiff = matchTIFFSignatures(
+            buffer: buffer,
+            position: position,
+            remaining: remaining,
+            cameraProfile: cameraProfile
+        ) {
             return tiff
         }
 
@@ -417,16 +427,30 @@ struct DeepScanService: DeepScanServicing {
         return nil
     }
 
-    private func matchTIFFSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
+    private func matchTIFFSignatures(
+        buffer: [UInt8],
+        position: Int,
+        remaining: Int,
+        cameraProfile: CameraProfile
+    ) -> FileSignature? {
         // Little-endian TIFF: 49 49 2A 00
         if buffer[position] == 0x49, buffer[position + 1] == 0x49,
            buffer[position + 2] == 0x2A, buffer[position + 3] == 0x00
         {
-            // Could be TIFF, CR2, ARW, or DNG — default to TIFF
+            // Could be TIFF, CR2, ARW, or DNG
             if remaining >= 10, buffer[position + 8] == 0x43, buffer[position + 9] == 0x52 {
                 return .cr2 // "CR" at offset 8
             }
-            return .tiff
+
+            // Signature promotion based on camera profile
+            switch cameraProfile {
+            case .sony:
+                return .arw
+            case .dji:
+                return .dng
+            default:
+                return .tiff
+            }
         }
         // Big-endian TIFF: 4D 4D 00 2A
         if buffer[position] == 0x4D, buffer[position + 1] == 0x4D,
