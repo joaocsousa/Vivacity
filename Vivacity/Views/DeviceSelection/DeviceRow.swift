@@ -69,7 +69,7 @@ struct DeviceRow: View {
             // Selection checkmark — always reserves space for consistent bar widths
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 22))
-                .foregroundStyle(.blue)
+                .foregroundStyle(.accent)
                 .opacity(isSelected ? 1 : 0)
         }
         .padding(.vertical, 12)
@@ -81,12 +81,12 @@ struct DeviceRow: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(
-                    isSelected ? Color.blue.opacity(0.6) : Color.white.opacity(0.06),
+                    isSelected ? Color.accentColor.opacity(0.6) : Color.secondary.opacity(0.2),
                     lineWidth: isSelected ? 1.5 : 1
                 )
         )
         .shadow(
-            color: isSelected ? Color.blue.opacity(0.2) : Color.clear,
+            color: isSelected ? Color.accentColor.opacity(0.2) : Color.clear,
             radius: 8,
             x: 0,
             y: 0

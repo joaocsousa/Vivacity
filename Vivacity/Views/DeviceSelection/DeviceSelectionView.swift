@@ -146,7 +146,7 @@ extension DeviceSelectionView {
         .overlay {
             if viewModel.isCreatingImage {
                 ZStack {
-                    Color.black.opacity(0.4)
+                    Color.primary.opacity(0.2)
                         .ignoresSafeArea()
 
                     VStack(spacing: 16) {
@@ -156,11 +156,11 @@ extension DeviceSelectionView {
 
                         Text("Creating Byte-to-Byte Disk Image...")
                             .font(.headline)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
 
                         Text("\(Int(viewModel.imageCreationProgress * 100))%")
                             .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(.secondary)
                     }
                     .padding(32)
                     .background(Color(.windowBackgroundColor))
