@@ -488,7 +488,8 @@ struct FastScanService: FastScanServicing {
             sizeInBytes: fileSize,
             offsetOnDisk: 0, // Filesystem-level scan — offset is for raw disk carving
             signatureMatch: signature,
-            source: source
+            source: source,
+            isLikelyContiguous: true
         )
     }
 
