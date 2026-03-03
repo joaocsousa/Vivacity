@@ -50,6 +50,43 @@ final class FileScanViewModel {
     /// Whether disk access was denied and the user needs to grant permissions.
     var permissionDenied: Bool = false
 
+    // MARK: - Filters
+
+    enum FileTypeFilter: String, CaseIterable, Sendable {
+        case all = "All"
+        case images = "Images"
+        case videos = "Videos"
+    }
+
+    enum FileSizeFilter: String, CaseIterable, Sendable {
+        case any = "Any Size"
+        case under5MB = "Under 5 MB"
+        case between5And100MB = "5-100 MB"
+        case over100MB = "Over 100 MB"
+
+        var byteRange: ClosedRange<Int64>? {
+            switch self {
+            case .any:
+                nil
+            case .under5MB:
+                0 ... 5_000_000
+            case .between5And100MB:
+                5_000_001 ... 100_000_000
+            case .over100MB:
+                100_000_001 ... Int64.max
+            }
+        }
+    }
+
+    /// Query string to filter by file name.
+    var fileNameQuery: String = ""
+
+    /// Selected type filter.
+    var fileTypeFilter: FileTypeFilter = .all
+
+    /// Selected size filter.
+    var fileSizeFilter: FileSizeFilter = .any
+
     // MARK: - Computed
 
     /// The file currently selected for preview, if any.
@@ -63,6 +100,19 @@ final class FileScanViewModel {
         selectedFileIDs.count
     }
 
+    /// Number of selected files visible under current filters.
+    var selectedFilteredCount: Int {
+        let filteredIDs = Set(filteredFiles.map(\.id))
+        return selectedFileIDs.intersection(filteredIDs).count
+    }
+
+    /// Whether any filter is active.
+    var isFiltering: Bool {
+        !fileNameQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || fileTypeFilter != .all
+            || fileSizeFilter != .any
+    }
+
     /// Whether recovery can be started (not scanning + at least one selected).
     var canRecover: Bool {
         (scanPhase == .fastComplete || scanPhase == .complete) && !selectedFileIDs.isEmpty
@@ -71,6 +121,76 @@ final class FileScanViewModel {
     /// Whether scanning is currently in progress.
     var isScanning: Bool {
         scanPhase == .fastScanning || scanPhase == .deepScanning
+    }
+
+    /// Whether there are any files to filter.
+    var hasFiles: Bool {
+        !foundFiles.isEmpty
+    }
+
+    /// Files that match the current filters.
+    var filteredFiles: [RecoverableFile] {
+        let normalizedQuery = fileNameQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        return foundFiles.filter { file in
+            if !normalizedQuery.isEmpty {
+                let nameMatches = file.fullFileName.lowercased().contains(normalizedQuery)
+                let pathMatches = file.filePath?.lowercased().contains(normalizedQuery) ?? false
+                if !nameMatches, !pathMatches {
+                    return false
+                }
+            }
+
+            switch fileTypeFilter {
+            case .all:
+                break
+            case .images:
+                if file.fileType != .image { return false }
+            case .videos:
+                if file.fileType != .video { return false }
+            }
+
+            if let range = fileSizeFilter.byteRange, !range.contains(file.sizeInBytes) {
+                return false
+            }
+
+            return true
+        }
+    }
+
+    /// Files found by the fast scan matching current filters.
+    var filteredFastScanFiles: [RecoverableFile] {
+        filteredFiles.filter { $0.source == .fastScan }
+    }
+
+    /// Files found by the deep scan matching current filters.
+    var filteredDeepScanFiles: [RecoverableFile] {
+        filteredFiles.filter { $0.source == .deepScan }
+    }
+
+    /// Whether the filtered result set is empty while files exist.
+    var showFilteredEmptyState: Bool {
+        hasFiles && filteredFiles.isEmpty
+    }
+
+    /// Label showing filtered vs total counts.
+    var filteredCountLabel: String {
+        if isFiltering {
+            return "Showing \(filteredFiles.count) of \(foundFiles.count) files"
+        }
+        return "\(foundFiles.count) files found"
+    }
+
+    /// Label showing selected count under current filters.
+    var selectedCountLabel: String? {
+        guard selectedCount > 0 else { return nil }
+
+        if isFiltering {
+            return "Selected \(selectedFilteredCount) of \(filteredFiles.count) shown"
+        }
+
+        return "Selected \(selectedCount)"
     }
 
     /// Files found by the fast scan.
@@ -303,9 +423,21 @@ final class FileScanViewModel {
         selectedFileIDs = Set(foundFiles.map(\.id))
     }
 
+    /// Selects all filtered files.
+    func selectAllFiltered() {
+        let filteredIDs = Set(filteredFiles.map(\.id))
+        selectedFileIDs.formUnion(filteredIDs)
+    }
+
     /// Deselects all files.
     func deselectAll() {
         selectedFileIDs.removeAll()
+    }
+
+    /// Deselects all filtered files.
+    func deselectFiltered() {
+        let filteredIDs = Set(filteredFiles.map(\.id))
+        selectedFileIDs.subtract(filteredIDs)
     }
 
     // MARK: - Private

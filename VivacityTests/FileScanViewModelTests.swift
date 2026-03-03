@@ -42,6 +42,29 @@ final class FileScanViewModelTests: XCTestCase {
         XCTAssertEqual(sut.scanPhase, .complete)
         XCTAssertEqual(sut.foundFiles.count, 2) // one fast + one deep
     }
+
+    @MainActor
+    func testFiltersApplyToFoundFiles() async {
+        let fast = FakeFastScanService(events: [
+            .fileFound(.fixture(id: 1, name: "IMG_0001", type: .image, size: 2_000_000, source: .fastScan)),
+            .fileFound(.fixture(id: 2, name: "Video_01", type: .video, size: 120_000_000, source: .fastScan)),
+            .fileFound(.fixture(id: 3, name: "IMG_0002", type: .image, size: 8_000_000, source: .fastScan)),
+            .completed,
+        ])
+        let deep = FakeDeepScanService(events: [])
+        let sut = FileScanViewModel(fastScanService: fast, deepScanService: deep)
+
+        sut.startFastScan(device: .fakeDevice())
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+
+        sut.fileTypeFilter = .images
+        sut.fileSizeFilter = .between5And100MB
+        sut.fileNameQuery = "img"
+
+        XCTAssertEqual(sut.filteredFiles.count, 1)
+        XCTAssertEqual(sut.filteredFiles.first?.fileName, "IMG_0002")
+        XCTAssertTrue(sut.isFiltering)
+    }
 }
 
 // MARK: - Fakes
@@ -89,13 +112,20 @@ struct FakeDeepScanService: DeepScanServicing {
 // MARK: - Fixtures
 
 extension RecoverableFile {
-    fileprivate static func fixture(id: Int, offset: UInt64 = 0, source: ScanSource) -> RecoverableFile {
+    fileprivate static func fixture(
+        id: Int,
+        name: String = "file",
+        type: FileCategory = .image,
+        size: Int64 = 1024,
+        offset: UInt64 = 0,
+        source: ScanSource
+    ) -> RecoverableFile {
         RecoverableFile(
             id: UUID(uuidString: "00000000-0000-0000-0000-0000000000\(String(format: "%02d", id))") ?? UUID(),
-            fileName: "file\(id)",
-            fileExtension: "jpg",
-            fileType: .image,
-            sizeInBytes: 1024,
+            fileName: name,
+            fileExtension: type == .image ? "jpg" : "mp4",
+            fileType: type,
+            sizeInBytes: size,
             offsetOnDisk: offset,
             signatureMatch: .jpeg,
             source: source

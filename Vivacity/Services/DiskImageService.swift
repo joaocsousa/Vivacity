@@ -25,6 +25,7 @@ struct DiskImageService: DiskImageServicing {
         injectedReader = diskReader
     }
 
+    // swiftlint:disable:next function_body_length
     func createImage(from device: StorageDevice, to destinationURL: URL) -> AsyncThrowingStream<Double, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
