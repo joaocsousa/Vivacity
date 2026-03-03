@@ -57,6 +57,7 @@
 		DD000003 /* NTFSScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000012 /* NTFSScanner.swift */; };
 		DD000004 /* ExFATScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000013 /* ExFATScanner.swift */; };
 		DD000005 /* EXIFDateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000014 /* EXIFDateExtractor.swift */; };
+		F24A0001A1B2C3D4E5F60708 /* FileFooterDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0002A1B2C3D4E5F60708 /* FileFooterDetector.swift */; };
 		DEBE1D2B6A956E1C67765455 /* LivePreviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */; };
 		EE000001 /* PrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000010 /* PrivilegedDiskReader.swift */; };
 		F868D76B41326B7A26617210 /* SessionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7249DFA6A6FA50A7404EB3 /* SessionManagerTests.swift */; };
@@ -130,6 +131,7 @@
 		DD000012 /* NTFSScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NTFSScanner.swift; sourceTree = "<group>"; };
 		DD000013 /* ExFATScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATScanner.swift; sourceTree = "<group>"; };
 		DD000014 /* EXIFDateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFDateExtractor.swift; sourceTree = "<group>"; };
+		F24A0002A1B2C3D4E5F60708 /* FileFooterDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileFooterDetector.swift; sourceTree = "<group>"; };
 		E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartitionSearchServiceTests.swift; sourceTree = "<group>"; };
 		E5FDF8909316E71A2C41052F /* DiskImageService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskImageService.swift; sourceTree = "<group>"; };
 		E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LivePreviewService.swift; sourceTree = "<group>"; };
@@ -289,6 +291,7 @@
 				BB000011 /* DeviceService.swift */,
 				CC000012 /* FastScanService.swift */,
 				CC000013 /* DeepScanService.swift */,
+				F24A0002A1B2C3D4E5F60708 /* FileFooterDetector.swift */,
 				DD000011 /* FATDirectoryScanner.swift */,
 				DD000014 /* EXIFDateExtractor.swift */,
 				DD000012 /* NTFSScanner.swift */,
@@ -522,6 +525,7 @@
 				CC000002 /* RecoverableFile.swift in Sources */,
 				CC000003 /* FastScanService.swift in Sources */,
 				CC000004 /* DeepScanService.swift in Sources */,
+				F24A0001A1B2C3D4E5F60708 /* FileFooterDetector.swift in Sources */,
 				CC000005 /* FileScanViewModel.swift in Sources */,
 				CC000006 /* FileScanView.swift in Sources */,
 				CC000008 /* FilePreviewView.swift in Sources */,
