@@ -2,6 +2,55 @@ import XCTest
 @testable import Vivacity
 
 final class DeepScanServiceTests: XCTestCase {
+    func testFileFooterDetectorFindsJPEGFooter() async throws {
+        var bytes: [UInt8] = [0xFF, 0xD8, 0xFF]
+        bytes.append(contentsOf: Array(repeating: 0x11, count: 100))
+        bytes.append(contentsOf: [0xFF, 0xD9])
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 512 - bytes.count))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let detector = FileFooterDetector()
+
+        let estimated = try await detector.estimateSize(
+            signature: .jpeg,
+            startOffset: 0,
+            reader: fakeReader,
+            maxScanBytes: 512
+        )
+
+        XCTAssertEqual(estimated, 105)
+    }
+
+    func testDeepScanEstimatesPNGSizeFromFooter() async throws {
+        var pngBytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+        pngBytes.append(contentsOf: Array(repeating: 0x10, count: 40))
+        pngBytes.append(contentsOf: [0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82])
+        pngBytes.append(contentsOf: Array(repeating: 0x00, count: 1024 - pngBytes.count))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(pngBytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+
+        let device = StorageDevice(
+            id: "test", name: "test", volumePath: URL(fileURLWithPath: "/dev/null"),
+            volumeUUID: "test", filesystemType: .other, isExternal: true, isDiskImage: false,
+            partitionOffset: nil, partitionSize: nil, totalCapacity: 1024, availableCapacity: 0
+        )
+
+        let stream = deepScanService.scan(device: device, existingOffsets: [], startOffset: 0, cameraProfile: .generic)
+        var firstFoundFile: RecoverableFile?
+
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                firstFoundFile = file
+                break
+            }
+        }
+
+        XCTAssertEqual(firstFoundFile?.signatureMatch, .png)
+        XCTAssertEqual(firstFoundFile?.sizeInBytes, 56)
+        XCTAssertEqual(firstFoundFile?.isLikelyContiguous, true)
+    }
+
     func testSignaturePromotionSony() async throws {
         var testBuffer = Data([0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00])
         testBuffer.append(Data(repeating: 0, count: 512 - testBuffer.count))

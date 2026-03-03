@@ -44,7 +44,7 @@ Users who accidentally delete photos or videos need a clean, modern macOS-native
 | M5 Deep scan FS-aware carving  | ✅ Done |
 | M6 Advanced features           | ✅ Done |
 | M7 Advanced camera recovery    | ⬜ TODO |
-| M8 Scan results UX             | ⬜ TODO |
+| M8 Scan results UX             | ✅ Done |
 | M9 Recovery destination        | ⬜ TODO |
 | M10 Polish & edge cases        | 🔶 In progress |
 

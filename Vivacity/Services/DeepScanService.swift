@@ -1,38 +1,35 @@
 import Foundation
 import os
 
-/// Service that performs raw sector-by-sector scanning using magic byte signatures.
 protocol DeepScanServicing: Sendable {
-    func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64, cameraProfile: CameraProfile)
-        -> AsyncThrowingStream<ScanEvent, Error>
+    func scan(
+        device: StorageDevice,
+        existingOffsets: Set<UInt64>,
+        startOffset: UInt64,
+        cameraProfile: CameraProfile
+    ) -> AsyncThrowingStream<ScanEvent, Error>
 }
+
 // swiftlint:disable:next type_body_length
 struct DeepScanService: DeepScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeepScan")
     private let diskReaderFactory: @Sendable (String) -> any PrivilegedDiskReading
+    private let fileFooterDetector: FileFooterDetecting
 
-    init(diskReaderFactory: @escaping @Sendable (String)
-        -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading })
-    {
+    init(
+        diskReaderFactory: @escaping @Sendable (String)
+            -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading },
+        fileFooterDetector: FileFooterDetecting = FileFooterDetector()
+    ) {
         self.diskReaderFactory = diskReaderFactory
+        self.fileFooterDetector = fileFooterDetector
     }
 
-    /// Size of each read block (512 bytes = one disk sector).
     private static let sectorSize = 512
-
-    /// How many sectors to read at once for performance (256 sectors = 128 KB).
     private static let readChunkSectors = 256
-
-    /// Maximum length of bytes we check for a signature header.
     private static let maxSignatureLength = 12
 
-    // MARK: - Signatures to scan for
-
-    /// Pre-built list of (signature, magicBytes) pairs for efficient matching.
-    /// Excludes signatures with ambiguous short prefixes that need extra context
-    /// (ftyp-based formats are handled separately).
     private static let directSignatures: [(FileSignature, [UInt8])] = {
-        // Signatures with unique, unambiguous magic bytes
         let unambiguous: [FileSignature] = [
             .jpeg, .png, .bmp, .gif, .mkv, .wmv, .flv,
         ]
@@ -41,12 +38,6 @@ struct DeepScanService: DeepScanServicing {
 
     // MARK: - Public API
 
-    /// Scans the given device by reading raw bytes sector-by-sector.
-    ///
-    /// - Parameters:
-    ///   - device: The device to scan.
-    ///   - existingOffsets: Offsets already discovered by Fast Scan, used for deduplication.
-    /// - Returns: An `AsyncThrowingStream` of ``ScanEvent`` values.
     func scan(
         device: StorageDevice,
         existingOffsets: Set<UInt64>,
@@ -75,6 +66,7 @@ struct DeepScanService: DeepScanServicing {
             }
         }
     }
+
     // MARK: - Scan Logic
 
     private struct ScanContext {
@@ -342,7 +334,6 @@ struct DeepScanService: DeepScanServicing {
 
                 var fileName = "\(context.cameraProfile.defaultFilePrefix)\(String(format: "%04d", filesFound))"
 
-                // Try to extract an EXIF date for better naming on photos
                 if match.category == .image {
                     let availableBytes = context.buffer.count - i
                     let checkLength = min(availableBytes, 65536)
@@ -354,6 +345,18 @@ struct DeepScanService: DeepScanServicing {
                 }
 
                 var sizeInBytes: Int64 = 0
+
+                if match == .jpeg || match == .png,
+                   let estimatedSize = try? await fileFooterDetector.estimateSize(
+                       signature: match,
+                       startOffset: offset,
+                       reader: reader,
+                       maxScanBytes: 32 * 1024 * 1024
+                   )
+                {
+                    sizeInBytes = estimatedSize
+                }
+
                 if match == .mp4 || match == .mov || match == .m4v || match == .threeGP {
                     let mp4Reconstructor = MP4Reconstructor()
                     if let contiguousSize = mp4Reconstructor.calculateContiguousSize(
@@ -362,10 +365,9 @@ struct DeepScanService: DeepScanServicing {
                     ) {
                         sizeInBytes = Int64(contiguousSize)
                     }
-                } else if match == .jpeg {
+                } else if match == .jpeg, sizeInBytes == 0 {
                     let imageReconstructor = ImageReconstructor()
 
-                    // We need to pass the header slice we have so far
                     let availableBytes = context.buffer.count - i
                     let checkLength = min(availableBytes, 65536)
                     let headerSlice = Data(context.buffer[i ..< i + checkLength])
@@ -377,10 +379,6 @@ struct DeepScanService: DeepScanServicing {
                     ) {
                         sizeInBytes = Int64(result.count)
                     }
-
-                    // If the chunk was fragmented, we should update the UI with a specific fragmented badge if we had
-                    // one
-                    // For now, we just accurately report the discovered stitched size
                 }
 
                 let file = RecoverableFile(

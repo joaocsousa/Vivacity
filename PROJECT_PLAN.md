@@ -21,7 +21,7 @@
 | M5 | Deep Scan FS-Aware Carving | T-025 → T-026 | ✅ DONE |
 | M6 | Advanced Features | T-027 → T-029 | ✅ DONE |
 | M7 | Advanced Camera Recovery | T-030 → T-033 | ✅ DONE |
-| M8 | Scan Results UX | T-022 → T-024 | 🔶 IN PROGRESS |
+| M8 | Scan Results UX | T-022 → T-024 | ✅ DONE |
 | M9 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
 | M10 | Polish & Edge Cases | T-016 → T-018 | 🔶 IN PROGRESS |
 
@@ -517,7 +517,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-024 ⬜ File size estimation for Deep Scan results
+### T-024 ✅ File size estimation for Deep Scan results
 
 **Description**: Estimate file sizes by finding the next header or known footer bytes (e.g., JPEG `FF D9`, PNG `IEND`).
 
