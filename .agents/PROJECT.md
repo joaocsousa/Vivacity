@@ -45,7 +45,7 @@ Users who accidentally delete photos or videos need a clean, modern macOS-native
 | M6 Advanced features           | ✅ Done |
 | M7 Advanced camera recovery    | ⬜ TODO |
 | M8 Scan results UX             | ✅ Done |
-| M9 Recovery destination        | 🔶 In progress |
+| M9 Recovery destination        | ✅ Done |
 | M10 Polish & edge cases        | 🔶 In progress |
 
 > **Minimum Supported OS**: macOS 14.0 (Sonoma). Also compatible with macOS 15.x (Sequoia).

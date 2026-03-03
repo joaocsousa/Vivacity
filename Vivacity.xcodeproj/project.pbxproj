@@ -23,7 +23,6 @@
 		7A262EA9E3725DD7AA12E5CE /* ImageReconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FFE5F19FEE9CB04CF674F2 /* ImageReconstructor.swift */; };
 		8196911B4649ACD2E9ABFC82 /* HFSPlusCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6026EEDF75109041E356905B /* HFSPlusCarver.swift */; };
 		8EB1D4218FEFD91EF71B930F /* FragmentedVideoAssemblerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E128C33742E42745F848C8 /* FragmentedVideoAssemblerTests.swift */; };
-		A60D8FD94410A8CB3F280066 /* MP4ReconstructorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20911F377875A190F5861FD7 /* MP4ReconstructorTests.swift */; };
 		AA000001 /* VivacityApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010 /* VivacityApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011 /* ContentView.swift */; };
 		AA000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000012 /* Assets.xcassets */; };
@@ -57,8 +56,11 @@
 		DD000003 /* NTFSScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000012 /* NTFSScanner.swift */; };
 		DD000004 /* ExFATScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000013 /* ExFATScanner.swift */; };
 		DD000005 /* EXIFDateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000014 /* EXIFDateExtractor.swift */; };
+		F24A0008A1B2C3D4E5F60708 /* RecoveryDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0007A1B2C3D4E5F60708 /* RecoveryDestinationView.swift */; };
 		F24A0005A1B2C3D4E5F60708 /* RecoveryDestinationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0003A1B2C3D4E5F60708 /* RecoveryDestinationViewModel.swift */; };
 		F24A0006A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0004A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift */; };
+		F24A0010A1B2C3D4E5F60708 /* FileRecoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0012A1B2C3D4E5F60708 /* FileRecoveryService.swift */; };
+		F24A0011A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0013A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift */; };
 		F24A0001A1B2C3D4E5F60708 /* FileFooterDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0002A1B2C3D4E5F60708 /* FileFooterDetector.swift */; };
 		DEBE1D2B6A956E1C67765455 /* LivePreviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */; };
 		EE000001 /* PrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000010 /* PrivilegedDiskReader.swift */; };
@@ -86,7 +88,6 @@
 		05A02025A207FE742FDDB8D8 /* PartitionSearchService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartitionSearchService.swift; sourceTree = "<group>"; };
 		15DB3BE95DBA2A386AB785A3 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		2088029C926601913E5DF08C /* CameraRecoveryServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CameraRecoveryServiceTests.swift; sourceTree = "<group>"; };
-		20911F377875A190F5861FD7 /* MP4ReconstructorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MP4ReconstructorTests.swift; path = VivacityTests/Carvers/MP4ReconstructorTests.swift; sourceTree = "<group>"; };
 		22FFE5F19FEE9CB04CF674F2 /* ImageReconstructor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageReconstructor.swift; sourceTree = "<group>"; };
 		2BE52ADF7980CA375B770CE3 /* VivacityUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VivacityUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		31C080987ACA5FEDE7E26580 /* SessionManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
@@ -133,8 +134,11 @@
 		DD000012 /* NTFSScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NTFSScanner.swift; sourceTree = "<group>"; };
 		DD000013 /* ExFATScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATScanner.swift; sourceTree = "<group>"; };
 		DD000014 /* EXIFDateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFDateExtractor.swift; sourceTree = "<group>"; };
+		F24A0007A1B2C3D4E5F60708 /* RecoveryDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryDestinationView.swift; sourceTree = "<group>"; };
 		F24A0003A1B2C3D4E5F60708 /* RecoveryDestinationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryDestinationViewModel.swift; sourceTree = "<group>"; };
 		F24A0004A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecoveryDestinationViewModelTests.swift; sourceTree = "<group>"; };
+		F24A0012A1B2C3D4E5F60708 /* FileRecoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRecoveryService.swift; sourceTree = "<group>"; };
+		F24A0013A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileRecoveryServiceTests.swift; sourceTree = "<group>"; };
 		F24A0002A1B2C3D4E5F60708 /* FileFooterDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileFooterDetector.swift; sourceTree = "<group>"; };
 		E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartitionSearchServiceTests.swift; sourceTree = "<group>"; };
 		E5FDF8909316E71A2C41052F /* DiskImageService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskImageService.swift; sourceTree = "<group>"; };
@@ -191,6 +195,7 @@
 				2088029C926601913E5DF08C /* CameraRecoveryServiceTests.swift */,
 				F90DAE936670A0F95A138FD9 /* DeepScanServiceTests.swift */,
 				F24A0004A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift */,
+				F24A0013A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift */,
 			);
 			name = VivacityTests;
 			path = VivacityTests;
@@ -230,7 +235,6 @@
 				4E17F3DF75DC40B7EAFE150E /* Frameworks */,
 				4B8831F9E5697EB7B2BE3AF1 /* VivacityTests */,
 				83BDDAE95B64992D5546B040 /* VivacityUITests */,
-				20911F377875A190F5861FD7 /* MP4ReconstructorTests.swift */,
 				AC2F873ABB177366AE8517A8 /* MP4Reconstructor.swift */,
 				B74266AD38F504F3E25042FD /* MP4ReconstructorTests.swift */,
 				695CF217F55C97CD24D30DF3 /* FragmentedVideoAssembler.swift */,
@@ -308,6 +312,7 @@
 				31C080987ACA5FEDE7E26580 /* SessionManager.swift */,
 				E5FDF8909316E71A2C41052F /* DiskImageService.swift */,
 				CC38108B7516FEE3C928A42B /* CameraRecoveryService.swift */,
+				F24A0012A1B2C3D4E5F60708 /* FileRecoveryService.swift */,
 				E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */,
 			);
 			path = Services;
@@ -328,6 +333,7 @@
 			children = (
 				BB000024 /* DeviceSelection */,
 				CC000020 /* FileScan */,
+				F24A0009A1B2C3D4E5F60708 /* RecoveryDestination */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -350,6 +356,14 @@
 				85684069117F459BA261B91B /* PermissionDeniedView.swift */,
 			);
 			path = FileScan;
+			sourceTree = "<group>";
+		};
+		F24A0009A1B2C3D4E5F60708 /* RecoveryDestination */ = {
+			isa = PBXGroup;
+			children = (
+				F24A0007A1B2C3D4E5F60708 /* RecoveryDestinationView.swift */,
+			);
+			path = RecoveryDestination;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -511,7 +525,7 @@
 				0027AA19C3AB3E9374D21AEF /* CameraRecoveryServiceTests.swift in Sources */,
 				AB3C1FD4C53D84A23AC4FEA5 /* DeepScanServiceTests.swift in Sources */,
 				F24A0006A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift in Sources */,
-				A60D8FD94410A8CB3F280066 /* MP4ReconstructorTests.swift in Sources */,
+				F24A0011A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift in Sources */,
 				1993DD545BDE507AFC084D7A /* MP4ReconstructorTests.swift in Sources */,
 				8EB1D4218FEFD91EF71B930F /* FragmentedVideoAssemblerTests.swift in Sources */,
 			);
@@ -536,6 +550,7 @@
 				CC000005 /* FileScanViewModel.swift in Sources */,
 				F24A0005A1B2C3D4E5F60708 /* RecoveryDestinationViewModel.swift in Sources */,
 				CC000006 /* FileScanView.swift in Sources */,
+				F24A0008A1B2C3D4E5F60708 /* RecoveryDestinationView.swift in Sources */,
 				CC000008 /* FilePreviewView.swift in Sources */,
 				CC000007 /* FileRow.swift in Sources */,
 				DD000001 /* VolumeInfo.swift in Sources */,
@@ -557,6 +572,7 @@
 				C3DAFCD9A0FDF3E1CC6C39D1 /* DiskImageService.swift in Sources */,
 				C73D1495CC9C62142296BF35 /* CameraProfile.swift in Sources */,
 				239EFD18DDF58EAB29C74CBA /* CameraRecoveryService.swift in Sources */,
+				F24A0010A1B2C3D4E5F60708 /* FileRecoveryService.swift in Sources */,
 				C53E93D12892ED1C6F64FDD8 /* MP4Reconstructor.swift in Sources */,
 				D980A369EB18B4CA88551E40 /* FragmentedVideoAssembler.swift in Sources */,
 				7A262EA9E3725DD7AA12E5CE /* ImageReconstructor.swift in Sources */,

@@ -2,25 +2,11 @@ import AppKit
 import Foundation
 import Observation
 
-/// API for recovering selected files to a destination folder.
-protocol FileRecoveryServicing: Sendable {
-    /// Recovers selected files from a scanned device to a destination folder.
-    func recover(files: [RecoverableFile], from sourceDevice: StorageDevice, to destinationURL: URL) async throws
-}
-
-/// Default placeholder until `FileRecoveryService` is implemented.
-struct PlaceholderFileRecoveryService: FileRecoveryServicing {
-    func recover(files _: [RecoverableFile], from _: StorageDevice, to _: URL) async throws {
-        throw RecoveryDestinationError.recoveryServiceNotImplemented
-    }
-}
-
 /// Errors raised while validating destination or starting recovery.
 enum RecoveryDestinationError: LocalizedError {
     case destinationRequired
     case destinationOnScannedDevice
     case insufficientSpace(required: Int64, available: Int64)
-    case recoveryServiceNotImplemented
 
     var errorDescription: String? {
         switch self {
@@ -30,8 +16,6 @@ enum RecoveryDestinationError: LocalizedError {
             "Choose a destination on a different device to avoid overwriting recoverable data."
         case let .insufficientSpace(required, available):
             "Not enough free space. Required: \(formatBytes(required)), available: \(formatBytes(available))."
-        case .recoveryServiceNotImplemented:
-            "Recovery service is not implemented yet."
         }
     }
 
@@ -91,7 +75,7 @@ final class RecoveryDestinationViewModel {
         scannedDevice: StorageDevice,
         selectedFiles: [RecoverableFile],
         requiredSpace: Int64? = nil,
-        recoveryService: FileRecoveryServicing = PlaceholderFileRecoveryService(),
+        recoveryService: FileRecoveryServicing = FileRecoveryService(),
         directoryPicker: @escaping DirectoryPicker = RecoveryDestinationViewModel.defaultDirectoryPicker,
         volumeInfoLookup: @escaping VolumeInfoLookup = RecoveryDestinationViewModel.defaultVolumeInfo
     ) {
