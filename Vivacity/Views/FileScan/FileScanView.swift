@@ -24,6 +24,12 @@ struct FileScanView: View {
             header
             Divider()
             deepScanPrompt
+            FilterToolbar(
+                fileNameQuery: $viewModel.fileNameQuery,
+                fileTypeFilter: $viewModel.fileTypeFilter,
+                fileSizeFilter: $viewModel.fileSizeFilter,
+                isEnabled: viewModel.hasFiles
+            )
 
             if viewModel.permissionDenied {
                 PermissionDeniedView(
@@ -105,6 +111,70 @@ struct FileScanView: View {
     /// is not directly accessible.
     private func startDeepScan() {
         viewModel.startDeepScan(device: device)
+    }
+}
+
+/// Toolbar for filtering scan results by type, size, and name.
+private struct FilterToolbar: View {
+    @Binding var fileNameQuery: String
+    @Binding var fileTypeFilter: FileScanViewModel.FileTypeFilter
+    @Binding var fileSizeFilter: FileScanViewModel.FileSizeFilter
+    let isEnabled: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+
+                Text("Filter")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            Picker("Type", selection: $fileTypeFilter) {
+                ForEach(FileScanViewModel.FileTypeFilter.allCases, id: \.self) { filter in
+                    Text(filter.rawValue).tag(filter)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 260)
+
+            Picker("Size", selection: $fileSizeFilter) {
+                ForEach(FileScanViewModel.FileSizeFilter.allCases, id: \.self) { filter in
+                    Text(filter.rawValue).tag(filter)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 150)
+
+            TextField("Search filename or path", text: $fileNameQuery)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12))
+
+            if isEnabled {
+                Button("Clear") {
+                    fileNameQuery = ""
+                    fileTypeFilter = .all
+                    fileSizeFilter = .any
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 12))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(.controlBackgroundColor))
+        .overlay(
+            Rectangle()
+                .frame(height: 1)
+                .foregroundStyle(Color.black.opacity(0.08)),
+            alignment: .bottom
+        )
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.5)
     }
 }
 
@@ -306,7 +376,13 @@ extension FileScanView {
 extension FileScanView {
     private var fileList: some View {
         ZStack {
-            if viewModel.foundFiles.isEmpty, !viewModel.isScanning {
+            if viewModel.showFilteredEmptyState, !viewModel.isScanning {
+                ContentUnavailableView(
+                    "No Matches",
+                    systemImage: "line.3.horizontal.decrease.circle",
+                    description: Text("No files match the current filters.")
+                )
+            } else if viewModel.foundFiles.isEmpty, !viewModel.isScanning {
                 ContentUnavailableView(
                     "No Files Found",
                     systemImage: "doc.questionmark.fill",
@@ -319,13 +395,13 @@ extension FileScanView {
                         deepScanPrompt
 
                         // Section: Fast Scan Results
-                        if !viewModel.fastScanFiles.isEmpty {
+                        if !viewModel.filteredFastScanFiles.isEmpty {
                             sectionHeader(
                                 title: "FAST SCAN RESULTS",
-                                count: viewModel.fastScanFiles.count
+                                count: viewModel.filteredFastScanFiles.count
                             )
 
-                            ForEach(viewModel.fastScanFiles) { file in
+                            ForEach(viewModel.filteredFastScanFiles) { file in
                                 FileRow(
                                     file: file,
                                     isSelected: viewModel.selectedFileIDs.contains(file.id),
@@ -338,13 +414,13 @@ extension FileScanView {
                         }
 
                         // Section: Deep Scan Results
-                        if !viewModel.deepScanFiles.isEmpty {
+                        if !viewModel.filteredDeepScanFiles.isEmpty {
                             sectionHeader(
                                 title: "DEEP SCAN RESULTS",
-                                count: viewModel.deepScanFiles.count
+                                count: viewModel.filteredDeepScanFiles.count
                             )
 
-                            ForEach(viewModel.deepScanFiles) { file in
+                            ForEach(viewModel.filteredDeepScanFiles) { file in
                                 FileRow(
                                     file: file,
                                     isSelected: viewModel.selectedFileIDs.contains(file.id),
@@ -388,23 +464,31 @@ extension FileScanView {
         HStack {
             // Select All / Deselect All
             HStack(spacing: 12) {
-                Button("Select All") { viewModel.selectAll() }
+                Button("Select All") { viewModel.selectAllFiltered() }
                     .buttonStyle(.borderless)
                     .font(.system(size: 13))
-                    .disabled(viewModel.foundFiles.isEmpty)
+                    .disabled(viewModel.filteredFiles.isEmpty)
 
-                Button("Deselect All") { viewModel.deselectAll() }
+                Button("Deselect All") { viewModel.deselectFiltered() }
                     .buttonStyle(.borderless)
                     .font(.system(size: 13))
-                    .disabled(viewModel.selectedFileIDs.isEmpty)
+                    .disabled(viewModel.selectedFilteredCount == 0)
             }
 
             Spacer()
 
             // File count
-            Text("\(viewModel.foundFiles.count) files found")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Text(viewModel.filteredCountLabel)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+
+                if let selectionLabel = viewModel.selectedCountLabel {
+                    Text(selectionLabel)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             Spacer()
 

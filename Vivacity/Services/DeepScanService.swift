@@ -2,15 +2,12 @@ import Foundation
 import os
 
 /// Service that performs raw sector-by-sector scanning using magic byte signatures.
-///
-/// Opens the volume (or its raw device node) for reading and scans sequentially
-/// for magic-byte patterns. Generates file names for discovered files and
-/// deduplicates against offsets already found by `FastScanService`.
 protocol DeepScanServicing: Sendable {
     func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64, cameraProfile: CameraProfile)
         -> AsyncThrowingStream<ScanEvent, Error>
 }
 
+// swiftlint:disable:next type_body_length
 struct DeepScanService: DeepScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeepScan")
     private let diskReaderFactory: @Sendable (String) -> any PrivilegedDiskReading
@@ -91,7 +88,7 @@ struct DeepScanService: DeepScanServicing {
         let cameraProfile: CameraProfile
     }
 
-    // swiftlint:disable:next function_body_length
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private func performScan(
         device: StorageDevice,
         existingOffsets: Set<UInt64>,
@@ -284,6 +281,7 @@ struct DeepScanService: DeepScanServicing {
         continuation.finish()
     }
 
+    // swiftlint:disable:next function_parameter_count
     private func processCarvedFile(
         fileName: String,
         fileExtension: String,
@@ -359,22 +357,30 @@ struct DeepScanService: DeepScanServicing {
                 var sizeInBytes: Int64 = 0
                 if match == .mp4 || match == .mov || match == .m4v || match == .threeGP {
                     let mp4Reconstructor = MP4Reconstructor()
-                    if let contiguousSize = mp4Reconstructor.calculateContiguousSize(startingAt: offset, reader: reader) {
+                    if let contiguousSize = mp4Reconstructor.calculateContiguousSize(
+                        startingAt: offset,
+                        reader: reader
+                    ) {
                         sizeInBytes = Int64(contiguousSize)
                     }
                 } else if match == .jpeg {
                     let imageReconstructor = ImageReconstructor()
-                    
+
                     // We need to pass the header slice we have so far
                     let availableBytes = context.buffer.count - i
                     let checkLength = min(availableBytes, 65536)
                     let headerSlice = Data(context.buffer[i ..< i + checkLength])
-                    
-                    if let result = await imageReconstructor.reconstruct(headerOffset: offset, initialChunk: headerSlice, reader: reader) {
+
+                    if let result = await imageReconstructor.reconstruct(
+                        headerOffset: offset,
+                        initialChunk: headerSlice,
+                        reader: reader
+                    ) {
                         sizeInBytes = Int64(result.count)
                     }
-                    
-                    // If the chunk was fragmented, we should update the UI with a specific fragmented badge if we had one
+
+                    // If the chunk was fragmented, we should update the UI with a specific fragmented badge if we had
+                    // one
                     // For now, we just accurately report the discovered stitched size
                 }
 

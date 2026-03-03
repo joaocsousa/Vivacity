@@ -49,7 +49,7 @@ struct RecoverableFile: Identifiable, Hashable, Sendable, Codable {
     let source: ScanSource
 
     /// The original file path on the volume, if discovered via filesystem scan.
-    var filePath: String? = nil
+    var filePath: String?
 
     // MARK: - Computed
 

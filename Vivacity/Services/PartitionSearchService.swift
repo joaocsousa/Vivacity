@@ -33,10 +33,9 @@ struct PartitionSearchService: Sendable {
                 // Read size of entry (4 bytes at offset 84)
                 let entrySize = gptHeaderBlock.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 84, as: UInt32.self) }
                 // Read Starting LBA of array (8 bytes at offset 72)
-                let arrayStartLBA = gptHeaderBlock.withUnsafeBytes { $0.loadUnaligned(
-                    fromByteOffset: 72,
-                    as: UInt64.self
-                ) }
+                let arrayStartLBA = gptHeaderBlock.withUnsafeBytes {
+                    $0.loadUnaligned(fromByteOffset: 72, as: UInt64.self)
+                }
 
                 logger.debug("GPT Array at LBA \(arrayStartLBA), \(numEntries) entries of size \(entrySize)")
 
@@ -60,15 +59,13 @@ struct PartitionSearchService: Sendable {
                         }
 
                         // First LBA at offset 32 (8 bytes)
-                        let firstLBA = arrayBlock.withUnsafeBytes { $0.loadUnaligned(
-                            fromByteOffset: entryStart + 32,
-                            as: UInt64.self
-                        ) }
+                        let firstLBA = arrayBlock.withUnsafeBytes {
+                            $0.loadUnaligned(fromByteOffset: entryStart + 32, as: UInt64.self)
+                        }
                         // Last LBA at offset 40 (8 bytes)
-                        let lastLBA = arrayBlock.withUnsafeBytes { $0.loadUnaligned(
-                            fromByteOffset: entryStart + 40,
-                            as: UInt64.self
-                        ) }
+                        let lastLBA = arrayBlock.withUnsafeBytes {
+                            $0.loadUnaligned(fromByteOffset: entryStart + 40, as: UInt64.self)
+                        }
 
                         let partitionOffset = firstLBA * UInt64(blockSize)
                         let partitionSize = (lastLBA - firstLBA + 1) * UInt64(blockSize)
