@@ -12,6 +12,7 @@ struct FileScanView: View {
     let sessionToResume: ScanSession?
 
     @State private var viewModel = AppEnvironment.makeFileScanViewModel()
+    @State private var showingRecoveryDestination = false
     @Environment(\.dismiss) private var dismiss
 
     init(device: StorageDevice, sessionToResume: ScanSession? = nil) {
@@ -94,6 +95,12 @@ struct FileScanView: View {
                 }
             }
         )
+        .sheet(isPresented: $showingRecoveryDestination) {
+            RecoveryDestinationView(
+                scannedDevice: device,
+                selectedFiles: selectedFilesForRecovery
+            )
+        }
     }
 
     // MARK: - Scan Helpers
@@ -111,6 +118,10 @@ struct FileScanView: View {
     /// is not directly accessible.
     private func startDeepScan() {
         viewModel.startDeepScan(device: device)
+    }
+
+    private var selectedFilesForRecovery: [RecoverableFile] {
+        viewModel.foundFiles.filter { viewModel.selectedFileIDs.contains($0.id) }
     }
 }
 
@@ -494,7 +505,7 @@ extension FileScanView {
 
             // Recover button
             Button {
-                // TODO: Navigate to recovery destination (M4)
+                showingRecoveryDestination = true
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.down.to.line")
