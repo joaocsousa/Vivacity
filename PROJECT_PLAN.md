@@ -22,7 +22,7 @@
 | M6 | Advanced Features | T-027 → T-029 | ✅ DONE |
 | M7 | Advanced Camera Recovery | T-030 → T-033 | ✅ DONE |
 | M8 | Scan Results UX | T-022 → T-024 | ✅ DONE |
-| M9 | Recovery Destination Screen | T-013 → T-015 | ⬜ TODO |
+| M9 | Recovery Destination Screen | T-013 → T-015 | 🔶 IN PROGRESS |
 | M10 | Polish & Edge Cases | T-016 → T-018 | 🔶 IN PROGRESS |
 
 ---
@@ -402,7 +402,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 ## M9 — Recovery Destination Screen
 
-### T-013 ⬜ Create `RecoveryDestinationViewModel`
+### T-013 ✅ Create `RecoveryDestinationViewModel`
 
 **Description**: ViewModel for destination selection.
 
@@ -416,6 +416,7 @@ xcodebuild -project Vivacity.xcodeproj -scheme Vivacity -configuration Debug bui
 
 **Files**:
 - `Vivacity/ViewModels/RecoveryDestinationViewModel.swift`
+- `VivacityTests/RecoveryDestinationViewModelTests.swift`
 
 **Subtasks**:
 - Define view model API and state (`destinationURL`, `requiredSpace`, `availableSpace`, `hasEnoughSpace`).
