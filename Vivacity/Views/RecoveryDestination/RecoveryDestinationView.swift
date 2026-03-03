@@ -20,13 +20,19 @@ struct RecoveryDestinationView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            header
-            destinationSection
-            spaceSection
-            warningsSection
-            Spacer()
-            footer
+        Group {
+            if viewModel.didCompleteRecovery {
+                completionPlaceholder
+            } else {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    destinationSection
+                    spaceSection
+                    warningsSection
+                    Spacer()
+                    footer
+                }
+            }
         }
         .padding(20)
         .frame(minWidth: 560, minHeight: 440)
@@ -53,6 +59,33 @@ struct RecoveryDestinationView: View {
 }
 
 extension RecoveryDestinationView {
+    private var completionPlaceholder: some View {
+        VStack(spacing: 14) {
+            Spacer()
+
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 52))
+                .foregroundStyle(.green)
+
+            Text("Recovery Complete")
+                .font(.system(size: 22, weight: .semibold))
+
+            Text("Recovered \(selectedFiles.count) file\(selectedFiles.count == 1 ? "" : "s").")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+
+            Button("Done") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.top, 6)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Choose Recovery Destination")

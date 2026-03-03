@@ -560,7 +560,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-017 🔶 Navigation & app flow integration
+### T-017 ✅ Navigation & app flow integration
 
 **Description**: Wire all screens together with proper navigation.
 

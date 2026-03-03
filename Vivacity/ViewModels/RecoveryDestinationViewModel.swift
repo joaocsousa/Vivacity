@@ -52,6 +52,9 @@ final class RecoveryDestinationViewModel {
     /// Whether a recovery operation is currently running.
     private(set) var isRecovering: Bool = false
 
+    /// Whether recovery completed successfully.
+    private(set) var didCompleteRecovery: Bool = false
+
     /// User-facing validation or recovery error.
     var errorMessage: String?
 
@@ -95,6 +98,7 @@ final class RecoveryDestinationViewModel {
     func selectDestination() {
         guard let pickedURL = directoryPicker() else { return }
         destinationURL = pickedURL
+        didCompleteRecovery = false
         updateAvailableSpace()
     }
 
@@ -129,6 +133,7 @@ final class RecoveryDestinationViewModel {
             }
 
             errorMessage = nil
+            didCompleteRecovery = false
             isRecovering = true
             defer { isRecovering = false }
 
@@ -138,8 +143,10 @@ final class RecoveryDestinationViewModel {
                 from: scannedDevice,
                 to: destinationURL
             )
+            didCompleteRecovery = true
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            didCompleteRecovery = false
         }
     }
 

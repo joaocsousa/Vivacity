@@ -8,12 +8,17 @@ import SwiftUI
 /// 3. Scrolling file list with checkboxes
 /// 4. Footer with select all/deselect, file count, and recover button
 struct FileScanView: View {
+    struct RecoveryNavigationState: Identifiable, Hashable {
+        let id = UUID()
+        let device: StorageDevice
+        let selectedFiles: [RecoverableFile]
+    }
+
     let device: StorageDevice
     let sessionToResume: ScanSession?
 
     @State private var viewModel = AppEnvironment.makeFileScanViewModel()
-    @State private var showingRecoveryDestination = false
-    @Environment(\.dismiss) private var dismiss
+    @State private var recoveryNavigationState: RecoveryNavigationState?
 
     init(device: StorageDevice, sessionToResume: ScanSession? = nil) {
         self.device = device
@@ -80,6 +85,11 @@ struct FileScanView: View {
                 checkPermissionsAndScan()
             }
         }
+        .onDisappear {
+            if viewModel.isScanning {
+                viewModel.stopScanning()
+            }
+        }
         .alert(
             "Scan Error",
             isPresented: Binding(
@@ -95,11 +105,8 @@ struct FileScanView: View {
                 }
             }
         )
-        .sheet(isPresented: $showingRecoveryDestination) {
-            RecoveryDestinationView(
-                scannedDevice: device,
-                selectedFiles: selectedFilesForRecovery
-            )
+        .navigationDestination(item: $recoveryNavigationState) { state in
+            RecoveryDestinationView(scannedDevice: state.device, selectedFiles: state.selectedFiles)
         }
     }
 
@@ -505,7 +512,10 @@ extension FileScanView {
 
             // Recover button
             Button {
-                showingRecoveryDestination = true
+                recoveryNavigationState = RecoveryNavigationState(
+                    device: device,
+                    selectedFiles: selectedFilesForRecovery
+                )
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.down.to.line")

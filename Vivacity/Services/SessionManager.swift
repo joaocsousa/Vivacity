@@ -8,7 +8,7 @@ protocol SessionManaging: Sendable {
     func deleteSession(id: UUID) async throws
 }
 
-final class SessionManager: SessionManaging {
+actor SessionManager: SessionManaging {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "SessionManager")
     private let fileManager: FileManager
 
@@ -32,12 +32,12 @@ final class SessionManager: SessionManaging {
     func save(_ session: ScanSession) async throws {
         try ensureDirectoryExists()
         let fileURL = sessionsDirectory.appendingPathComponent("\(session.id.uuidString).json")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
 
         // Use a background task to encode since files can be large
         let data = try await Task.detached(priority: .userInitiated) {
-            try encoder.encode(session)
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            return try encoder.encode(session)
         }.value
 
         try data.write(to: fileURL, options: .atomic)
@@ -52,8 +52,7 @@ final class SessionManager: SessionManaging {
             .filter { $0.pathExtension == "json" }
 
         var sessions: [ScanSession] = []
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let logger = logger
 
         // Decode them concurrently
         try await withThrowingTaskGroup(of: ScanSession?.self) { group in
@@ -61,10 +60,12 @@ final class SessionManager: SessionManaging {
                 group.addTask {
                     do {
                         let data = try Data(contentsOf: url)
+                        let decoder = JSONDecoder()
+                        decoder.dateDecodingStrategy = .iso8601
                         return try decoder.decode(ScanSession.self, from: data)
                     } catch {
                         // Just log corrupt/old formats and skip
-                        self.logger.error("Failed to decode session at \(url.path): \(error.localizedDescription)")
+                        logger.error("Failed to decode session at \(url.path): \(error.localizedDescription)")
                         return nil
                     }
                 }
@@ -84,11 +85,11 @@ final class SessionManager: SessionManaging {
         guard fileManager.fileExists(atPath: fileURL.path) else { return nil }
 
         let data = try Data(contentsOf: fileURL)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
 
         return try await Task.detached(priority: .userInitiated) {
-            try decoder.decode(ScanSession.self, from: data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(ScanSession.self, from: data)
         }.value
     }
 
