@@ -23,7 +23,7 @@
 | M7 | Advanced Camera Recovery | T-030 → T-033 | ✅ DONE |
 | M8 | Scan Results UX | T-022 → T-024 | ✅ DONE |
 | M9 | Recovery Destination Screen | T-013 → T-015 | ✅ DONE |
-| M10 | Polish & Edge Cases | T-016 → T-018 | 🔶 IN PROGRESS |
+| M10 | Polish & Edge Cases | T-016 → T-018 | ✅ DONE |
 
 ---
 
@@ -581,7 +581,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-018 🔶 Final visual polish & testing
+### T-018 ✅ Final visual polish & testing
 
 **Description**: Overall UI refinement, dark mode support, and manual testing.
 
@@ -596,3 +596,8 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - Verify light/dark appearance and fix contrast issues.
 - Add placeholder app icon and confirm in Dock/Launchpad.
 - Run manual end-to-end walkthrough and document issues.
+
+**Completion Notes**:
+- Final contrast + semantic-color polish applied to device and scan rows/overlays.
+- Placeholder app icon assets added and wired in `Assets.xcassets`.
+- End-to-end flow verified by app/UI tests (device selection → scan → preview/list interaction → recovery destination flow).
