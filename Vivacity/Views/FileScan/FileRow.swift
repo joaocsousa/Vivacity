@@ -65,6 +65,15 @@ struct FileRow: View {
                     .foregroundStyle(badgeColor)
                     .clipShape(Capsule())
 
+                Circle()
+                    .fill(confidenceColor)
+                    .frame(width: 9, height: 9)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 0.6)
+                    )
+                    .accessibilityLabel(file.recoveryConfidence.accessibilityLabel)
+
                 Spacer()
 
                 // File size
@@ -102,6 +111,14 @@ struct FileRow: View {
 
     private var badgeColor: Color {
         file.source == .fastScan ? .blue : .purple
+    }
+
+    private var confidenceColor: Color {
+        switch file.recoveryConfidence {
+        case .high: .green
+        case .medium: .yellow
+        case .low: .red
+        }
     }
 }
 

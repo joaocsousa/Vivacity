@@ -6,7 +6,6 @@ protocol DeepScanServicing: Sendable {
     func scan(device: StorageDevice, existingOffsets: Set<UInt64>, startOffset: UInt64, cameraProfile: CameraProfile)
         -> AsyncThrowingStream<ScanEvent, Error>
 }
-
 // swiftlint:disable:next type_body_length
 struct DeepScanService: DeepScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeepScan")
@@ -76,7 +75,6 @@ struct DeepScanService: DeepScanServicing {
             }
         }
     }
-
     // MARK: - Scan Logic
 
     private struct ScanContext {
@@ -310,7 +308,8 @@ struct DeepScanService: DeepScanServicing {
                     sizeInBytes: sizeInBytes,
                     offsetOnDisk: offsetOnDisk,
                     signatureMatch: sig,
-                    source: .deepScan
+                    source: .deepScan,
+                    isLikelyContiguous: sizeInBytes > 0
                 )
 
                 filesFound += 1
@@ -392,7 +391,8 @@ struct DeepScanService: DeepScanServicing {
                     sizeInBytes: sizeInBytes,
                     offsetOnDisk: offset,
                     signatureMatch: match,
-                    source: .deepScan
+                    source: .deepScan,
+                    isLikelyContiguous: sizeInBytes > 0
                 )
                 continuation.yield(.fileFound(file))
 

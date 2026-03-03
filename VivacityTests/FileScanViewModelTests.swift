@@ -65,6 +65,35 @@ final class FileScanViewModelTests: XCTestCase {
         XCTAssertEqual(sut.filteredFiles.first?.fileName, "IMG_0002")
         XCTAssertTrue(sut.isFiltering)
     }
+
+    func testRecoveryConfidenceClassification() {
+        let fast = RecoverableFile.fixture(id: 1, source: .fastScan, contiguous: true)
+        XCTAssertEqual(fast.recoveryConfidence, .high)
+
+        let deepContiguous = RecoverableFile.fixture(
+            id: 2,
+            type: .video,
+            size: 50_000_000,
+            source: .deepScan,
+            contiguous: true
+        )
+        XCTAssertEqual(deepContiguous.recoveryConfidence, .medium)
+
+        let deepLikelyFragmented = RecoverableFile.fixture(
+            id: 3,
+            source: .deepScan,
+            contiguous: false
+        )
+        XCTAssertEqual(deepLikelyFragmented.recoveryConfidence, .low)
+
+        let deepUnknownWithNoSize = RecoverableFile.fixture(
+            id: 4,
+            size: 0,
+            source: .deepScan,
+            contiguous: nil
+        )
+        XCTAssertEqual(deepUnknownWithNoSize.recoveryConfidence, .low)
+    }
 }
 
 // MARK: - Fakes
@@ -118,7 +147,8 @@ extension RecoverableFile {
         type: FileCategory = .image,
         size: Int64 = 1024,
         offset: UInt64 = 0,
-        source: ScanSource
+        source: ScanSource,
+        contiguous: Bool? = nil
     ) -> RecoverableFile {
         RecoverableFile(
             id: UUID(uuidString: "00000000-0000-0000-0000-0000000000\(String(format: "%02d", id))") ?? UUID(),
@@ -128,7 +158,8 @@ extension RecoverableFile {
             sizeInBytes: size,
             offsetOnDisk: offset,
             signatureMatch: .jpeg,
-            source: source
+            source: source,
+            isLikelyContiguous: contiguous
         )
     }
 }

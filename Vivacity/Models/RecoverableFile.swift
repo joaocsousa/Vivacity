@@ -20,6 +20,29 @@ enum ScanEvent: Sendable {
     case completed
 }
 
+// MARK: - Recovery Confidence
+
+/// Estimated chance that a file can be fully recovered.
+enum RecoveryConfidence: String, Sendable, Codable {
+    case high
+    case medium
+    case low
+
+    /// Short label for UI display.
+    var displayName: String {
+        switch self {
+        case .high: "High"
+        case .medium: "Medium"
+        case .low: "Low"
+        }
+    }
+
+    /// VoiceOver-friendly label for the confidence indicator.
+    var accessibilityLabel: String {
+        "Recovery confidence: \(displayName)"
+    }
+}
+
 // MARK: - Recoverable File
 
 /// A file on disk that can potentially be recovered.
@@ -51,6 +74,10 @@ struct RecoverableFile: Identifiable, Hashable, Sendable, Codable {
     /// The original file path on the volume, if discovered via filesystem scan.
     var filePath: String?
 
+    /// Whether the scanner could infer that the bytes are likely contiguous.
+    /// `nil` means unknown.
+    var isLikelyContiguous: Bool?
+
     // MARK: - Computed
 
     /// Human-readable file size string (e.g. "3.2 MB").
@@ -61,5 +88,26 @@ struct RecoverableFile: Identifiable, Hashable, Sendable, Codable {
     /// Full file name with extension (e.g. "IMG_2847.jpg").
     var fullFileName: String {
         "\(fileName).\(fileExtension)"
+    }
+
+    /// Derived recovery confidence based on scan source and contiguity hints.
+    var recoveryConfidence: RecoveryConfidence {
+        switch source {
+        case .fastScan:
+            // Catalog/filesystem hits generally preserve file boundaries and names.
+            return isLikelyContiguous == false ? .medium : .high
+
+        case .deepScan:
+            // Raw carving is less certain; explicit contiguity raises confidence.
+            if isLikelyContiguous == true {
+                return .medium
+            }
+            if isLikelyContiguous == false {
+                return .low
+            }
+
+            // Unknown contiguity: use discovered size as a weak confidence signal.
+            return sizeInBytes > 0 ? .medium : .low
+        }
     }
 }

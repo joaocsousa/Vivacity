@@ -487,7 +487,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ## M8 — Scan Results UX
 
-### T-022 🔶 Add result filtering
+### T-022 ✅ Add result filtering
 
 **Description**: Filter toolbar (by type, size, filename search) above the file list, matching Disk Drill's UX.
 
@@ -502,7 +502,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-023 ⬜ Add recovery confidence indicator
+### T-023 ✅ Add recovery confidence indicator
 
 **Description**: Green/yellow/red dot per file indicating estimated recovery chances based on scan source and contiguity.
 
