@@ -19,12 +19,12 @@ struct FileRow: View {
                 Button(action: onToggle) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(isSelected ? Color.blue : Color.white.opacity(0.08))
+                            .fill(isSelected ? Color.accentColor : Color(.controlBackgroundColor))
                             .frame(width: 20, height: 20)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
                                     .strokeBorder(
-                                        isSelected ? Color.blue : Color.white.opacity(0.2),
+                                        isSelected ? Color.accentColor : Color.secondary.opacity(0.3),
                                         lineWidth: 1
                                     )
                             )
@@ -70,7 +70,7 @@ struct FileRow: View {
                     .frame(width: 9, height: 9)
                     .overlay(
                         Circle()
-                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 0.6)
+                            .strokeBorder(Color.secondary.opacity(0.35), lineWidth: 0.6)
                     )
                     .accessibilityLabel(file.recoveryConfidence.accessibilityLabel)
 
@@ -84,7 +84,7 @@ struct FileRow: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
         }
-        .background(isPreviewSelected ? Color.blue.opacity(0.15) : Color.clear)
+        .background(isPreviewSelected ? Color.accentColor.opacity(0.15) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture { onSelectForPreview() }
     }

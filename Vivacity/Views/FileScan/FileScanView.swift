@@ -188,7 +188,7 @@ private struct FilterToolbar: View {
         .overlay(
             Rectangle()
                 .frame(height: 1)
-                .foregroundStyle(Color.black.opacity(0.08)),
+                .foregroundStyle(Color(.separatorColor)),
             alignment: .bottom
         )
         .disabled(!isEnabled)
@@ -381,7 +381,7 @@ extension FileScanView {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+                    .strokeBorder(Color(.separatorColor).opacity(0.35), lineWidth: 1)
             )
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

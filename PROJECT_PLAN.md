@@ -581,7 +581,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-018 ⬜ Final visual polish & testing
+### T-018 🔶 Final visual polish & testing
 
 **Description**: Overall UI refinement, dark mode support, and manual testing.
 
