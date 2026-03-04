@@ -98,6 +98,8 @@ struct FastScanService: FastScanServicing {
             case let .progress(p):
                 // Scale Phase A progress to 0-50%
                 continuation.yield(.progress(p * 0.5))
+            case .checkpoint:
+                break
             case .completed:
                 break // Wait for Phase B
             }
@@ -161,6 +163,8 @@ struct FastScanService: FastScanServicing {
                         case let .progress(p):
                             // Scale Phase B progress 50-100%
                             continuation.yield(.progress(0.5 + p * 0.5))
+                        case .checkpoint:
+                            break
                         case .completed:
                             break
                         }

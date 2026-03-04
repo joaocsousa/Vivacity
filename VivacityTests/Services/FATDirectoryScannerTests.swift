@@ -46,7 +46,8 @@ final class FATDirectoryScannerTests: XCTestCase {
                 volumeInfo: VolumeInfo(
                     filesystemType: .fat32,
                     devicePath: "/dev/fake",
-                    mountPoint: URL(fileURLWithPath: "/")
+                    mountPoint: URL(fileURLWithPath: "/"),
+                    blockSize: 512
                 ),
                 reader: reader,
                 continuation: $0

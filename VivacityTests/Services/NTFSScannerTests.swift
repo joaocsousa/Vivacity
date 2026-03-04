@@ -62,7 +62,8 @@ final class NTFSScannerTests: XCTestCase {
                 volumeInfo: VolumeInfo(
                     filesystemType: .ntfs,
                     devicePath: "/dev/fake",
-                    mountPoint: URL(fileURLWithPath: "/")
+                    mountPoint: URL(fileURLWithPath: "/"),
+                    blockSize: 512
                 ),
                 reader: reader,
                 continuation: $0

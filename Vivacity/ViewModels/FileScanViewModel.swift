@@ -213,6 +213,10 @@ final class FileScanViewModel {
 
     /// Handle for the currently running scan task (for cancellation).
     private var scanTask: Task<Void, Never>?
+    /// Periodic session checkpoint task while deep scan is active.
+    private var sessionAutoSaveTask: Task<Void, Never>?
+    /// Exact deep-scan cursor reported by the scanner.
+    private var lastDeepScanOffset: UInt64 = 0
 
     /// Timestamp when the fast scan started.
     private var fastScanStartTime: Date?
@@ -282,6 +286,7 @@ final class FileScanViewModel {
         scanPhase = .deepScanning
         progress = 0
         errorMessage = nil
+        lastDeepScanOffset = 0
 
         // We use offsetOnDisk to deduplicate bytes found in the Deep Scan.
         // FastScanService sets offsetOnDisk to 0 for files found by FileManager,
@@ -302,21 +307,26 @@ final class FileScanViewModel {
                 if scanPhase == .deepScanning {
                     scanPhase = .complete
                 }
+                stopSessionAutoSave()
             } catch is CancellationError {
                 logger.info("Deep scan cancelled by user")
                 scanPhase = .complete
+                stopSessionAutoSave()
             } catch {
                 logger.error("Deep scan error: \(error.localizedDescription)")
                 errorMessage = "Deep scan error: \(error.localizedDescription)"
                 scanPhase = .complete
+                stopSessionAutoSave()
             }
         }
+        startSessionAutoSave(device: device)
     }
 
     /// Stops the currently running scan phase early.
     func stopScanning() {
         scanTask?.cancel()
         scanTask = nil
+        stopSessionAutoSave()
 
         // If the user manually stops the scan, we always jump to the final completion state
         // (skipping any intermediate prompts like the Deep Scan prompt)
@@ -338,6 +348,7 @@ final class FileScanViewModel {
     func skipDeepScan() {
         guard scanPhase == .fastComplete else { return }
         scanPhase = .complete
+        stopSessionAutoSave()
     }
 
     // MARK: - Session Management
@@ -347,9 +358,14 @@ final class FileScanViewModel {
         guard isScanning || scanPhase == .fastComplete || scanPhase == .complete else { return }
 
         // Convert progress percentage back to approximate offset
-        let activeOffset = scanPhase == .deepScanning
-            ? UInt64(progress * Double(device.totalCapacity))
-            : (scanPhase == .complete ? UInt64(device.totalCapacity) : 0)
+        let activeOffset: UInt64 = switch scanPhase {
+        case .deepScanning:
+            max(lastDeepScanOffset, UInt64(progress * Double(device.totalCapacity)))
+        case .complete:
+            max(lastDeepScanOffset, UInt64(device.totalCapacity))
+        default:
+            0
+        }
 
         let session = ScanSession(
             id: UUID(),
@@ -376,6 +392,7 @@ final class FileScanViewModel {
         scanPhase = .deepScanning
         foundFiles = session.discoveredFiles
         progress = Double(session.lastScannedOffset) / Double(device.totalCapacity)
+        lastDeepScanOffset = UInt64(max(session.lastScannedOffset, 0))
         selectedFileIDs = []
         errorMessage = nil
 
@@ -396,15 +413,19 @@ final class FileScanViewModel {
                 if scanPhase == .deepScanning {
                     scanPhase = .complete
                 }
+                stopSessionAutoSave()
             } catch is CancellationError {
                 logger.info("Deep scan cancelled by user")
                 scanPhase = .complete
+                stopSessionAutoSave()
             } catch {
                 logger.error("Deep scan error: \(error.localizedDescription)")
                 errorMessage = "Deep scan error: \(error.localizedDescription)"
                 scanPhase = .complete
+                stopSessionAutoSave()
             }
         }
+        startSessionAutoSave(device: device)
     }
 
     // MARK: - Selection
@@ -451,6 +472,8 @@ final class FileScanViewModel {
             }
         case let .progress(value):
             progress = value
+        case let .checkpoint(offset):
+            lastDeepScanOffset = offset
         case .completed:
             if scanPhase == .fastScanning {
                 finishFastScan()
@@ -466,5 +489,21 @@ final class FileScanViewModel {
         }
         scanPhase = .fastComplete
         progress = 1
+    }
+
+    private func startSessionAutoSave(device: StorageDevice) {
+        stopSessionAutoSave()
+        sessionAutoSaveTask = Task { [weak self] in
+            while let self {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled else { return }
+                await saveSession(device: device)
+            }
+        }
+    }
+
+    private func stopSessionAutoSave() {
+        sessionAutoSaveTask?.cancel()
+        sessionAutoSaveTask = nil
     }
 }
