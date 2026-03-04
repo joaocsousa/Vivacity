@@ -8,6 +8,28 @@
 
 ---
 
+### T-050 ✅ Stabilize Default Test Scheme Against UI Runner Environment Flakes
+
+**Description**: Prevent routine `xcodebuild test -scheme Vivacity` runs from failing due macOS UI-test runner environment issues (activation/auth dialogs) by separating UI tests into a dedicated scheme while keeping unit-test coverage in the default scheme.
+
+**Acceptance Criteria**:
+- Default `Vivacity` scheme runs deterministic unit tests without requiring UI runner startup.
+- `VivacityUITests` remains runnable via a dedicated UI-focused scheme.
+- Project generation remains source-of-truth through XcodeGen (`project.yml`).
+- Build/lint/test commands continue to pass in the local development environment.
+
+**Files**:
+- `project.yml`
+- `PROJECT_PLAN.md`
+
+**Completion Notes**:
+- Updated `project.yml` so scheme `Vivacity` includes only `VivacityTests` in the test action.
+- Added new dedicated `VivacityUI` scheme for explicit UI test execution (`VivacityUITests`).
+- This keeps default developer and CI sanity runs stable while preserving a clear path to run UI automation intentionally.
+- Verification on March 4, 2026: `xcodegen generate`, `swiftformat .`, `swiftlint` (0 violations), `xcodebuild build -scheme Vivacity -destination 'platform=macOS'`, and `xcodebuild test -scheme Vivacity -destination 'platform=macOS'` passed without needing `-skip-testing`.
+
+---
+
 
 
 ## Milestones Overview
@@ -27,6 +49,7 @@
 | M11 | Coverage & Quality Hardening | T-034 → T-036 | ✅ DONE |
 | M12 | XcodeGen Migration | T-037 → T-039 | ✅ DONE |
 | M13 | Recovery Quality Improvements | T-040 → T-046 | ✅ DONE |
+| M14 | Test Reliability Hardening | T-050 | ✅ DONE |
 
 ---
 
