@@ -1,7 +1,6 @@
 import Foundation
 import os
 
-// swiftlint:disable file_length
 // MARK: - Scan Phase
 
 /// The current phase of the unified single-run scan flow.
@@ -20,29 +19,7 @@ enum ScanPhase: Sendable, Equatable {
 /// view layer.
 @Observable
 @MainActor
-// swiftlint:disable:next type_body_length
 final class FileScanViewModel {
-    struct SampleVerificationSummary: Sendable, Equatable {
-        let verifiedCount: Int
-        let mismatchCount: Int
-        let unreadableCount: Int
-
-        var hasWarnings: Bool {
-            mismatchCount > 0 || unreadableCount > 0
-        }
-
-        var warningMessage: String {
-            var parts: [String] = []
-            if mismatchCount > 0 {
-                parts.append("\(mismatchCount) file(s) changed between reads")
-            }
-            if unreadableCount > 0 {
-                parts.append("\(unreadableCount) file(s) could not be read")
-            }
-            return parts.joined(separator: ", ")
-        }
-    }
-
     // MARK: - Published State
 
     /// Current scan phase.
@@ -81,56 +58,6 @@ final class FileScanViewModel {
     /// Whether pre-recovery sample verification is currently running.
     private(set) var isVerifyingSamples: Bool = false
 
-    /// Human-readable percentage label for current progress.
-    var progressPercentageText: String {
-        "\(Int((progress * 100).rounded()))%"
-    }
-
-    /// Human-readable ETA label for scan progress.
-    var estimatedTimeRemainingText: String? {
-        guard isScanning, let remaining = estimatedTimeRemaining, remaining.isFinite else {
-            return nil
-        }
-        if remaining <= 60 {
-            return "< 1 min"
-        }
-        return Self.etaFormatter.string(from: remaining)
-    }
-
-    /// Human-readable total scan duration label (available after completion).
-    var scanDurationText: String? {
-        guard let duration = scanDuration else { return nil }
-        return Self.durationFormatter.string(from: duration)
-    }
-
-    // MARK: - Filters
-
-    enum FileTypeFilter: String, CaseIterable, Sendable {
-        case all = "All"
-        case images = "Images"
-        case videos = "Videos"
-    }
-
-    enum FileSizeFilter: String, CaseIterable, Sendable {
-        case any = "Any Size"
-        case under5MB = "Under 5 MB"
-        case between5And100MB = "5-100 MB"
-        case over100MB = "Over 100 MB"
-
-        var byteRange: ClosedRange<Int64>? {
-            switch self {
-            case .any:
-                nil
-            case .under5MB:
-                0 ... 5_000_000
-            case .between5And100MB:
-                5_000_001 ... 100_000_000
-            case .over100MB:
-                100_000_001 ... Int64.max
-            }
-        }
-    }
-
     /// Query string to filter by file name.
     var fileNameQuery: String = ""
 
@@ -139,102 +66,6 @@ final class FileScanViewModel {
 
     /// Selected size filter.
     var fileSizeFilter: FileSizeFilter = .any
-
-    // MARK: - Computed
-
-    /// The file currently selected for preview, if any.
-    var previewFile: RecoverableFile? {
-        guard let id = previewFileID else { return nil }
-        return foundFiles.first { $0.id == id }
-    }
-
-    /// Number of files the user has selected.
-    var selectedCount: Int {
-        selectedFileIDs.count
-    }
-
-    /// Number of selected files visible under current filters.
-    var selectedFilteredCount: Int {
-        let filteredIDs = Set(filteredFiles.map(\.id))
-        return selectedFileIDs.intersection(filteredIDs).count
-    }
-
-    /// Whether any filter is active.
-    var isFiltering: Bool {
-        !fileNameQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || fileTypeFilter != .all
-            || fileSizeFilter != .any
-    }
-
-    /// Whether recovery can be started (not scanning + at least one selected).
-    var canRecover: Bool {
-        scanPhase == .complete && !selectedFileIDs.isEmpty
-    }
-
-    /// Whether scanning is currently in progress.
-    var isScanning: Bool {
-        scanPhase == .scanning
-    }
-
-    /// Whether there are any files to filter.
-    var hasFiles: Bool {
-        !foundFiles.isEmpty
-    }
-
-    /// Files that match the current filters.
-    var filteredFiles: [RecoverableFile] {
-        let normalizedQuery = fileNameQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-
-        return foundFiles.filter { file in
-            if !normalizedQuery.isEmpty {
-                let nameMatches = file.fullFileName.lowercased().contains(normalizedQuery)
-                let pathMatches = file.filePath?.lowercased().contains(normalizedQuery) ?? false
-                if !nameMatches, !pathMatches {
-                    return false
-                }
-            }
-
-            switch fileTypeFilter {
-            case .all:
-                break
-            case .images:
-                if file.fileType != .image { return false }
-            case .videos:
-                if file.fileType != .video { return false }
-            }
-
-            if let range = fileSizeFilter.byteRange, !range.contains(file.sizeInBytes) {
-                return false
-            }
-
-            return true
-        }
-    }
-
-    /// Whether the filtered result set is empty while files exist.
-    var showFilteredEmptyState: Bool {
-        hasFiles && filteredFiles.isEmpty
-    }
-
-    /// Label showing filtered vs total counts.
-    var filteredCountLabel: String {
-        if isFiltering {
-            return "Showing \(filteredFiles.count) of \(foundFiles.count) files"
-        }
-        return "\(foundFiles.count) files found"
-    }
-
-    /// Label showing selected count under current filters.
-    var selectedCountLabel: String? {
-        guard selectedCount > 0 else { return nil }
-
-        if isFiltering {
-            return "Selected \(selectedFilteredCount) of \(filteredFiles.count) shown"
-        }
-
-        return "Selected \(selectedCount)"
-    }
 
     // MARK: - Dependencies
 
@@ -284,7 +115,7 @@ final class FileScanViewModel {
         case failed(String)
     }
 
-    private static let etaFormatter: DateComponentsFormatter = {
+    static let etaFormatter: DateComponentsFormatter = {
         let formatter = DateComponentsFormatter()
         formatter.allowedUnits = [.hour, .minute]
         formatter.unitsStyle = .abbreviated
@@ -292,7 +123,7 @@ final class FileScanViewModel {
         return formatter
     }()
 
-    private static let durationFormatter: DateComponentsFormatter = {
+    static let durationFormatter: DateComponentsFormatter = {
         let formatter = DateComponentsFormatter()
         formatter.allowedUnits = [.hour, .minute, .second]
         formatter.unitsStyle = .abbreviated
@@ -382,39 +213,6 @@ final class FileScanViewModel {
         )
     }
 
-    // MARK: - Selection
-
-    /// Toggles the selection state of a file.
-    func toggleSelection(_ fileID: UUID) {
-        if selectedFileIDs.contains(fileID) {
-            selectedFileIDs.remove(fileID)
-        } else {
-            selectedFileIDs.insert(fileID)
-        }
-    }
-
-    /// Selects all found files.
-    func selectAll() {
-        selectedFileIDs = Set(foundFiles.map(\.id))
-    }
-
-    /// Selects all filtered files.
-    func selectAllFiltered() {
-        let filteredIDs = Set(filteredFiles.map(\.id))
-        selectedFileIDs.formUnion(filteredIDs)
-    }
-
-    /// Deselects all files.
-    func deselectAll() {
-        selectedFileIDs.removeAll()
-    }
-
-    /// Deselects all filtered files.
-    func deselectFiltered() {
-        let filteredIDs = Set(filteredFiles.map(\.id))
-        selectedFileIDs.subtract(filteredIDs)
-    }
-
     /// Verifies selected files by hashing head/tail samples before recovery.
     ///
     /// Returns a summary with counts of verified, mismatched, and unreadable files.
@@ -440,9 +238,11 @@ final class FileScanViewModel {
             return nil
         }
     }
+}
 
-    // MARK: - Private
+// MARK: - Scan Internals
 
+extension FileScanViewModel {
     private func startUnifiedScan(
         device: StorageDevice,
         startOffset: UInt64,

@@ -32,8 +32,7 @@ actor LivePreviewService: LivePreviewServicing {
         Self.createTempDirectory(at: tempDirectoryURL, logger: logger)
     }
 
-    // swiftlint:disable:next modifier_order
-    private nonisolated static func createTempDirectory(at url: URL, logger: Logger) {
+    nonisolated static func createTempDirectory(at url: URL, logger: Logger) {
         do {
             if !FileManager.default.fileExists(atPath: url.path) {
                 try FileManager.default.createDirectory(

@@ -17,7 +17,6 @@ protocol FastScanServicing: Sendable {
     func scan(device: StorageDevice) -> AsyncThrowingStream<ScanEvent, Error>
 }
 
-// swiftlint:disable type_body_length
 struct FastScanService: FastScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FastScan")
     private let diskReaderFactory: @Sendable (String) -> any PrivilegedDiskReading
@@ -68,19 +67,29 @@ struct FastScanService: FastScanServicing {
 
     // MARK: - Scan Logic
 
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private func performScan(
         device: StorageDevice,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let volumeInfo = VolumeInfo.detect(for: device)
-
         logger.info("Fast scan Phase A (Filesystem) on \(volumeInfo.filesystemType.displayName)")
-
         var foundFilenames = Set<String>()
+        for try await event in makeFilesystemPhaseStream(device: device) {
+            handleFilesystemPhaseEvent(event, foundFilenames: &foundFilenames, continuation: continuation)
+        }
 
-        // ── Phase A: Filesystem Walk ──
-        let phaseAStream = AsyncThrowingStream<ScanEvent, Error> { phaseAContinuation in
+        await runRawCatalogPhaseIfNeeded(
+            volumeInfo: volumeInfo,
+            foundFilenames: &foundFilenames,
+            continuation: continuation
+        )
+
+        continuation.yield(.completed)
+        continuation.finish()
+    }
+
+    private func makeFilesystemPhaseStream(device: StorageDevice) -> AsyncThrowingStream<ScanEvent, Error> {
+        AsyncThrowingStream { phaseAContinuation in
             Task.detached {
                 do {
                     try await performFilesystemScan(device: device, continuation: phaseAContinuation)
@@ -89,101 +98,106 @@ struct FastScanService: FastScanServicing {
                 }
             }
         }
+    }
 
-        for try await event in phaseAStream {
-            switch event {
-            case let .fileFound(file):
-                foundFilenames.insert(file.fileName)
-                continuation.yield(event)
-            case let .progress(p):
-                // Scale Phase A progress to 0-50%
-                continuation.yield(.progress(p * 0.5))
-            case .checkpoint:
-                break
-            case .completed:
-                break // Wait for Phase B
-            }
+    private func handleFilesystemPhaseEvent(
+        _ event: ScanEvent,
+        foundFilenames: inout Set<String>,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
+    ) {
+        switch event {
+        case let .fileFound(file):
+            foundFilenames.insert(file.fileName)
+            continuation.yield(event)
+        case let .progress(progress):
+            continuation.yield(.progress(progress * 0.5))
+        case .checkpoint, .completed:
+            break
+        }
+    }
+
+    private func runRawCatalogPhaseIfNeeded(
+        volumeInfo: VolumeInfo,
+        foundFilenames: inout Set<String>,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
+    ) async {
+        guard volumeInfo.filesystemType == .fat32
+            || volumeInfo.filesystemType == .exfat
+            || volumeInfo.filesystemType == .ntfs
+        else {
+            continuation.yield(.progress(1.0))
+            return
         }
 
-        // ── Phase B: Raw Catalog Scan ──
-        let needsPhaseB = volumeInfo.filesystemType == .fat32 ||
-            volumeInfo.filesystemType == .exfat ||
-            volumeInfo.filesystemType == .ntfs
+        logger.info("Fast scan Phase B (Raw Catalog) on \(volumeInfo.filesystemType.displayName)")
+        do {
+            let reader = diskReaderFactory(volumeInfo.devicePath)
+            try reader.start()
+            defer { reader.stop() }
 
-        if needsPhaseB {
-            logger.info("Fast scan Phase B (Raw Catalog) on \(volumeInfo.filesystemType.displayName)")
-            do {
-                let reader = diskReaderFactory(volumeInfo.devicePath)
-                try reader.start()
-                defer { reader.stop() }
-
-                if reader.isSeekable {
-                    let phaseBStream = AsyncThrowingStream<ScanEvent, Error> { phaseBContinuation in
-                        Task.detached {
-                            do {
-                                switch volumeInfo.filesystemType {
-                                case .fat32:
-                                    let scanner = FATDirectoryScanner()
-                                    try await scanner.scan(
-                                        volumeInfo: volumeInfo,
-                                        reader: reader,
-                                        continuation: phaseBContinuation
-                                    )
-                                case .exfat:
-                                    let scanner = ExFATScanner()
-                                    try await scanner.scan(
-                                        volumeInfo: volumeInfo,
-                                        reader: reader,
-                                        continuation: phaseBContinuation
-                                    )
-                                case .ntfs:
-                                    let scanner = NTFSScanner()
-                                    try await scanner.scan(
-                                        volumeInfo: volumeInfo,
-                                        reader: reader,
-                                        continuation: phaseBContinuation
-                                    )
-                                default:
-                                    break
-                                }
-                                phaseBContinuation.finish()
-                            } catch {
-                                phaseBContinuation.finish(throwing: error)
-                            }
-                        }
-                    }
-
-                    for try await event in phaseBStream {
-                        switch event {
-                        case let .fileFound(file):
-                            if !foundFilenames.contains(file.fileName) {
-                                foundFilenames.insert(file.fileName)
-                                continuation.yield(event)
-                            }
-                        case let .progress(p):
-                            // Scale Phase B progress 50-100%
-                            continuation.yield(.progress(0.5 + p * 0.5))
-                        case .checkpoint:
-                            break
-                        case .completed:
-                            break
-                        }
-                    }
-                } else {
-                    logger.warning("Device is not seekable (using FIFO), skipping catalog scan Phase B")
-                    continuation.yield(.progress(1.0))
-                }
-            } catch {
-                logger.error("Phase B scan failed or access denied: \(error.localizedDescription)")
+            guard reader.isSeekable else {
+                logger.warning("Device is not seekable (using FIFO), skipping catalog scan Phase B")
                 continuation.yield(.progress(1.0))
+                return
             }
-        } else {
-            // For APFS/HFS+ jump to 100%
+
+            for try await event in makeRawCatalogPhaseStream(volumeInfo: volumeInfo, reader: reader) {
+                switch event {
+                case let .fileFound(file):
+                    if !foundFilenames.contains(file.fileName) {
+                        foundFilenames.insert(file.fileName)
+                        continuation.yield(event)
+                    }
+                case let .progress(progress):
+                    continuation.yield(.progress(0.5 + progress * 0.5))
+                case .checkpoint, .completed:
+                    break
+                }
+            }
+        } catch {
+            logger.error("Phase B scan failed or access denied: \(error.localizedDescription)")
             continuation.yield(.progress(1.0))
         }
+    }
 
-        continuation.yield(.completed)
-        continuation.finish()
+    private func makeRawCatalogPhaseStream(
+        volumeInfo: VolumeInfo,
+        reader: any PrivilegedDiskReading
+    ) -> AsyncThrowingStream<ScanEvent, Error> {
+        AsyncThrowingStream { phaseBContinuation in
+            Task.detached {
+                do {
+                    try await runFilesystemSpecificCatalogScan(
+                        volumeInfo: volumeInfo,
+                        reader: reader,
+                        continuation: phaseBContinuation
+                    )
+                    phaseBContinuation.finish()
+                } catch {
+                    phaseBContinuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func runFilesystemSpecificCatalogScan(
+        volumeInfo: VolumeInfo,
+        reader: any PrivilegedDiskReading,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
+    ) async throws {
+        switch volumeInfo.filesystemType {
+        case .fat32:
+            let scanner = FATDirectoryScanner()
+            try await scanner.scan(volumeInfo: volumeInfo, reader: reader, continuation: continuation)
+        case .exfat:
+            let scanner = ExFATScanner()
+            try await scanner.scan(volumeInfo: volumeInfo, reader: reader, continuation: continuation)
+        case .ntfs:
+            let scanner = NTFSScanner()
+            try await scanner.scan(volumeInfo: volumeInfo, reader: reader, continuation: continuation)
+        default:
+            break
+        }
     }
 
     // MARK: - Filesystem-Level Scan (all FS types)
@@ -321,7 +335,9 @@ struct FastScanService: FastScanServicing {
             )
         }
     }
+}
 
+extension FastScanService {
     @Sendable
     private static func defaultRunTMUtil(volumeRoot: URL, logger: Logger) -> String? {
         let process = Process()
@@ -542,5 +558,3 @@ struct FastScanService: FastScanServicing {
         }
     }
 }
-
-// swiftlint:enable type_body_length

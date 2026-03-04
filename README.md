@@ -77,6 +77,7 @@ Before committing, format your code:
 swiftformat .
 ```
 SwiftLint runs automatically during the Xcode build phase to surface warnings.
+Lint suppressions are not allowed: never add `swiftlint:disable` / `swiftlint:enable`; fix warnings in code.
 
 ## How It Works
 

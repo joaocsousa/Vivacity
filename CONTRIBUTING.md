@@ -33,6 +33,11 @@ xcodebuild test -scheme VivacityUI -destination 'platform=macOS' SYMROOT="$(pwd)
 xcodebuild build -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"
 ```
 
+## SwiftLint Policy
+
+- Never use `swiftlint:disable` or `swiftlint:enable` in source code.
+- Do not silence warnings. Fix the underlying code so lint passes cleanly.
+
 ## Scan Behavior (Current)
 
 Vivacity now uses a **single unified scan flow** from the user perspective.

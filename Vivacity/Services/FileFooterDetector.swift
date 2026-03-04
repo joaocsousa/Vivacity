@@ -27,7 +27,6 @@ struct PNGSizeEstimation: Sendable, Equatable {
     }
 }
 
-// swiftlint:disable type_body_length
 struct FileFooterDetector: FileFooterDetecting {
     /// Conservative cap so deep scan does not read the full disk to estimate one file.
     private static let defaultMaxScanBytes = 32 * 1024 * 1024
@@ -508,7 +507,9 @@ struct FileFooterDetector: FileFooterDetecting {
 
         return nil
     }
+}
 
+extension FileFooterDetector {
     private func firstBoundaryIndex(in bytes: [UInt8], from startIndex: Int) -> Int? {
         guard startIndex < bytes.count else { return nil }
 
@@ -542,5 +543,3 @@ struct FileFooterDetector: FileFooterDetecting {
         return nil
     }
 }
-
-// swiftlint:enable type_body_length
