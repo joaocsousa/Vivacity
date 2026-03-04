@@ -46,17 +46,17 @@ open Vivacity.xcodeproj
 ### Xcode Project Workflow (XcodeGen)
 
 - `project.yml` is the single source of truth for project structure and build settings.
-- `Vivacity.xcodeproj` is generated from `project.yml` and is committed to the repository.
+- `Vivacity.xcodeproj` is **not** committed; regenerate locally from `project.yml`.
 - Do not edit `Vivacity.xcodeproj/project.pbxproj` manually. Update `project.yml`, then run:
 
 ```bash
 xcodegen generate
 ```
 
-- To verify generated project parity before opening a PR:
+- To regenerate/verify before builds or PRs:
 
 ```bash
-./scripts/check-xcodegen.sh
+./scripts/check-xcodegen.sh   # regenerates and ensures the project remains untracked
 ```
 
 ### Testing & Code Quality

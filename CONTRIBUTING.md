@@ -16,7 +16,7 @@ brew install xcodegen swiftformat swiftlint
 ## Development Flow
 
 1. Update project config in `project.yml` (not `project.pbxproj`).
-2. Regenerate the project:
+2. Regenerate the project (untracked):
 
 ```bash
 xcodegen generate
@@ -25,7 +25,7 @@ xcodegen generate
 3. Validate project/code quality:
 
 ```bash
-./scripts/check-xcodegen.sh
+./scripts/check-xcodegen.sh   # regenerates and ensures xcodeproj stays untracked
 swiftformat .
 swiftlint
 xcodebuild test -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"
@@ -35,5 +35,5 @@ xcodebuild build -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/
 ## Source of Truth
 
 - `project.yml` is canonical.
-- `Vivacity.xcodeproj` is committed but must always be regenerated from `project.yml`.
-- Pull requests that include project changes should include both `project.yml` and generated `Vivacity.xcodeproj` updates.
+- `Vivacity.xcodeproj` is generated locally and ignored by git.
+- Pull requests should only include `project.yml` changes (plus any required scripts/docs).

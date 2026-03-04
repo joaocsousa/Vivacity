@@ -12,11 +12,14 @@ fi
 echo "Generating project from project.yml..."
 xcodegen generate >/dev/null
 
-if ! git diff --quiet -- project.yml Vivacity.xcodeproj; then
-  echo "error: Generated project is out of sync with project.yml."
-  echo "Run 'xcodegen generate' and commit updated files."
-  git --no-pager diff --stat -- project.yml Vivacity.xcodeproj
+if git ls-files --error-unmatch "Vivacity.xcodeproj" >/dev/null 2>&1; then
+  echo "error: Vivacity.xcodeproj is tracked. Remove it from git (we keep it untracked) and rerun."
   exit 1
 fi
 
-echo "OK: XcodeGen spec and Vivacity.xcodeproj are in sync."
+if [[ ! -d "Vivacity.xcodeproj" ]]; then
+  echo "error: xcodegen did not produce Vivacity.xcodeproj"
+  exit 1
+fi
+
+echo "OK: Generated Vivacity.xcodeproj (untracked) from project.yml."
