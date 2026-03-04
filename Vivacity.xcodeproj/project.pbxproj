@@ -27,6 +27,12 @@
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011 /* ContentView.swift */; };
 		AA000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000012 /* Assets.xcassets */; };
 		AB3C1FD4C53D84A23AC4FEA5 /* DeepScanServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE936670A0F95A138FD9 /* DeepScanServiceTests.swift */; };
+		AB3C1FD5C53D84A23AC4FEA5 /* FastScanServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE946670A0F95A138FD9 /* FastScanServiceTests.swift */; };
+		AB3C1FD6C53D84A23AC4FEA5 /* FATDirectoryScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE956670A0F95A138FD9 /* FATDirectoryScannerTests.swift */; };
+		AB3C1FD7C53D84A23AC4FEA5 /* ExFATScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE966670A0F95A138FD9 /* ExFATScannerTests.swift */; };
+		AB3C1FD8C53D84A23AC4FEA5 /* NTFSScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE976670A0F95A138FD9 /* NTFSScannerTests.swift */; };
+		AB3C1FD9C53D84A23AC4FEA5 /* LivePreviewServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE986670A0F95A138FD9 /* LivePreviewServiceTests.swift */; };
+		AB3C1FDAC53D84A23AC4FEA5 /* ImageReconstructorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE996670A0F95A138FD9 /* ImageReconstructorTests.swift */; };
 		AE6AAF9F4E9B6DBFEE5A8A64 /* VivacityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D39259AB1E971A197CF2563F /* VivacityUITests.swift */; };
 		AF85BE679C9148F5B87783B6 /* APFSCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 765344A29DF87B5DEA1EB788 /* APFSCarver.swift */; };
 		AF9D9F74FA517ECD01D20E30 /* FileScanViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D64682A1FDC7E785D23022 /* FileScanViewModelTests.swift */; };
@@ -145,6 +151,12 @@
 		E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LivePreviewService.swift; sourceTree = "<group>"; };
 		EE000010 /* PrivilegedDiskReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReader.swift; sourceTree = "<group>"; };
 		F90DAE936670A0F95A138FD9 /* DeepScanServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeepScanServiceTests.swift; sourceTree = "<group>"; };
+		F90DAE946670A0F95A138FD9 /* FastScanServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/FastScanServiceTests.swift; sourceTree = "<group>"; };
+		F90DAE956670A0F95A138FD9 /* FATDirectoryScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/FATDirectoryScannerTests.swift; sourceTree = "<group>"; };
+		F90DAE966670A0F95A138FD9 /* ExFATScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/ExFATScannerTests.swift; sourceTree = "<group>"; };
+		F90DAE976670A0F95A138FD9 /* NTFSScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/NTFSScannerTests.swift; sourceTree = "<group>"; };
+		F90DAE986670A0F95A138FD9 /* LivePreviewServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/LivePreviewServiceTests.swift; sourceTree = "<group>"; };
+		F90DAE996670A0F95A138FD9 /* ImageReconstructorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Carvers/ImageReconstructorTests.swift; sourceTree = "<group>"; };
 		F9AE38D76593EBF1B3F64048 /* CarverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CarverTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -194,6 +206,12 @@
 				79DB19E6CFA8AE3C81367F05 /* DiskImageServiceTests.swift */,
 				2088029C926601913E5DF08C /* CameraRecoveryServiceTests.swift */,
 				F90DAE936670A0F95A138FD9 /* DeepScanServiceTests.swift */,
+				F90DAE946670A0F95A138FD9 /* FastScanServiceTests.swift */,
+				F90DAE956670A0F95A138FD9 /* FATDirectoryScannerTests.swift */,
+				F90DAE966670A0F95A138FD9 /* ExFATScannerTests.swift */,
+				F90DAE976670A0F95A138FD9 /* NTFSScannerTests.swift */,
+				F90DAE986670A0F95A138FD9 /* LivePreviewServiceTests.swift */,
+				F90DAE996670A0F95A138FD9 /* ImageReconstructorTests.swift */,
 				F24A0004A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift */,
 				F24A0013A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift */,
 			);
@@ -524,6 +542,12 @@
 				04C55D61D29BEF9F556574FD /* DiskImageServiceTests.swift in Sources */,
 				0027AA19C3AB3E9374D21AEF /* CameraRecoveryServiceTests.swift in Sources */,
 				AB3C1FD4C53D84A23AC4FEA5 /* DeepScanServiceTests.swift in Sources */,
+				AB3C1FD5C53D84A23AC4FEA5 /* FastScanServiceTests.swift in Sources */,
+				AB3C1FD6C53D84A23AC4FEA5 /* FATDirectoryScannerTests.swift in Sources */,
+				AB3C1FD7C53D84A23AC4FEA5 /* ExFATScannerTests.swift in Sources */,
+				AB3C1FD8C53D84A23AC4FEA5 /* NTFSScannerTests.swift in Sources */,
+				AB3C1FD9C53D84A23AC4FEA5 /* LivePreviewServiceTests.swift in Sources */,
+				AB3C1FDAC53D84A23AC4FEA5 /* ImageReconstructorTests.swift in Sources */,
 				F24A0006A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift in Sources */,
 				F24A0011A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift in Sources */,
 				1993DD545BDE507AFC084D7A /* MP4ReconstructorTests.swift in Sources */,

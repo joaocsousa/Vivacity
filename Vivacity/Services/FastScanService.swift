@@ -17,6 +17,7 @@ protocol FastScanServicing: Sendable {
     func scan(device: StorageDevice) -> AsyncThrowingStream<ScanEvent, Error>
 }
 
+// swiftlint:disable type_body_length
 struct FastScanService: FastScanServicing {
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FastScan")
     private let diskReaderFactory: @Sendable (String) -> any PrivilegedDiskReading
@@ -234,7 +235,7 @@ struct FastScanService: FastScanServicing {
                 options: [.skipsPackageDescendants]
             ) else { continue }
 
-            for case let fileURL as URL in enumerator {
+            while let fileURL = enumerator.nextObject() as? URL {
                 try Task.checkCancellation()
 
                 if let isDir = try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory, isDir == true {
@@ -421,13 +422,24 @@ struct FastScanService: FastScanServicing {
             options: [.skipsPackageDescendants, .skipsHiddenFiles]
         ) else { return }
 
-        for case let fileURL as URL in enumerator {
+        while let fileURL = enumerator.nextObject() as? URL {
             guard !Task.isCancelled else { break }
 
             let ext = fileURL.pathExtension.lowercased()
             guard Self.supportedExtensions.contains(ext) else { continue }
 
-            let relativePath = fileURL.path.replacingOccurrences(of: mountPoint.path, with: "")
+            let canonicalMountPath = mountPoint.resolvingSymlinksInPath().path
+            let canonicalFilePath = fileURL.resolvingSymlinksInPath().path
+
+            let rawRelativePath: String = if canonicalFilePath.hasPrefix(canonicalMountPath) {
+                String(canonicalFilePath.dropFirst(canonicalMountPath.count))
+            } else if fileURL.path.hasPrefix(mountPoint.path) {
+                String(fileURL.path.dropFirst(mountPoint.path.count))
+            } else {
+                fileURL.lastPathComponent
+            }
+
+            let relativePath = rawRelativePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             let liveURL = volumeRoot.appendingPathComponent(relativePath)
 
             if !fm.fileExists(atPath: liveURL.path) {
@@ -526,3 +538,5 @@ struct FastScanService: FastScanServicing {
         }
     }
 }
+
+// swiftlint:enable type_body_length
