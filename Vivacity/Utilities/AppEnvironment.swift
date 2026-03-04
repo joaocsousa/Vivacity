@@ -13,7 +13,7 @@ enum AppEnvironment {
 
     /// Call at app startup to configure fakes when running UI tests.
     static func configureForTestingIfNeeded() {
-#if DEBUG
+        #if DEBUG
         let env = ProcessInfo.processInfo.environment
         guard env["VIVACITY_USE_FAKE_SERVICES"] == "1" else { return }
 
@@ -34,7 +34,7 @@ enum AppEnvironment {
                 ])
             )
         }
-#endif
+        #endif
     }
 }
 

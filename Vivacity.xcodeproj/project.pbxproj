@@ -3,512 +3,457 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0027AA19C3AB3E9374D21AEF /* CameraRecoveryServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2088029C926601913E5DF08C /* CameraRecoveryServiceTests.swift */; };
-		01CA7678C5E49342FBEC6DD7 /* PartitionSearchServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */; };
-		0465723FD557A47A36FFB4AF /* PartitionSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05A02025A207FE742FDDB8D8 /* PartitionSearchService.swift */; };
-		04C55D61D29BEF9F556574FD /* DiskImageServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79DB19E6CFA8AE3C81367F05 /* DiskImageServiceTests.swift */; };
-		11A73B5D24096FBDF2C0A314 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 15DB3BE95DBA2A386AB785A3 /* Foundation.framework */; };
-		18DDB8736E8D384F2B052EFA /* FATCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */; };
-		1993DD545BDE507AFC084D7A /* MP4ReconstructorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B74266AD38F504F3E25042FD /* MP4ReconstructorTests.swift */; };
-		19FD47F9859C4CF27B0654BC /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 15DB3BE95DBA2A386AB785A3 /* Foundation.framework */; };
-		1B40A2766C311C7E9959F1C4 /* CarverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9AE38D76593EBF1B3F64048 /* CarverTests.swift */; };
-		239EFD18DDF58EAB29C74CBA /* CameraRecoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC38108B7516FEE3C928A42B /* CameraRecoveryService.swift */; };
-		49971FA5A658E089F0216CB2 /* PrivilegedDiskReading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F72C99CDB009F0B10499058 /* PrivilegedDiskReading.swift */; };
-		53042BE3A8A7C4D7E26D1653 /* FATModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 701C8C0145874A1017A1233A /* FATModels.swift */; };
-		702BC9CC6922EABB684E6289 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = D72ED180F0AD92F957FD37E1 /* AppEnvironment.swift */; };
-		7A262EA9E3725DD7AA12E5CE /* ImageReconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22FFE5F19FEE9CB04CF674F2 /* ImageReconstructor.swift */; };
-		8196911B4649ACD2E9ABFC82 /* HFSPlusCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6026EEDF75109041E356905B /* HFSPlusCarver.swift */; };
-		8EB1D4218FEFD91EF71B930F /* FragmentedVideoAssemblerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E128C33742E42745F848C8 /* FragmentedVideoAssemblerTests.swift */; };
-		AA000001 /* VivacityApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000010 /* VivacityApp.swift */; };
-		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000011 /* ContentView.swift */; };
-		AA000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000012 /* Assets.xcassets */; };
-		AB3C1FD4C53D84A23AC4FEA5 /* DeepScanServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE936670A0F95A138FD9 /* DeepScanServiceTests.swift */; };
-		AB3C1FD5C53D84A23AC4FEA5 /* FastScanServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE946670A0F95A138FD9 /* FastScanServiceTests.swift */; };
-		AB3C1FD6C53D84A23AC4FEA5 /* FATDirectoryScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE956670A0F95A138FD9 /* FATDirectoryScannerTests.swift */; };
-		AB3C1FD7C53D84A23AC4FEA5 /* ExFATScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE966670A0F95A138FD9 /* ExFATScannerTests.swift */; };
-		AB3C1FD8C53D84A23AC4FEA5 /* NTFSScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE976670A0F95A138FD9 /* NTFSScannerTests.swift */; };
-		AB3C1FD9C53D84A23AC4FEA5 /* LivePreviewServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE986670A0F95A138FD9 /* LivePreviewServiceTests.swift */; };
-		AB3C1FDAC53D84A23AC4FEA5 /* ImageReconstructorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90DAE996670A0F95A138FD9 /* ImageReconstructorTests.swift */; };
-		AE6AAF9F4E9B6DBFEE5A8A64 /* VivacityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D39259AB1E971A197CF2563F /* VivacityUITests.swift */; };
-		AF85BE679C9148F5B87783B6 /* APFSCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 765344A29DF87B5DEA1EB788 /* APFSCarver.swift */; };
-		AF9D9F74FA517ECD01D20E30 /* FileScanViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D64682A1FDC7E785D23022 /* FileScanViewModelTests.swift */; };
-		BB000001 /* StorageDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000010 /* StorageDevice.swift */; };
-		BB000002 /* DeviceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000011 /* DeviceService.swift */; };
-		BB000003 /* DeviceSelectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000012 /* DeviceSelectionViewModel.swift */; };
-		BB000004 /* DeviceSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000013 /* DeviceSelectionView.swift */; };
-		BB000005 /* DeviceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000014 /* DeviceRow.swift */; };
-		BD297BEA662DAFEF20262A63 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31C080987ACA5FEDE7E26580 /* SessionManager.swift */; };
-		BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85684069117F459BA261B91B /* PermissionDeniedView.swift */; };
-		C20F471C0D5544F7E17D075F /* FakePrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1B11E2F3AF898154D08CA6 /* FakePrivilegedDiskReader.swift */; };
-		C3DAFCD9A0FDF3E1CC6C39D1 /* DiskImageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FDF8909316E71A2C41052F /* DiskImageService.swift */; };
-		C53E93D12892ED1C6F64FDD8 /* MP4Reconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2F873ABB177366AE8517A8 /* MP4Reconstructor.swift */; };
-		C73D1495CC9C62142296BF35 /* CameraProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A1B19E38146320E5D70329E /* CameraProfile.swift */; };
-		C9D70560A62EA3B78A99B80A /* ScanSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0ADEBE5D623AB329A92699C /* ScanSession.swift */; };
-		CC000001 /* FileSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000010 /* FileSignature.swift */; };
-		CC000002 /* RecoverableFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000011 /* RecoverableFile.swift */; };
-		CC000003 /* FastScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000012 /* FastScanService.swift */; };
-		CC000004 /* DeepScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000013 /* DeepScanService.swift */; };
-		CC000005 /* FileScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000014 /* FileScanViewModel.swift */; };
-		CC000006 /* FileScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000015 /* FileScanView.swift */; };
-		CC000007 /* FileRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000016 /* FileRow.swift */; };
-		CC000008 /* FilePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000017 /* FilePreviewView.swift */; };
-		D980A369EB18B4CA88551E40 /* FragmentedVideoAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 695CF217F55C97CD24D30DF3 /* FragmentedVideoAssembler.swift */; };
-		DD000001 /* VolumeInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000010 /* VolumeInfo.swift */; };
-		DD000002 /* FATDirectoryScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000011 /* FATDirectoryScanner.swift */; };
-		DD000003 /* NTFSScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000012 /* NTFSScanner.swift */; };
-		DD000004 /* ExFATScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000013 /* ExFATScanner.swift */; };
-		DD000005 /* EXIFDateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000014 /* EXIFDateExtractor.swift */; };
-		F24A0008A1B2C3D4E5F60708 /* RecoveryDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0007A1B2C3D4E5F60708 /* RecoveryDestinationView.swift */; };
-		F24A0005A1B2C3D4E5F60708 /* RecoveryDestinationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0003A1B2C3D4E5F60708 /* RecoveryDestinationViewModel.swift */; };
-		F24A0006A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0004A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift */; };
-		F24A0010A1B2C3D4E5F60708 /* FileRecoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0012A1B2C3D4E5F60708 /* FileRecoveryService.swift */; };
-		F24A0011A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0013A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift */; };
-		F24A0001A1B2C3D4E5F60708 /* FileFooterDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24A0002A1B2C3D4E5F60708 /* FileFooterDetector.swift */; };
-		DEBE1D2B6A956E1C67765455 /* LivePreviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */; };
-		EE000001 /* PrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000010 /* PrivilegedDiskReader.swift */; };
-		F868D76B41326B7A26617210 /* SessionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7249DFA6A6FA50A7404EB3 /* SessionManagerTests.swift */; };
+		00931C01885F0F6958E83677 /* PartitionSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEE98246DBDA27627B451AB2 /* PartitionSearchService.swift */; };
+		03A99E3159E4EDB20C010DB2 /* LivePreviewService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F778D2D01BDD409132C6CD /* LivePreviewService.swift */; };
+		06058B0CCD28359644C30B40 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7440B3EA13CCE7938E850E52 /* ContentView.swift */; };
+		077A51E17D05FE7ECF5E5319 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEBAA18557A524CC25001987 /* AppEnvironment.swift */; };
+		0CF30080EDD11D61C3C17999 /* DeviceSelectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E438495DF84FBF25DF0E80E0 /* DeviceSelectionViewModel.swift */; };
+		0D024DE5C9BE18F37CC324FB /* DiskImageServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6181B986D79D12FBB4FA98 /* DiskImageServiceTests.swift */; };
+		104CEB2634E1AA065DF610F5 /* PrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A08941DFB93CBD65410D6F /* PrivilegedDiskReader.swift */; };
+		11652FFD851388C39A5211FC /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A15764732492BC7548B89A6B /* SessionManager.swift */; };
+		11CAFCEB273970561391B100 /* FileRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5493B363900AF1D70C560A7 /* FileRow.swift */; };
+		1BB2289F9DC3F580906419CD /* FileScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14852AB7DED9C33B14908906 /* FileScanView.swift */; };
+		1C52BC48EDF23A77F9D59AD1 /* FATDirectoryScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E437A0241805491AD65C7CC /* FATDirectoryScannerTests.swift */; };
+		2148DC54C9E64686933B6BDA /* DeepScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A3C4EE79CD9CBA6438E9FC /* DeepScanService.swift */; };
+		2F0D0F45F1A4CBAC0394E70F /* HFSPlusCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0C32B6E22A21D6EBAFBEBE0 /* HFSPlusCarver.swift */; };
+		367E9FE7B65042D7D57FBF56 /* RecoverableFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A703308D82EE993CC2056AE /* RecoverableFile.swift */; };
+		3C0F3AF8694F9CF2C86233FA /* DeepScanServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2450B5276362C5741A3A8564 /* DeepScanServiceTests.swift */; };
+		3C2EDAFBD340B305A7EAA95D /* FATCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F55BD3D7AD752F2A81C1E5 /* FATCarver.swift */; };
+		3D0916B36C3729CE03391262 /* FragmentedVideoAssemblerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE9F0765F5F27901DA2F8F6C /* FragmentedVideoAssemblerTests.swift */; };
+		3F2B58EC0753290F6EF7D672 /* CarverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80134CC6A91C8B1CB704DCBF /* CarverTests.swift */; };
+		4D379CD5745376C750B82D4D /* DeviceSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E83C93B6F1D795F64064DE4 /* DeviceSelectionView.swift */; };
+		5059248ADC0B93DD4CF25089 /* FATDirectoryScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85E7667F8D25F8F009CF4C2 /* FATDirectoryScanner.swift */; };
+		505E98525DAC2611DCD6ABC9 /* ExFATScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C35F606B23E71F2E9DF9C0 /* ExFATScannerTests.swift */; };
+		58A5E2C4D810CB8724BAF916 /* FileScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C80519E90FBDE89238C379 /* FileScanViewModel.swift */; };
+		5AF2F324C0E3C39E41BB035D /* FileScanViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C743B5D3071301D629129F47 /* FileScanViewModelTests.swift */; };
+		5D930053FCEA04ACFC6218C8 /* FilePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B3E7CE58D5A886D07B5FA3 /* FilePreviewView.swift */; };
+		620E9B53A9A33B0B758A4EA2 /* APFSCarver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35589341E290EB381B7786A9 /* APFSCarver.swift */; };
+		65DF8D6F94C2E95104B6CC35 /* SessionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC87F8801F7960504E33CD79 /* SessionManagerTests.swift */; };
+		74082CAD78D63C4D06E31A38 /* RecoveryDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26734D6609F8840799867BE5 /* RecoveryDestinationView.swift */; };
+		81BD73D2EDC959AD2A6ABEC4 /* PermissionDeniedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF31BA6DD99ABA35A59EE60 /* PermissionDeniedView.swift */; };
+		82FE3AA9D396AF34053C302D /* LivePreviewServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D47227FE40A9D3359873D7 /* LivePreviewServiceTests.swift */; };
+		8321203437AFB541AFAE30F0 /* ScanSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24242E6231C18ABCF95AFB4E /* ScanSession.swift */; };
+		859C7C30E2EBA34F0DAEB6FE /* MP4Reconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A59845E81AECA12DC6FA63C /* MP4Reconstructor.swift */; };
+		90ADCF266A4922BF51B28BCE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 813F892753186505FE3AC38C /* Assets.xcassets */; };
+		99FDB593D0F035BFC7D99F48 /* FileSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1945E20E8BA8053B6887B09C /* FileSignature.swift */; };
+		9B13E0E0351DC880554E363B /* FileRecoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EAAAC3174F2989415E764BF /* FileRecoveryService.swift */; };
+		9DAA1D7937850B64857CE3D6 /* CameraRecoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49504C7E0FA3974CCFCC0532 /* CameraRecoveryService.swift */; };
+		A01970202BB5192A4F3A5D8A /* VivacityApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6533E49B7DC688069A7A69F2 /* VivacityApp.swift */; };
+		AA2682061279386E0DE9E844 /* FileRecoveryServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30B62B326803C1F2F157DC1 /* FileRecoveryServiceTests.swift */; };
+		AA71CE302C1F5E41C39346BC /* FragmentedVideoAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D678616101D53E95D842ADF /* FragmentedVideoAssembler.swift */; };
+		AC518D2E85AAF57ECF7D54F0 /* PartitionSearchServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0938BB457C5B7EC36673B570 /* PartitionSearchServiceTests.swift */; };
+		B064934E4833CC896249EF08 /* PrivilegedDiskReading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33B0B5AA1352FC217AF5620D /* PrivilegedDiskReading.swift */; };
+		B09F3FE39A46053B770371D4 /* FATModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147E9D157D854956E181E709 /* FATModels.swift */; };
+		B3DEE11310570E526AC4FF71 /* FastScanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AA0A9A17B9FCF612FC6FE45 /* FastScanService.swift */; };
+		C01A1DEFA19003CE68313A24 /* FakePrivilegedDiskReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32EA9481366D101CD6BC3BF8 /* FakePrivilegedDiskReader.swift */; };
+		C362E67B3C40C3C56D8C967C /* DiskImageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3856BA55D26D11EAAB760644 /* DiskImageService.swift */; };
+		C72E56A5B276A94350B5305A /* NTFSScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308D1FD7909AFFD68B30FEA7 /* NTFSScannerTests.swift */; };
+		CC63020F3592BB3E3B003D98 /* ImageReconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F8CA23D8B2E1CC4243DB63 /* ImageReconstructor.swift */; };
+		CCDC94EFA27610887A07ECB7 /* StorageDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47DDDF1923CF4817747DF896 /* StorageDevice.swift */; };
+		D0FB6B25B26231CD99094656 /* NTFSScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 831FC83A468C39590799E7EF /* NTFSScanner.swift */; };
+		D2AA554B09B80A92FA955699 /* CameraProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36ABDB24E87488F6364810AF /* CameraProfile.swift */; };
+		D2C851A3DCE068A2F499EEA7 /* ImageReconstructorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99776D01DC7BE0505962045B /* ImageReconstructorTests.swift */; };
+		D4479992C89F5F39F53D70AF /* DeviceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E918688D4F2028C641FAE18 /* DeviceRow.swift */; };
+		D85861E815D6EF7AF08F1255 /* ExFATScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51CA98A2D11611B1D21DC9E4 /* ExFATScanner.swift */; };
+		E33DD69245EBDC574B61C7D1 /* MP4ReconstructorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F159A792417B453FEC784152 /* MP4ReconstructorTests.swift */; };
+		E37320DC60A55C997C57F29F /* FastScanServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F328A66E93D9B636EB810EFF /* FastScanServiceTests.swift */; };
+		E620E61C0A86029781320113 /* RecoveryDestinationViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA88F1F7CF265C2EE9B5A6A /* RecoveryDestinationViewModelTests.swift */; };
+		E91CB9C3A20A40FA2B92E1E4 /* EXIFDateExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCA43942A279D02A5F642B1 /* EXIFDateExtractor.swift */; };
+		F1CAB5A0B0D48514F9497299 /* RecoveryDestinationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7294EE81ECC026824472976 /* RecoveryDestinationViewModel.swift */; };
+		F403E78ECD2996000F3D4E28 /* DeviceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AB19FD457E5D574B0C940BA /* DeviceService.swift */; };
+		F4317D7E523A05AFA39327E4 /* FileFooterDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F82F7C404551CACAD46E9B4 /* FileFooterDetector.swift */; };
+		F4FC8612E092BE27D16C4CF9 /* CameraRecoveryServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188035211EA15281770871C3 /* CameraRecoveryServiceTests.swift */; };
+		F90C6BA0B2A199C6EE4ED01A /* VivacityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 737C64196EDFE4E331A56C79 /* VivacityUITests.swift */; };
+		F9792417A52D1B8C92977143 /* VolumeInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C013657BBAB37D35EFD9EA80 /* VolumeInfo.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		236BBA76DDE9DD64841B5309 /* PBXContainerItemProxy */ = {
+		07F87DCCC18620DD0B3F366D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = AA000060 /* Project object */;
+			containerPortal = 3340BCC9F4AC22F94A50B57E /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = AA000050;
+			remoteGlobalIDString = BEF52493ED46F1397A69AFCD;
 			remoteInfo = Vivacity;
 		};
-		4E4E5891858AEC2B439A704B /* PBXContainerItemProxy */ = {
+		E2596597E3878067FE7C8C15 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = AA000060 /* Project object */;
+			containerPortal = 3340BCC9F4AC22F94A50B57E /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = AA000050;
+			remoteGlobalIDString = BEF52493ED46F1397A69AFCD;
 			remoteInfo = Vivacity;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		05A02025A207FE742FDDB8D8 /* PartitionSearchService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartitionSearchService.swift; sourceTree = "<group>"; };
-		15DB3BE95DBA2A386AB785A3 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		2088029C926601913E5DF08C /* CameraRecoveryServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CameraRecoveryServiceTests.swift; sourceTree = "<group>"; };
-		22FFE5F19FEE9CB04CF674F2 /* ImageReconstructor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageReconstructor.swift; sourceTree = "<group>"; };
-		2BE52ADF7980CA375B770CE3 /* VivacityUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VivacityUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		31C080987ACA5FEDE7E26580 /* SessionManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
-		31D64682A1FDC7E785D23022 /* FileScanViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileScanViewModelTests.swift; sourceTree = "<group>"; };
-		3A1B19E38146320E5D70329E /* CameraProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CameraProfile.swift; sourceTree = "<group>"; };
-		5F72C99CDB009F0B10499058 /* PrivilegedDiskReading.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReading.swift; sourceTree = "<group>"; };
-		6026EEDF75109041E356905B /* HFSPlusCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HFSPlusCarver.swift; path = Services/Carvers/HFSPlusCarver.swift; sourceTree = "<group>"; };
-		695CF217F55C97CD24D30DF3 /* FragmentedVideoAssembler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FragmentedVideoAssembler.swift; path = Vivacity/Services/Carvers/FragmentedVideoAssembler.swift; sourceTree = "<group>"; };
-		6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FATCarver.swift; path = FATCarver.swift; sourceTree = "<group>"; };
-		6C1B11E2F3AF898154D08CA6 /* FakePrivilegedDiskReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FakePrivilegedDiskReader.swift; sourceTree = "<group>"; };
-		701C8C0145874A1017A1233A /* FATModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FATModels.swift; sourceTree = "<group>"; };
-		765344A29DF87B5DEA1EB788 /* APFSCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = APFSCarver.swift; path = Services/Carvers/APFSCarver.swift; sourceTree = "<group>"; };
-		79DB19E6CFA8AE3C81367F05 /* DiskImageServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskImageServiceTests.swift; sourceTree = "<group>"; };
-		85684069117F459BA261B91B /* PermissionDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionDeniedView.swift; sourceTree = "<group>"; };
-		89CF8379179BDF91F511A062 /* VivacityTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VivacityTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A2E128C33742E42745F848C8 /* FragmentedVideoAssemblerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FragmentedVideoAssemblerTests.swift; path = VivacityTests/Carvers/FragmentedVideoAssemblerTests.swift; sourceTree = "<group>"; };
-		AA000010 /* VivacityApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VivacityApp.swift; sourceTree = "<group>"; };
-		AA000011 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		AA000012 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		AA000013 /* Vivacity.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vivacity.entitlements; sourceTree = "<group>"; };
-		AA000020 /* Vivacity.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vivacity.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AC2F873ABB177366AE8517A8 /* MP4Reconstructor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MP4Reconstructor.swift; path = Vivacity/Services/Carvers/MP4Reconstructor.swift; sourceTree = "<group>"; };
-		B0ADEBE5D623AB329A92699C /* ScanSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScanSession.swift; sourceTree = "<group>"; };
-		B74266AD38F504F3E25042FD /* MP4ReconstructorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MP4ReconstructorTests.swift; path = VivacityTests/Carvers/MP4ReconstructorTests.swift; sourceTree = "<group>"; };
-		BB000010 /* StorageDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDevice.swift; sourceTree = "<group>"; };
-		BB000011 /* DeviceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceService.swift; sourceTree = "<group>"; };
-		BB000012 /* DeviceSelectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionViewModel.swift; sourceTree = "<group>"; };
-		BB000013 /* DeviceSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionView.swift; sourceTree = "<group>"; };
-		BB000014 /* DeviceRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRow.swift; sourceTree = "<group>"; };
-		CB7249DFA6A6FA50A7404EB3 /* SessionManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionManagerTests.swift; sourceTree = "<group>"; };
-		CC000010 /* FileSignature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSignature.swift; sourceTree = "<group>"; };
-		CC000011 /* RecoverableFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoverableFile.swift; sourceTree = "<group>"; };
-		CC000012 /* FastScanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastScanService.swift; sourceTree = "<group>"; };
-		CC000013 /* DeepScanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepScanService.swift; sourceTree = "<group>"; };
-		CC000014 /* FileScanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileScanViewModel.swift; sourceTree = "<group>"; };
-		CC000015 /* FileScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileScanView.swift; sourceTree = "<group>"; };
-		CC000016 /* FileRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRow.swift; sourceTree = "<group>"; };
-		CC000017 /* FilePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreviewView.swift; sourceTree = "<group>"; };
-		CC38108B7516FEE3C928A42B /* CameraRecoveryService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CameraRecoveryService.swift; sourceTree = "<group>"; };
-		D39259AB1E971A197CF2563F /* VivacityUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VivacityUITests.swift; sourceTree = "<group>"; };
-		D72ED180F0AD92F957FD37E1 /* AppEnvironment.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
-		DD000010 /* VolumeInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeInfo.swift; sourceTree = "<group>"; };
-		DD000011 /* FATDirectoryScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FATDirectoryScanner.swift; sourceTree = "<group>"; };
-		DD000012 /* NTFSScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NTFSScanner.swift; sourceTree = "<group>"; };
-		DD000013 /* ExFATScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATScanner.swift; sourceTree = "<group>"; };
-		DD000014 /* EXIFDateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFDateExtractor.swift; sourceTree = "<group>"; };
-		F24A0007A1B2C3D4E5F60708 /* RecoveryDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryDestinationView.swift; sourceTree = "<group>"; };
-		F24A0003A1B2C3D4E5F60708 /* RecoveryDestinationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryDestinationViewModel.swift; sourceTree = "<group>"; };
-		F24A0004A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecoveryDestinationViewModelTests.swift; sourceTree = "<group>"; };
-		F24A0012A1B2C3D4E5F60708 /* FileRecoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRecoveryService.swift; sourceTree = "<group>"; };
-		F24A0013A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileRecoveryServiceTests.swift; sourceTree = "<group>"; };
-		F24A0002A1B2C3D4E5F60708 /* FileFooterDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileFooterDetector.swift; sourceTree = "<group>"; };
-		E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartitionSearchServiceTests.swift; sourceTree = "<group>"; };
-		E5FDF8909316E71A2C41052F /* DiskImageService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiskImageService.swift; sourceTree = "<group>"; };
-		E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LivePreviewService.swift; sourceTree = "<group>"; };
-		EE000010 /* PrivilegedDiskReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReader.swift; sourceTree = "<group>"; };
-		F90DAE936670A0F95A138FD9 /* DeepScanServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeepScanServiceTests.swift; sourceTree = "<group>"; };
-		F90DAE946670A0F95A138FD9 /* FastScanServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/FastScanServiceTests.swift; sourceTree = "<group>"; };
-		F90DAE956670A0F95A138FD9 /* FATDirectoryScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/FATDirectoryScannerTests.swift; sourceTree = "<group>"; };
-		F90DAE966670A0F95A138FD9 /* ExFATScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/ExFATScannerTests.swift; sourceTree = "<group>"; };
-		F90DAE976670A0F95A138FD9 /* NTFSScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/NTFSScannerTests.swift; sourceTree = "<group>"; };
-		F90DAE986670A0F95A138FD9 /* LivePreviewServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Services/LivePreviewServiceTests.swift; sourceTree = "<group>"; };
-		F90DAE996670A0F95A138FD9 /* ImageReconstructorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Carvers/ImageReconstructorTests.swift; sourceTree = "<group>"; };
-		F9AE38D76593EBF1B3F64048 /* CarverTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CarverTests.swift; sourceTree = "<group>"; };
+		04D47227FE40A9D3359873D7 /* LivePreviewServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePreviewServiceTests.swift; sourceTree = "<group>"; };
+		0938BB457C5B7EC36673B570 /* PartitionSearchServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartitionSearchServiceTests.swift; sourceTree = "<group>"; };
+		0AB19FD457E5D574B0C940BA /* DeviceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceService.swift; sourceTree = "<group>"; };
+		147E9D157D854956E181E709 /* FATModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FATModels.swift; sourceTree = "<group>"; };
+		14852AB7DED9C33B14908906 /* FileScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileScanView.swift; sourceTree = "<group>"; };
+		18227BFB530109ACDFC92F53 /* VivacityTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VivacityTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		188035211EA15281770871C3 /* CameraRecoveryServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraRecoveryServiceTests.swift; sourceTree = "<group>"; };
+		1945E20E8BA8053B6887B09C /* FileSignature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSignature.swift; sourceTree = "<group>"; };
+		1E918688D4F2028C641FAE18 /* DeviceRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRow.swift; sourceTree = "<group>"; };
+		24242E6231C18ABCF95AFB4E /* ScanSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSession.swift; sourceTree = "<group>"; };
+		2450B5276362C5741A3A8564 /* DeepScanServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepScanServiceTests.swift; sourceTree = "<group>"; };
+		26734D6609F8840799867BE5 /* RecoveryDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryDestinationView.swift; sourceTree = "<group>"; };
+		2A59845E81AECA12DC6FA63C /* MP4Reconstructor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MP4Reconstructor.swift; sourceTree = "<group>"; };
+		308D1FD7909AFFD68B30FEA7 /* NTFSScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NTFSScannerTests.swift; sourceTree = "<group>"; };
+		32EA9481366D101CD6BC3BF8 /* FakePrivilegedDiskReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FakePrivilegedDiskReader.swift; sourceTree = "<group>"; };
+		33B0B5AA1352FC217AF5620D /* PrivilegedDiskReading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReading.swift; sourceTree = "<group>"; };
+		35589341E290EB381B7786A9 /* APFSCarver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APFSCarver.swift; sourceTree = "<group>"; };
+		36ABDB24E87488F6364810AF /* CameraProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraProfile.swift; sourceTree = "<group>"; };
+		3856BA55D26D11EAAB760644 /* DiskImageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskImageService.swift; sourceTree = "<group>"; };
+		3D6181B986D79D12FBB4FA98 /* DiskImageServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskImageServiceTests.swift; sourceTree = "<group>"; };
+		3F82F7C404551CACAD46E9B4 /* FileFooterDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileFooterDetector.swift; sourceTree = "<group>"; };
+		40C80519E90FBDE89238C379 /* FileScanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileScanViewModel.swift; sourceTree = "<group>"; };
+		47DDDF1923CF4817747DF896 /* StorageDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageDevice.swift; sourceTree = "<group>"; };
+		49504C7E0FA3974CCFCC0532 /* CameraRecoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraRecoveryService.swift; sourceTree = "<group>"; };
+		4FF31BA6DD99ABA35A59EE60 /* PermissionDeniedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionDeniedView.swift; sourceTree = "<group>"; };
+		51CA98A2D11611B1D21DC9E4 /* ExFATScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATScanner.swift; sourceTree = "<group>"; };
+		56F8CA23D8B2E1CC4243DB63 /* ImageReconstructor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageReconstructor.swift; sourceTree = "<group>"; };
+		57A3C4EE79CD9CBA6438E9FC /* DeepScanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepScanService.swift; sourceTree = "<group>"; };
+		5A703308D82EE993CC2056AE /* RecoverableFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoverableFile.swift; sourceTree = "<group>"; };
+		5AA0A9A17B9FCF612FC6FE45 /* FastScanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastScanService.swift; sourceTree = "<group>"; };
+		5E437A0241805491AD65C7CC /* FATDirectoryScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FATDirectoryScannerTests.swift; sourceTree = "<group>"; };
+		6533E49B7DC688069A7A69F2 /* VivacityApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VivacityApp.swift; sourceTree = "<group>"; };
+		737C64196EDFE4E331A56C79 /* VivacityUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VivacityUITests.swift; sourceTree = "<group>"; };
+		7440B3EA13CCE7938E850E52 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		80134CC6A91C8B1CB704DCBF /* CarverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarverTests.swift; sourceTree = "<group>"; };
+		813F892753186505FE3AC38C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		831FC83A468C39590799E7EF /* NTFSScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NTFSScanner.swift; sourceTree = "<group>"; };
+		8D678616101D53E95D842ADF /* FragmentedVideoAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FragmentedVideoAssembler.swift; sourceTree = "<group>"; };
+		8E83C93B6F1D795F64064DE4 /* DeviceSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionView.swift; sourceTree = "<group>"; };
+		8EAAAC3174F2989415E764BF /* FileRecoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRecoveryService.swift; sourceTree = "<group>"; };
+		99776D01DC7BE0505962045B /* ImageReconstructorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageReconstructorTests.swift; sourceTree = "<group>"; };
+		A15764732492BC7548B89A6B /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
+		A85E7667F8D25F8F009CF4C2 /* FATDirectoryScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FATDirectoryScanner.swift; sourceTree = "<group>"; };
+		B7294EE81ECC026824472976 /* RecoveryDestinationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryDestinationViewModel.swift; sourceTree = "<group>"; };
+		BEBAA18557A524CC25001987 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		BEF16CD13AF31A261247DF14 /* Vivacity.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vivacity.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C013657BBAB37D35EFD9EA80 /* VolumeInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeInfo.swift; sourceTree = "<group>"; };
+		C4B3E7CE58D5A886D07B5FA3 /* FilePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePreviewView.swift; sourceTree = "<group>"; };
+		C743B5D3071301D629129F47 /* FileScanViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileScanViewModelTests.swift; sourceTree = "<group>"; };
+		C7F778D2D01BDD409132C6CD /* LivePreviewService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePreviewService.swift; sourceTree = "<group>"; };
+		CC87F8801F7960504E33CD79 /* SessionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManagerTests.swift; sourceTree = "<group>"; };
+		D3C35F606B23E71F2E9DF9C0 /* ExFATScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExFATScannerTests.swift; sourceTree = "<group>"; };
+		DD42EC837C789FF8548959AD /* VivacityUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VivacityUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0C32B6E22A21D6EBAFBEBE0 /* HFSPlusCarver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HFSPlusCarver.swift; sourceTree = "<group>"; };
+		E1A08941DFB93CBD65410D6F /* PrivilegedDiskReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedDiskReader.swift; sourceTree = "<group>"; };
+		E1F55BD3D7AD752F2A81C1E5 /* FATCarver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FATCarver.swift; sourceTree = "<group>"; };
+		E438495DF84FBF25DF0E80E0 /* DeviceSelectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSelectionViewModel.swift; sourceTree = "<group>"; };
+		E5493B363900AF1D70C560A7 /* FileRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRow.swift; sourceTree = "<group>"; };
+		EBA88F1F7CF265C2EE9B5A6A /* RecoveryDestinationViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryDestinationViewModelTests.swift; sourceTree = "<group>"; };
+		EDCA43942A279D02A5F642B1 /* EXIFDateExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EXIFDateExtractor.swift; sourceTree = "<group>"; };
+		EE9F0765F5F27901DA2F8F6C /* FragmentedVideoAssemblerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FragmentedVideoAssemblerTests.swift; sourceTree = "<group>"; };
+		F159A792417B453FEC784152 /* MP4ReconstructorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MP4ReconstructorTests.swift; sourceTree = "<group>"; };
+		F30B62B326803C1F2F157DC1 /* FileRecoveryServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileRecoveryServiceTests.swift; sourceTree = "<group>"; };
+		F328A66E93D9B636EB810EFF /* FastScanServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastScanServiceTests.swift; sourceTree = "<group>"; };
+		FEE98246DBDA27627B451AB2 /* PartitionSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartitionSearchService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
-/* Begin PBXFrameworksBuildPhase section */
-		35EEBB313288E101E61F568B /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				11A73B5D24096FBDF2C0A314 /* Foundation.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		42F2AFFFEB1A01635911B8B8 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				19FD47F9859C4CF27B0654BC /* Foundation.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		AA000030 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXFrameworksBuildPhase section */
-
 /* Begin PBXGroup section */
-		19D4E757967FF21B12DAF861 /* OS X */ = {
+		033E477F7BFED803B2CA1846 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				15DB3BE95DBA2A386AB785A3 /* Foundation.framework */,
-			);
-			name = "OS X";
-			sourceTree = "<group>";
-		};
-		4B8831F9E5697EB7B2BE3AF1 /* VivacityTests */ = {
-			isa = PBXGroup;
-			children = (
-				F9AE38D76593EBF1B3F64048 /* CarverTests.swift */,
-				6C1B11E2F3AF898154D08CA6 /* FakePrivilegedDiskReader.swift */,
-				31D64682A1FDC7E785D23022 /* FileScanViewModelTests.swift */,
-				E1399EEE9C59F294757C377F /* PartitionSearchServiceTests.swift */,
-				CB7249DFA6A6FA50A7404EB3 /* SessionManagerTests.swift */,
-				79DB19E6CFA8AE3C81367F05 /* DiskImageServiceTests.swift */,
-				2088029C926601913E5DF08C /* CameraRecoveryServiceTests.swift */,
-				F90DAE936670A0F95A138FD9 /* DeepScanServiceTests.swift */,
-				F90DAE946670A0F95A138FD9 /* FastScanServiceTests.swift */,
-				F90DAE956670A0F95A138FD9 /* FATDirectoryScannerTests.swift */,
-				F90DAE966670A0F95A138FD9 /* ExFATScannerTests.swift */,
-				F90DAE976670A0F95A138FD9 /* NTFSScannerTests.swift */,
-				F90DAE986670A0F95A138FD9 /* LivePreviewServiceTests.swift */,
-				F90DAE996670A0F95A138FD9 /* ImageReconstructorTests.swift */,
-				F24A0004A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift */,
-				F24A0013A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift */,
-			);
-			name = VivacityTests;
-			path = VivacityTests;
-			sourceTree = "<group>";
-		};
-		4E17F3DF75DC40B7EAFE150E /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				19D4E757967FF21B12DAF861 /* OS X */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		826BE228AF4543AB0EE096D4 /* Utilities */ = {
-			isa = PBXGroup;
-			children = (
-				D72ED180F0AD92F957FD37E1 /* AppEnvironment.swift */,
-			);
-			name = Utilities;
-			path = Utilities;
-			sourceTree = "<group>";
-		};
-		83BDDAE95B64992D5546B040 /* VivacityUITests */ = {
-			isa = PBXGroup;
-			children = (
-				D39259AB1E971A197CF2563F /* VivacityUITests.swift */,
-			);
-			name = VivacityUITests;
-			path = VivacityUITests;
-			sourceTree = "<group>";
-		};
-		AA000040 = {
-			isa = PBXGroup;
-			children = (
-				AA000041 /* Vivacity */,
-				AA000042 /* Products */,
-				4E17F3DF75DC40B7EAFE150E /* Frameworks */,
-				4B8831F9E5697EB7B2BE3AF1 /* VivacityTests */,
-				83BDDAE95B64992D5546B040 /* VivacityUITests */,
-				AC2F873ABB177366AE8517A8 /* MP4Reconstructor.swift */,
-				B74266AD38F504F3E25042FD /* MP4ReconstructorTests.swift */,
-				695CF217F55C97CD24D30DF3 /* FragmentedVideoAssembler.swift */,
-				A2E128C33742E42745F848C8 /* FragmentedVideoAssemblerTests.swift */,
-			);
-			sourceTree = "<group>";
-		};
-		AA000041 /* Vivacity */ = {
-			isa = PBXGroup;
-			children = (
-				AA000010 /* VivacityApp.swift */,
-				AA000011 /* ContentView.swift */,
-				BB000020 /* Models */,
-				BB000021 /* Services */,
-				BB000022 /* ViewModels */,
-				BB000023 /* Views */,
-				AA000012 /* Assets.xcassets */,
-				AA000013 /* Vivacity.entitlements */,
-				765344A29DF87B5DEA1EB788 /* APFSCarver.swift */,
-				6026EEDF75109041E356905B /* HFSPlusCarver.swift */,
-				826BE228AF4543AB0EE096D4 /* Utilities */,
-			);
-			path = Vivacity;
-			sourceTree = "<group>";
-		};
-		AA000042 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				AA000020 /* Vivacity.app */,
-				89CF8379179BDF91F511A062 /* VivacityTests.xctest */,
-				2BE52ADF7980CA375B770CE3 /* VivacityUITests.xctest */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		ABF74D4EC834328576E9A7E6 /* Carvers */ = {
-			isa = PBXGroup;
-			children = (
-				6BA5D8A0D0DEBB96D730E340 /* FATCarver.swift */,
-				22FFE5F19FEE9CB04CF674F2 /* ImageReconstructor.swift */,
-			);
-			name = Carvers;
-			path = Carvers;
-			sourceTree = "<group>";
-		};
-		BB000020 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				BB000010 /* StorageDevice.swift */,
-				CC000010 /* FileSignature.swift */,
-				CC000011 /* RecoverableFile.swift */,
-				DD000010 /* VolumeInfo.swift */,
-				701C8C0145874A1017A1233A /* FATModels.swift */,
-				B0ADEBE5D623AB329A92699C /* ScanSession.swift */,
-				3A1B19E38146320E5D70329E /* CameraProfile.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		BB000021 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				BB000011 /* DeviceService.swift */,
-				CC000012 /* FastScanService.swift */,
-				CC000013 /* DeepScanService.swift */,
-				F24A0002A1B2C3D4E5F60708 /* FileFooterDetector.swift */,
-				DD000011 /* FATDirectoryScanner.swift */,
-				DD000014 /* EXIFDateExtractor.swift */,
-				DD000012 /* NTFSScanner.swift */,
-				DD000013 /* ExFATScanner.swift */,
-				EE000010 /* PrivilegedDiskReader.swift */,
-				ABF74D4EC834328576E9A7E6 /* Carvers */,
-				5F72C99CDB009F0B10499058 /* PrivilegedDiskReading.swift */,
-				05A02025A207FE742FDDB8D8 /* PartitionSearchService.swift */,
-				31C080987ACA5FEDE7E26580 /* SessionManager.swift */,
-				E5FDF8909316E71A2C41052F /* DiskImageService.swift */,
-				CC38108B7516FEE3C928A42B /* CameraRecoveryService.swift */,
-				F24A0012A1B2C3D4E5F60708 /* FileRecoveryService.swift */,
-				E83B03580CCB5DAB84A5FB5C /* LivePreviewService.swift */,
+				D3C35F606B23E71F2E9DF9C0 /* ExFATScannerTests.swift */,
+				F328A66E93D9B636EB810EFF /* FastScanServiceTests.swift */,
+				5E437A0241805491AD65C7CC /* FATDirectoryScannerTests.swift */,
+				04D47227FE40A9D3359873D7 /* LivePreviewServiceTests.swift */,
+				308D1FD7909AFFD68B30FEA7 /* NTFSScannerTests.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
 		};
-		BB000022 /* ViewModels */ = {
+		08150CA941515D9522625D1E /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
-				BB000012 /* DeviceSelectionViewModel.swift */,
-				CC000014 /* FileScanViewModel.swift */,
-				F24A0003A1B2C3D4E5F60708 /* RecoveryDestinationViewModel.swift */,
+				BEBAA18557A524CC25001987 /* AppEnvironment.swift */,
 			);
-			path = ViewModels;
+			path = Utilities;
 			sourceTree = "<group>";
 		};
-		BB000023 /* Views */ = {
+		0C55ED4D1E139826EB9437D4 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				BB000024 /* DeviceSelection */,
-				CC000020 /* FileScan */,
-				F24A0009A1B2C3D4E5F60708 /* RecoveryDestination */,
+				3B58A625825440B6FF2CA65A /* DeviceSelection */,
+				CAAB180357135AA9FAE9C53B /* FileScan */,
+				852AA6463DEBAA07A5CEE8A1 /* RecoveryDestination */,
 			);
 			path = Views;
 			sourceTree = "<group>";
 		};
-		BB000024 /* DeviceSelection */ = {
+		3B58A625825440B6FF2CA65A /* DeviceSelection */ = {
 			isa = PBXGroup;
 			children = (
-				BB000013 /* DeviceSelectionView.swift */,
-				BB000014 /* DeviceRow.swift */,
+				1E918688D4F2028C641FAE18 /* DeviceRow.swift */,
+				8E83C93B6F1D795F64064DE4 /* DeviceSelectionView.swift */,
 			);
 			path = DeviceSelection;
 			sourceTree = "<group>";
 		};
-		CC000020 /* FileScan */ = {
+		4BC1401259B5E9A408D51FD6 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				CC000015 /* FileScanView.swift */,
-				CC000017 /* FilePreviewView.swift */,
-				CC000016 /* FileRow.swift */,
-				85684069117F459BA261B91B /* PermissionDeniedView.swift */,
+				BEF16CD13AF31A261247DF14 /* Vivacity.app */,
+				18227BFB530109ACDFC92F53 /* VivacityTests.xctest */,
+				DD42EC837C789FF8548959AD /* VivacityUITests.xctest */,
 			);
-			path = FileScan;
+			name = Products;
 			sourceTree = "<group>";
 		};
-		F24A0009A1B2C3D4E5F60708 /* RecoveryDestination */ = {
+		4E81AA7F18029FC4BFD36682 /* Carvers */ = {
 			isa = PBXGroup;
 			children = (
-				F24A0007A1B2C3D4E5F60708 /* RecoveryDestinationView.swift */,
+				EE9F0765F5F27901DA2F8F6C /* FragmentedVideoAssemblerTests.swift */,
+				99776D01DC7BE0505962045B /* ImageReconstructorTests.swift */,
+				F159A792417B453FEC784152 /* MP4ReconstructorTests.swift */,
+			);
+			path = Carvers;
+			sourceTree = "<group>";
+		};
+		6F7295E2124C1E5A89A9E831 /* Vivacity */ = {
+			isa = PBXGroup;
+			children = (
+				813F892753186505FE3AC38C /* Assets.xcassets */,
+				7440B3EA13CCE7938E850E52 /* ContentView.swift */,
+				6533E49B7DC688069A7A69F2 /* VivacityApp.swift */,
+				78946D76236B6D775CD19A52 /* Models */,
+				B772995E45170C65A665A535 /* Services */,
+				08150CA941515D9522625D1E /* Utilities */,
+				AF7DBFC6D18122D2DFBD747D /* ViewModels */,
+				0C55ED4D1E139826EB9437D4 /* Views */,
+			);
+			path = Vivacity;
+			sourceTree = "<group>";
+		};
+		78946D76236B6D775CD19A52 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				36ABDB24E87488F6364810AF /* CameraProfile.swift */,
+				147E9D157D854956E181E709 /* FATModels.swift */,
+				1945E20E8BA8053B6887B09C /* FileSignature.swift */,
+				5A703308D82EE993CC2056AE /* RecoverableFile.swift */,
+				24242E6231C18ABCF95AFB4E /* ScanSession.swift */,
+				47DDDF1923CF4817747DF896 /* StorageDevice.swift */,
+				C013657BBAB37D35EFD9EA80 /* VolumeInfo.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		7CF3B5D299AC0C4AA62EE234 /* VivacityUITests */ = {
+			isa = PBXGroup;
+			children = (
+				737C64196EDFE4E331A56C79 /* VivacityUITests.swift */,
+			);
+			path = VivacityUITests;
+			sourceTree = "<group>";
+		};
+		852AA6463DEBAA07A5CEE8A1 /* RecoveryDestination */ = {
+			isa = PBXGroup;
+			children = (
+				26734D6609F8840799867BE5 /* RecoveryDestinationView.swift */,
 			);
 			path = RecoveryDestination;
+			sourceTree = "<group>";
+		};
+		96BC7E72CD536AFD18C77A4A = {
+			isa = PBXGroup;
+			children = (
+				6F7295E2124C1E5A89A9E831 /* Vivacity */,
+				A9928E11A8A90E5297C40C2C /* VivacityTests */,
+				7CF3B5D299AC0C4AA62EE234 /* VivacityUITests */,
+				4BC1401259B5E9A408D51FD6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A9928E11A8A90E5297C40C2C /* VivacityTests */ = {
+			isa = PBXGroup;
+			children = (
+				188035211EA15281770871C3 /* CameraRecoveryServiceTests.swift */,
+				80134CC6A91C8B1CB704DCBF /* CarverTests.swift */,
+				2450B5276362C5741A3A8564 /* DeepScanServiceTests.swift */,
+				3D6181B986D79D12FBB4FA98 /* DiskImageServiceTests.swift */,
+				32EA9481366D101CD6BC3BF8 /* FakePrivilegedDiskReader.swift */,
+				F30B62B326803C1F2F157DC1 /* FileRecoveryServiceTests.swift */,
+				C743B5D3071301D629129F47 /* FileScanViewModelTests.swift */,
+				0938BB457C5B7EC36673B570 /* PartitionSearchServiceTests.swift */,
+				EBA88F1F7CF265C2EE9B5A6A /* RecoveryDestinationViewModelTests.swift */,
+				CC87F8801F7960504E33CD79 /* SessionManagerTests.swift */,
+				4E81AA7F18029FC4BFD36682 /* Carvers */,
+				033E477F7BFED803B2CA1846 /* Services */,
+			);
+			path = VivacityTests;
+			sourceTree = "<group>";
+		};
+		AF7DBFC6D18122D2DFBD747D /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				E438495DF84FBF25DF0E80E0 /* DeviceSelectionViewModel.swift */,
+				40C80519E90FBDE89238C379 /* FileScanViewModel.swift */,
+				B7294EE81ECC026824472976 /* RecoveryDestinationViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		B263E397E0EFE2BE7D5354B6 /* Carvers */ = {
+			isa = PBXGroup;
+			children = (
+				35589341E290EB381B7786A9 /* APFSCarver.swift */,
+				E1F55BD3D7AD752F2A81C1E5 /* FATCarver.swift */,
+				8D678616101D53E95D842ADF /* FragmentedVideoAssembler.swift */,
+				E0C32B6E22A21D6EBAFBEBE0 /* HFSPlusCarver.swift */,
+				56F8CA23D8B2E1CC4243DB63 /* ImageReconstructor.swift */,
+				2A59845E81AECA12DC6FA63C /* MP4Reconstructor.swift */,
+			);
+			path = Carvers;
+			sourceTree = "<group>";
+		};
+		B772995E45170C65A665A535 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				49504C7E0FA3974CCFCC0532 /* CameraRecoveryService.swift */,
+				57A3C4EE79CD9CBA6438E9FC /* DeepScanService.swift */,
+				0AB19FD457E5D574B0C940BA /* DeviceService.swift */,
+				3856BA55D26D11EAAB760644 /* DiskImageService.swift */,
+				51CA98A2D11611B1D21DC9E4 /* ExFATScanner.swift */,
+				EDCA43942A279D02A5F642B1 /* EXIFDateExtractor.swift */,
+				5AA0A9A17B9FCF612FC6FE45 /* FastScanService.swift */,
+				A85E7667F8D25F8F009CF4C2 /* FATDirectoryScanner.swift */,
+				3F82F7C404551CACAD46E9B4 /* FileFooterDetector.swift */,
+				8EAAAC3174F2989415E764BF /* FileRecoveryService.swift */,
+				C7F778D2D01BDD409132C6CD /* LivePreviewService.swift */,
+				831FC83A468C39590799E7EF /* NTFSScanner.swift */,
+				FEE98246DBDA27627B451AB2 /* PartitionSearchService.swift */,
+				E1A08941DFB93CBD65410D6F /* PrivilegedDiskReader.swift */,
+				33B0B5AA1352FC217AF5620D /* PrivilegedDiskReading.swift */,
+				A15764732492BC7548B89A6B /* SessionManager.swift */,
+				B263E397E0EFE2BE7D5354B6 /* Carvers */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		CAAB180357135AA9FAE9C53B /* FileScan */ = {
+			isa = PBXGroup;
+			children = (
+				C4B3E7CE58D5A886D07B5FA3 /* FilePreviewView.swift */,
+				E5493B363900AF1D70C560A7 /* FileRow.swift */,
+				14852AB7DED9C33B14908906 /* FileScanView.swift */,
+				4FF31BA6DD99ABA35A59EE60 /* PermissionDeniedView.swift */,
+			);
+			path = FileScan;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		69F4E17C7B971D23F9BC3B5C /* VivacityUITests */ = {
+		54C0CCFC1155687A093D8E23 /* VivacityUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 9FA87E585651311208FBD9D9 /* Build configuration list for PBXNativeTarget "VivacityUITests" */;
+			buildConfigurationList = DFA2A97A8A1A3E36B4F8B2A8 /* Build configuration list for PBXNativeTarget "VivacityUITests" */;
 			buildPhases = (
-				D77CF9CAFCD520A6931FCF87 /* Sources */,
-				35EEBB313288E101E61F568B /* Frameworks */,
-				6ABC5419EDF6D7AD0AC216CE /* Resources */,
+				079A267CACCD6EDC6EB225C3 /* Sources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				8F0E98F36BC8240D5B852A8A /* PBXTargetDependency */,
+				5EB76CF04ED06D495C5C5D04 /* PBXTargetDependency */,
 			);
 			name = VivacityUITests;
+			packageProductDependencies = (
+			);
 			productName = VivacityUITests;
-			productReference = 2BE52ADF7980CA375B770CE3 /* VivacityUITests.xctest */;
+			productReference = DD42EC837C789FF8548959AD /* VivacityUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
-		AA000050 /* Vivacity */ = {
+		BEF52493ED46F1397A69AFCD /* Vivacity */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AA000070 /* Build configuration list for PBXNativeTarget "Vivacity" */;
+			buildConfigurationList = D43022E2D0C37D196888803E /* Build configuration list for PBXNativeTarget "Vivacity" */;
 			buildPhases = (
-				AA000051 /* Sources */,
-				AA000030 /* Frameworks */,
-				AA000052 /* Resources */,
-				B1B3784DA8232F470F85A39D /* SwiftLint */,
+				F1A53DC743FF4EF79E897315 /* SwiftLint */,
+				E3013980D5B9CE0C3DECF91D /* Sources */,
+				80F332F04D682E0EE955559F /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			name = Vivacity;
+			packageProductDependencies = (
+			);
 			productName = Vivacity;
-			productReference = AA000020 /* Vivacity.app */;
+			productReference = BEF16CD13AF31A261247DF14 /* Vivacity.app */;
 			productType = "com.apple.product-type.application";
 		};
-		E504D5F17D16B013A99BC2D8 /* VivacityTests */ = {
+		C00ECE2FF40ABDF3D6E1E4C6 /* VivacityTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2B4E40396DA6077C4F6C16BA /* Build configuration list for PBXNativeTarget "VivacityTests" */;
+			buildConfigurationList = 1B9864FEB6EE3CFF0961A59B /* Build configuration list for PBXNativeTarget "VivacityTests" */;
 			buildPhases = (
-				7D6ABD40B2D7694155FB1FFC /* Sources */,
-				42F2AFFFEB1A01635911B8B8 /* Frameworks */,
-				640182B0D3262A6EA170038C /* Resources */,
+				1FF39EB194793558FAB81F12 /* Sources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				A7CC635059984AE2B71E8ABE /* PBXTargetDependency */,
+				D06ACF1B5E881065D30AF2EC /* PBXTargetDependency */,
 			);
 			name = VivacityTests;
+			packageProductDependencies = (
+			);
 			productName = VivacityTests;
-			productReference = 89CF8379179BDF91F511A062 /* VivacityTests.xctest */;
+			productReference = 18227BFB530109ACDFC92F53 /* VivacityTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		AA000060 /* Project object */ = {
+		3340BCC9F4AC22F94A50B57E /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1500;
-				LastUpgradeCheck = 1500;
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
-					69F4E17C7B971D23F9BC3B5C = {
-						TestTargetID = AA000050;
-					};
-					AA000050 = {
-						CreatedOnToolsVersion = 15.0;
-					};
-					E504D5F17D16B013A99BC2D8 = {
-						TestTargetID = AA000050;
+					54C0CCFC1155687A093D8E23 = {
+						TestTargetID = BEF52493ED46F1397A69AFCD;
 					};
 				};
 			};
-			buildConfigurationList = AA000080 /* Build configuration list for PBXProject "Vivacity" */;
+			buildConfigurationList = 3B344E4F2E9622ADEBF2A310 /* Build configuration list for PBXProject "Vivacity" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				en,
 				Base,
+				en,
 			);
-			mainGroup = AA000040;
-			productRefGroup = AA000042 /* Products */;
+			mainGroup = 96BC7E72CD536AFD18C77A4A;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				AA000050 /* Vivacity */,
-				E504D5F17D16B013A99BC2D8 /* VivacityTests */,
-				69F4E17C7B971D23F9BC3B5C /* VivacityUITests */,
+				BEF52493ED46F1397A69AFCD /* Vivacity */,
+				C00ECE2FF40ABDF3D6E1E4C6 /* VivacityTests */,
+				54C0CCFC1155687A093D8E23 /* VivacityUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		640182B0D3262A6EA170038C /* Resources */ = {
+		80F332F04D682E0EE955559F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		6ABC5419EDF6D7AD0AC216CE /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		AA000052 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				AA000003 /* Assets.xcassets in Resources */,
+				90ADCF266A4922BF51B28BCE /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		B1B3784DA8232F470F85A39D /* SwiftLint */ = {
+		F1A53DC743FF4EF79E897315 /* SwiftLint */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -530,190 +475,112 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		7D6ABD40B2D7694155FB1FFC /* Sources */ = {
+		079A267CACCD6EDC6EB225C3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1B40A2766C311C7E9959F1C4 /* CarverTests.swift in Sources */,
-				C20F471C0D5544F7E17D075F /* FakePrivilegedDiskReader.swift in Sources */,
-				AF9D9F74FA517ECD01D20E30 /* FileScanViewModelTests.swift in Sources */,
-				01CA7678C5E49342FBEC6DD7 /* PartitionSearchServiceTests.swift in Sources */,
-				F868D76B41326B7A26617210 /* SessionManagerTests.swift in Sources */,
-				04C55D61D29BEF9F556574FD /* DiskImageServiceTests.swift in Sources */,
-				0027AA19C3AB3E9374D21AEF /* CameraRecoveryServiceTests.swift in Sources */,
-				AB3C1FD4C53D84A23AC4FEA5 /* DeepScanServiceTests.swift in Sources */,
-				AB3C1FD5C53D84A23AC4FEA5 /* FastScanServiceTests.swift in Sources */,
-				AB3C1FD6C53D84A23AC4FEA5 /* FATDirectoryScannerTests.swift in Sources */,
-				AB3C1FD7C53D84A23AC4FEA5 /* ExFATScannerTests.swift in Sources */,
-				AB3C1FD8C53D84A23AC4FEA5 /* NTFSScannerTests.swift in Sources */,
-				AB3C1FD9C53D84A23AC4FEA5 /* LivePreviewServiceTests.swift in Sources */,
-				AB3C1FDAC53D84A23AC4FEA5 /* ImageReconstructorTests.swift in Sources */,
-				F24A0006A1B2C3D4E5F60708 /* RecoveryDestinationViewModelTests.swift in Sources */,
-				F24A0011A1B2C3D4E5F60708 /* FileRecoveryServiceTests.swift in Sources */,
-				1993DD545BDE507AFC084D7A /* MP4ReconstructorTests.swift in Sources */,
-				8EB1D4218FEFD91EF71B930F /* FragmentedVideoAssemblerTests.swift in Sources */,
+				F90C6BA0B2A199C6EE4ED01A /* VivacityUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA000051 /* Sources */ = {
+		1FF39EB194793558FAB81F12 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA000001 /* VivacityApp.swift in Sources */,
-				AA000002 /* ContentView.swift in Sources */,
-				BB000001 /* StorageDevice.swift in Sources */,
-				BB000002 /* DeviceService.swift in Sources */,
-				BB000003 /* DeviceSelectionViewModel.swift in Sources */,
-				BB000004 /* DeviceSelectionView.swift in Sources */,
-				BB000005 /* DeviceRow.swift in Sources */,
-				CC000001 /* FileSignature.swift in Sources */,
-				CC000002 /* RecoverableFile.swift in Sources */,
-				CC000003 /* FastScanService.swift in Sources */,
-				CC000004 /* DeepScanService.swift in Sources */,
-				F24A0001A1B2C3D4E5F60708 /* FileFooterDetector.swift in Sources */,
-				CC000005 /* FileScanViewModel.swift in Sources */,
-				F24A0005A1B2C3D4E5F60708 /* RecoveryDestinationViewModel.swift in Sources */,
-				CC000006 /* FileScanView.swift in Sources */,
-				F24A0008A1B2C3D4E5F60708 /* RecoveryDestinationView.swift in Sources */,
-				CC000008 /* FilePreviewView.swift in Sources */,
-				CC000007 /* FileRow.swift in Sources */,
-				DD000001 /* VolumeInfo.swift in Sources */,
-				DD000002 /* FATDirectoryScanner.swift in Sources */,
-				DD000005 /* EXIFDateExtractor.swift in Sources */,
-				DD000003 /* NTFSScanner.swift in Sources */,
-				DD000004 /* ExFATScanner.swift in Sources */,
-				EE000001 /* PrivilegedDiskReader.swift in Sources */,
-				BF9DF821A5074909AFDC5BD8 /* PermissionDeniedView.swift in Sources */,
-				53042BE3A8A7C4D7E26D1653 /* FATModels.swift in Sources */,
-				18DDB8736E8D384F2B052EFA /* FATCarver.swift in Sources */,
-				AF85BE679C9148F5B87783B6 /* APFSCarver.swift in Sources */,
-				8196911B4649ACD2E9ABFC82 /* HFSPlusCarver.swift in Sources */,
-				49971FA5A658E089F0216CB2 /* PrivilegedDiskReading.swift in Sources */,
-				702BC9CC6922EABB684E6289 /* AppEnvironment.swift in Sources */,
-				0465723FD557A47A36FFB4AF /* PartitionSearchService.swift in Sources */,
-				C9D70560A62EA3B78A99B80A /* ScanSession.swift in Sources */,
-				BD297BEA662DAFEF20262A63 /* SessionManager.swift in Sources */,
-				C3DAFCD9A0FDF3E1CC6C39D1 /* DiskImageService.swift in Sources */,
-				C73D1495CC9C62142296BF35 /* CameraProfile.swift in Sources */,
-				239EFD18DDF58EAB29C74CBA /* CameraRecoveryService.swift in Sources */,
-				F24A0010A1B2C3D4E5F60708 /* FileRecoveryService.swift in Sources */,
-				C53E93D12892ED1C6F64FDD8 /* MP4Reconstructor.swift in Sources */,
-				D980A369EB18B4CA88551E40 /* FragmentedVideoAssembler.swift in Sources */,
-				7A262EA9E3725DD7AA12E5CE /* ImageReconstructor.swift in Sources */,
-				DEBE1D2B6A956E1C67765455 /* LivePreviewService.swift in Sources */,
+				F4FC8612E092BE27D16C4CF9 /* CameraRecoveryServiceTests.swift in Sources */,
+				3F2B58EC0753290F6EF7D672 /* CarverTests.swift in Sources */,
+				3C0F3AF8694F9CF2C86233FA /* DeepScanServiceTests.swift in Sources */,
+				0D024DE5C9BE18F37CC324FB /* DiskImageServiceTests.swift in Sources */,
+				505E98525DAC2611DCD6ABC9 /* ExFATScannerTests.swift in Sources */,
+				1C52BC48EDF23A77F9D59AD1 /* FATDirectoryScannerTests.swift in Sources */,
+				C01A1DEFA19003CE68313A24 /* FakePrivilegedDiskReader.swift in Sources */,
+				E37320DC60A55C997C57F29F /* FastScanServiceTests.swift in Sources */,
+				AA2682061279386E0DE9E844 /* FileRecoveryServiceTests.swift in Sources */,
+				5AF2F324C0E3C39E41BB035D /* FileScanViewModelTests.swift in Sources */,
+				3D0916B36C3729CE03391262 /* FragmentedVideoAssemblerTests.swift in Sources */,
+				D2C851A3DCE068A2F499EEA7 /* ImageReconstructorTests.swift in Sources */,
+				82FE3AA9D396AF34053C302D /* LivePreviewServiceTests.swift in Sources */,
+				E33DD69245EBDC574B61C7D1 /* MP4ReconstructorTests.swift in Sources */,
+				C72E56A5B276A94350B5305A /* NTFSScannerTests.swift in Sources */,
+				AC518D2E85AAF57ECF7D54F0 /* PartitionSearchServiceTests.swift in Sources */,
+				E620E61C0A86029781320113 /* RecoveryDestinationViewModelTests.swift in Sources */,
+				65DF8D6F94C2E95104B6CC35 /* SessionManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		D77CF9CAFCD520A6931FCF87 /* Sources */ = {
+		E3013980D5B9CE0C3DECF91D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AE6AAF9F4E9B6DBFEE5A8A64 /* VivacityUITests.swift in Sources */,
+				620E9B53A9A33B0B758A4EA2 /* APFSCarver.swift in Sources */,
+				077A51E17D05FE7ECF5E5319 /* AppEnvironment.swift in Sources */,
+				D2AA554B09B80A92FA955699 /* CameraProfile.swift in Sources */,
+				9DAA1D7937850B64857CE3D6 /* CameraRecoveryService.swift in Sources */,
+				06058B0CCD28359644C30B40 /* ContentView.swift in Sources */,
+				2148DC54C9E64686933B6BDA /* DeepScanService.swift in Sources */,
+				D4479992C89F5F39F53D70AF /* DeviceRow.swift in Sources */,
+				4D379CD5745376C750B82D4D /* DeviceSelectionView.swift in Sources */,
+				0CF30080EDD11D61C3C17999 /* DeviceSelectionViewModel.swift in Sources */,
+				F403E78ECD2996000F3D4E28 /* DeviceService.swift in Sources */,
+				C362E67B3C40C3C56D8C967C /* DiskImageService.swift in Sources */,
+				E91CB9C3A20A40FA2B92E1E4 /* EXIFDateExtractor.swift in Sources */,
+				D85861E815D6EF7AF08F1255 /* ExFATScanner.swift in Sources */,
+				3C2EDAFBD340B305A7EAA95D /* FATCarver.swift in Sources */,
+				5059248ADC0B93DD4CF25089 /* FATDirectoryScanner.swift in Sources */,
+				B09F3FE39A46053B770371D4 /* FATModels.swift in Sources */,
+				B3DEE11310570E526AC4FF71 /* FastScanService.swift in Sources */,
+				F4317D7E523A05AFA39327E4 /* FileFooterDetector.swift in Sources */,
+				5D930053FCEA04ACFC6218C8 /* FilePreviewView.swift in Sources */,
+				9B13E0E0351DC880554E363B /* FileRecoveryService.swift in Sources */,
+				11CAFCEB273970561391B100 /* FileRow.swift in Sources */,
+				1BB2289F9DC3F580906419CD /* FileScanView.swift in Sources */,
+				58A5E2C4D810CB8724BAF916 /* FileScanViewModel.swift in Sources */,
+				99FDB593D0F035BFC7D99F48 /* FileSignature.swift in Sources */,
+				AA71CE302C1F5E41C39346BC /* FragmentedVideoAssembler.swift in Sources */,
+				2F0D0F45F1A4CBAC0394E70F /* HFSPlusCarver.swift in Sources */,
+				CC63020F3592BB3E3B003D98 /* ImageReconstructor.swift in Sources */,
+				03A99E3159E4EDB20C010DB2 /* LivePreviewService.swift in Sources */,
+				859C7C30E2EBA34F0DAEB6FE /* MP4Reconstructor.swift in Sources */,
+				D0FB6B25B26231CD99094656 /* NTFSScanner.swift in Sources */,
+				00931C01885F0F6958E83677 /* PartitionSearchService.swift in Sources */,
+				81BD73D2EDC959AD2A6ABEC4 /* PermissionDeniedView.swift in Sources */,
+				104CEB2634E1AA065DF610F5 /* PrivilegedDiskReader.swift in Sources */,
+				B064934E4833CC896249EF08 /* PrivilegedDiskReading.swift in Sources */,
+				367E9FE7B65042D7D57FBF56 /* RecoverableFile.swift in Sources */,
+				74082CAD78D63C4D06E31A38 /* RecoveryDestinationView.swift in Sources */,
+				F1CAB5A0B0D48514F9497299 /* RecoveryDestinationViewModel.swift in Sources */,
+				8321203437AFB541AFAE30F0 /* ScanSession.swift in Sources */,
+				11652FFD851388C39A5211FC /* SessionManager.swift in Sources */,
+				CCDC94EFA27610887A07ECB7 /* StorageDevice.swift in Sources */,
+				A01970202BB5192A4F3A5D8A /* VivacityApp.swift in Sources */,
+				F9792417A52D1B8C92977143 /* VolumeInfo.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		8F0E98F36BC8240D5B852A8A /* PBXTargetDependency */ = {
+		5EB76CF04ED06D495C5C5D04 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			name = Vivacity;
-			target = AA000050 /* Vivacity */;
-			targetProxy = 4E4E5891858AEC2B439A704B /* PBXContainerItemProxy */;
+			target = BEF52493ED46F1397A69AFCD /* Vivacity */;
+			targetProxy = 07F87DCCC18620DD0B3F366D /* PBXContainerItemProxy */;
 		};
-		A7CC635059984AE2B71E8ABE /* PBXTargetDependency */ = {
+		D06ACF1B5E881065D30AF2EC /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			name = Vivacity;
-			target = AA000050 /* Vivacity */;
-			targetProxy = 236BBA76DDE9DD64841B5309 /* PBXContainerItemProxy */;
+			target = BEF52493ED46F1397A69AFCD /* Vivacity */;
+			targetProxy = E2596597E3878067FE7C8C15 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		129EC1D6D56B55B4BA3F6307 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_MODULE_NAME = VivacityTests;
-				PRODUCT_NAME = VivacityTests;
-				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vivacity.app/Contents/MacOS/Vivacity";
-				TEST_TARGET_NAME = Vivacity;
-			};
-			name = Release;
-		};
-		489EEA321F644B7D67970D19 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_MODULE_NAME = VivacityUITests;
-				PRODUCT_NAME = VivacityUITests;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = Vivacity;
-			};
-			name = Release;
-		};
-		AA000071 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Vivacity/Vivacity.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.joao.Vivacity;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		AA000072 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Vivacity/Vivacity.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.joao.Vivacity;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
-		AA000081 /* Debug */ = {
+		230648499FBD8DEE35771443 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
@@ -743,14 +610,13 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
-					"DEBUG=1",
 					"$(inherited)",
+					"DEBUG=1",
 				);
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
@@ -758,24 +624,81 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
-		AA000082 /* Release */ = {
+		3BA9C42F9387FECC5BF1141B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.joao.VivacityTests;
+				PRODUCT_NAME = VivacityTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vivacity.app/Contents/MacOS/Vivacity";
+			};
+			name = Release;
+		};
+		426F9981B61EEDCD58E75B71 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Vivacity/Vivacity.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joao.Vivacity;
+				PRODUCT_NAME = Vivacity;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Debug;
+		};
+		563A207CEA59ECAB2B3BEC02 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.joao.VivacityUITests;
+				PRODUCT_NAME = VivacityUITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = Vivacity;
+			};
+			name = Debug;
+		};
+		C2AD05B0172D921124C929CB /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
@@ -805,8 +728,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
@@ -814,80 +736,112 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
-		CD893EDD8EC8AA5EE46D2AAD /* Debug */ = {
+		C7512D96AB02137074076F7E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_MODULE_NAME = VivacityTests;
-				PRODUCT_NAME = VivacityTests;
-				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vivacity.app/Contents/MacOS/Vivacity";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.joao.VivacityUITests;
+				PRODUCT_NAME = VivacityUITests;
+				SDKROOT = macosx;
 				TEST_TARGET_NAME = Vivacity;
 			};
-			name = Debug;
+			name = Release;
 		};
-		D4D12D8F0A70C46940E8D56A /* Debug */ = {
+		EF3E9C0BDCF304D70B1ADF6F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_MODULE_NAME = VivacityUITests;
-				PRODUCT_NAME = VivacityUITests;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = Vivacity;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Vivacity/Vivacity.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joao.Vivacity;
+				PRODUCT_NAME = Vivacity;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
+		FAB0E0FBA3C3187068678A89 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.joao.VivacityTests;
+				PRODUCT_NAME = VivacityTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vivacity.app/Contents/MacOS/Vivacity";
 			};
 			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2B4E40396DA6077C4F6C16BA /* Build configuration list for PBXNativeTarget "VivacityTests" */ = {
+		1B9864FEB6EE3CFF0961A59B /* Build configuration list for PBXNativeTarget "VivacityTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				129EC1D6D56B55B4BA3F6307 /* Release */,
-				CD893EDD8EC8AA5EE46D2AAD /* Debug */,
+				FAB0E0FBA3C3187068678A89 /* Debug */,
+				3BA9C42F9387FECC5BF1141B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
-		9FA87E585651311208FBD9D9 /* Build configuration list for PBXNativeTarget "VivacityUITests" */ = {
+		3B344E4F2E9622ADEBF2A310 /* Build configuration list for PBXProject "Vivacity" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				489EEA321F644B7D67970D19 /* Release */,
-				D4D12D8F0A70C46940E8D56A /* Debug */,
+				230648499FBD8DEE35771443 /* Debug */,
+				C2AD05B0172D921124C929CB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
-		AA000070 /* Build configuration list for PBXNativeTarget "Vivacity" */ = {
+		D43022E2D0C37D196888803E /* Build configuration list for PBXNativeTarget "Vivacity" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				AA000071 /* Debug */,
-				AA000072 /* Release */,
+				426F9981B61EEDCD58E75B71 /* Debug */,
+				EF3E9C0BDCF304D70B1ADF6F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
-		AA000080 /* Build configuration list for PBXProject "Vivacity" */ = {
+		DFA2A97A8A1A3E36B4F8B2A8 /* Build configuration list for PBXNativeTarget "VivacityUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				AA000081 /* Debug */,
-				AA000082 /* Release */,
+				563A207CEA59ECAB2B3BEC02 /* Debug */,
+				C7512D96AB02137074076F7E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = AA000060 /* Project object */;
+	rootObject = 3340BCC9F4AC22F94A50B57E /* Project object */;
 }
