@@ -68,6 +68,30 @@ final class FileScanViewModelTests: XCTestCase {
         XCTAssertTrue(sut.isFiltering)
     }
 
+    @MainActor
+    func testDefaultSelectionIncludesOnlyMediumAndHighConfidence() async {
+        let fast = FakeFastScanService(events: [
+            .fileFound(.fixture(id: 1, source: .fastScan)),
+            .completed,
+        ])
+        let deep = FakeDeepScanService(events: [
+            .fileFound(.fixture(id: 2, source: .deepScan, confidenceScore: 0.81)),
+            .fileFound(.fixture(id: 3, source: .deepScan, confidenceScore: 0.20)),
+            .completed,
+        ])
+        let sut = FileScanViewModel(fastScanService: fast, deepScanService: deep)
+
+        sut.startFastScan(device: .fakeDevice())
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        sut.startDeepScan(device: .fakeDevice())
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        let selectedNames = Set(sut.foundFiles.filter { sut.selectedFileIDs.contains($0.id) }.map(\.fileName))
+        XCTAssertTrue(selectedNames.contains("file_01"))
+        XCTAssertTrue(selectedNames.contains("file_02"))
+        XCTAssertFalse(selectedNames.contains("file_03"))
+    }
+
     func testRecoveryConfidenceClassification() {
         let fast = RecoverableFile.fixture(id: 1, source: .fastScan, contiguous: true)
         XCTAssertEqual(fast.recoveryConfidence, .high)
@@ -150,18 +174,20 @@ extension RecoverableFile {
         size: Int64 = 1024,
         offset: UInt64 = 0,
         source: ScanSource,
-        contiguous: Bool? = nil
+        contiguous: Bool? = nil,
+        confidenceScore: Double? = nil
     ) -> RecoverableFile {
         RecoverableFile(
             id: UUID(uuidString: "00000000-0000-0000-0000-0000000000\(String(format: "%02d", id))") ?? UUID(),
-            fileName: name,
+            fileName: name == "file" ? "file_\(String(format: "%02d", id))" : name,
             fileExtension: type == .image ? "jpg" : "mp4",
             fileType: type,
             sizeInBytes: size,
             offsetOnDisk: offset,
             signatureMatch: .jpeg,
             source: source,
-            isLikelyContiguous: contiguous
+            isLikelyContiguous: contiguous,
+            confidenceScore: confidenceScore
         )
     }
 }
@@ -260,14 +286,14 @@ final class FileScanViewModelAdditionalTests: XCTestCase {
         sut.fileTypeFilter = .images
         sut.selectAllFiltered()
 
-        XCTAssertEqual(sut.selectedCount, 2)
+        XCTAssertEqual(sut.selectedCount, 3)
         XCTAssertEqual(sut.selectedFilteredCount, 2)
         XCTAssertNotNil(sut.selectedCountLabel)
         XCTAssertTrue(sut.canRecover)
 
         sut.deselectFiltered()
-        XCTAssertEqual(sut.selectedCount, 0)
-        XCTAssertFalse(sut.canRecover)
+        XCTAssertEqual(sut.selectedCount, 1)
+        XCTAssertTrue(sut.canRecover)
     }
 
     func testStopScanningTransitionsToComplete() async {

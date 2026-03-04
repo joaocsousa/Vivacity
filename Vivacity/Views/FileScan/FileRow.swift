@@ -65,13 +65,14 @@ struct FileRow: View {
                     .foregroundStyle(badgeColor)
                     .clipShape(Capsule())
 
-                Circle()
-                    .fill(confidenceColor)
-                    .frame(width: 9, height: 9)
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Color.secondary.opacity(0.35), lineWidth: 0.6)
-                    )
+                Text(file.recoveryConfidence.displayName.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.5)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(confidenceColor.opacity(0.18))
+                    .foregroundStyle(confidenceColor)
+                    .clipShape(Capsule())
                     .accessibilityLabel(file.recoveryConfidence.accessibilityLabel)
 
                 Spacer()

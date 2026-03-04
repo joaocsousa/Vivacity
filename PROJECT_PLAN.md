@@ -744,7 +744,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ## M13 — Recovery Quality Improvements
 
-### T-040 Design confidence scoring and entropy filtering
+### T-040 ✅ Design confidence scoring and entropy filtering
 
 **Description**: Introduce a confidence score for carved files combining signature strength, footer/structure presence, size plausibility, and entropy checks; drop low-confidence/low-entropy hits and surface confidence in the UI.
 
@@ -760,6 +760,14 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `Vivacity/ViewModels/FileScanViewModel.swift`
 - `Vivacity/Views/FileScan/FileRow.swift`
 - `VivacityTests/**` (new fixtures + tests)
+
+**Completion Notes**:
+- Added a persisted `confidenceScore` on `RecoverableFile` and mapped it to low/medium/high confidence buckets for UI and selection logic.
+- Implemented deep-scan confidence scoring using signature strength, structure signal, size plausibility, and Shannon entropy.
+- Added entropy-based JPEG false-positive suppression before emitting scan results.
+- Updated file rows to show explicit confidence badges.
+- Updated default selection behavior to auto-select only medium/high confidence discoveries.
+- Added tests covering entropy suppression, confidence scoring persistence/classification, and default-selection behavior.
 
 ---
 
