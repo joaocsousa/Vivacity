@@ -21,6 +21,27 @@ enum ScanPhase: Sendable, Equatable {
 @Observable
 @MainActor
 final class FileScanViewModel {
+    struct SampleVerificationSummary: Sendable, Equatable {
+        let verifiedCount: Int
+        let mismatchCount: Int
+        let unreadableCount: Int
+
+        var hasWarnings: Bool {
+            mismatchCount > 0 || unreadableCount > 0
+        }
+
+        var warningMessage: String {
+            var parts: [String] = []
+            if mismatchCount > 0 {
+                parts.append("\(mismatchCount) file(s) changed between reads")
+            }
+            if unreadableCount > 0 {
+                parts.append("\(unreadableCount) file(s) could not be read")
+            }
+            return parts.joined(separator: ", ")
+        }
+    }
+
     // MARK: - Published State
 
     /// Current scan phase.
@@ -49,6 +70,12 @@ final class FileScanViewModel {
 
     /// Whether disk access was denied and the user needs to grant permissions.
     var permissionDenied: Bool = false
+
+    /// Last sample verification summary for selected files.
+    private(set) var lastSampleVerificationSummary: SampleVerificationSummary?
+
+    /// Whether pre-recovery sample verification is currently running.
+    private(set) var isVerifyingSamples: Bool = false
 
     // MARK: - Filters
 
@@ -209,6 +236,7 @@ final class FileScanViewModel {
     private let deepScanService: DeepScanServicing
     private let sessionManager: SessionManaging
     private let cameraRecoveryService: CameraRecoveryServicing
+    private let fileSampleVerifier: FileSampleVerifying
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FileScan")
 
     /// Handle for the currently running scan task (for cancellation).
@@ -227,12 +255,14 @@ final class FileScanViewModel {
         fastScanService: FastScanServicing = FastScanService(),
         deepScanService: DeepScanServicing = DeepScanService(),
         sessionManager: SessionManaging = SessionManager(),
-        cameraRecoveryService: CameraRecoveryServicing = CameraRecoveryService()
+        cameraRecoveryService: CameraRecoveryServicing = CameraRecoveryService(),
+        fileSampleVerifier: FileSampleVerifying = FileRecoveryService()
     ) {
         self.fastScanService = fastScanService
         self.deepScanService = deepScanService
         self.sessionManager = sessionManager
         self.cameraRecoveryService = cameraRecoveryService
+        self.fileSampleVerifier = fileSampleVerifier
     }
 
     // MARK: - Actions
@@ -459,6 +489,32 @@ final class FileScanViewModel {
     func deselectFiltered() {
         let filteredIDs = Set(filteredFiles.map(\.id))
         selectedFileIDs.subtract(filteredIDs)
+    }
+
+    /// Verifies selected files by hashing head/tail samples before recovery.
+    ///
+    /// Returns a summary with counts of verified, mismatched, and unreadable files.
+    func verifySelectedSamples(device: StorageDevice) async -> SampleVerificationSummary? {
+        let selectedFiles = foundFiles.filter { selectedFileIDs.contains($0.id) }
+        guard !selectedFiles.isEmpty else { return nil }
+
+        isVerifyingSamples = true
+        defer { isVerifyingSamples = false }
+
+        do {
+            let results = try await fileSampleVerifier.verifySamples(files: selectedFiles, from: device)
+            let summary = SampleVerificationSummary(
+                verifiedCount: results.filter { $0.status == .verified }.count,
+                mismatchCount: results.filter { $0.status == .mismatch }.count,
+                unreadableCount: results.filter { $0.status == .unreadable }.count
+            )
+            lastSampleVerificationSummary = summary
+            return summary
+        } catch {
+            logger.error("Sample verification failed: \(error.localizedDescription)")
+            errorMessage = "Sample verification failed: \(error.localizedDescription)"
+            return nil
+        }
     }
 
     // MARK: - Private

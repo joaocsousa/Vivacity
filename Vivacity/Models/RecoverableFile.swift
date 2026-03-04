@@ -45,6 +45,21 @@ enum RecoveryConfidence: String, Sendable, Codable {
     }
 }
 
+/// Estimated likelihood that recovered output contains corruption artifacts.
+enum CorruptionLikelihood: String, Sendable, Codable {
+    case low
+    case medium
+    case high
+
+    var displayName: String {
+        switch self {
+        case .low: "Low"
+        case .medium: "Medium"
+        case .high: "High"
+        }
+    }
+}
+
 // MARK: - Recoverable File
 
 /// A file on disk that can potentially be recovered.
@@ -151,6 +166,18 @@ struct RecoverableFile: Identifiable, Hashable, Sendable, Codable {
 
             // Unknown contiguity: use discovered size as a weak confidence signal.
             return sizeInBytes > 0 ? .medium : .low
+        }
+    }
+
+    /// Inverse signal of `recoveryConfidence`, surfaced as corruption risk in UI.
+    var corruptionLikelihood: CorruptionLikelihood {
+        switch recoveryConfidence {
+        case .high:
+            .low
+        case .medium:
+            .medium
+        case .low:
+            .high
         }
     }
 }

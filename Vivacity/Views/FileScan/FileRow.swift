@@ -75,6 +75,15 @@ struct FileRow: View {
                     .clipShape(Capsule())
                     .accessibilityLabel(file.recoveryConfidence.accessibilityLabel)
 
+                Text("CORRUPTION \(file.corruptionLikelihood.displayName.uppercased())")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.5)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(corruptionColor.opacity(0.18))
+                    .foregroundStyle(corruptionColor)
+                    .clipShape(Capsule())
+
                 Spacer()
 
                 // File size
@@ -119,6 +128,14 @@ struct FileRow: View {
         case .high: .green
         case .medium: .yellow
         case .low: .red
+        }
+    }
+
+    private var corruptionColor: Color {
+        switch file.corruptionLikelihood {
+        case .low: .green
+        case .medium: .yellow
+        case .high: .red
         }
     }
 }

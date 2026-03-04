@@ -92,6 +92,30 @@ final class FileRecoveryServiceTests: XCTestCase {
         XCTAssertEqual(result.recoveredFiles.count, 1)
         XCTAssertEqual(result.recoveredFiles[0].lastPathComponent, "20241123_184501+0200_Canon.jpg")
     }
+
+    func testVerifySamplesReturnsMismatchWhenHashesChangeBetweenReads() async throws {
+        let device = try makeDiskImageDevice(at: makeSourceImage(data: Data(repeating: 0xAA, count: 512)))
+        let file = makeFile(name: "clip", ext: "mov", offset: 0, size: 256)
+        let service = FileRecoveryService(diskReaderFactory: { _ in
+            FlakySampleReader()
+        })
+
+        let results = try await service.verifySamples(files: [file], from: device)
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.status, .mismatch)
+    }
+
+    func testVerifySamplesReturnsUnreadableWhenReadFails() async throws {
+        let device = try makeDiskImageDevice(at: makeSourceImage(data: Data(repeating: 0xAA, count: 512)))
+        let file = makeFile(name: "clip", ext: "mov", offset: 0, size: 256)
+        let service = FileRecoveryService(diskReaderFactory: { _ in
+            UnreadableSampleReader()
+        })
+
+        let results = try await service.verifySamples(files: [file], from: device)
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.status, .unreadable)
+    }
 }
 
 extension FileRecoveryServiceTests {
@@ -141,5 +165,36 @@ extension FileRecoveryServiceTests {
             source: .deepScan,
             isLikelyContiguous: true
         )
+    }
+}
+
+private final class FlakySampleReader: PrivilegedDiskReading, @unchecked Sendable {
+    var isSeekable: Bool {
+        true
+    }
+
+    private var readCount = 0
+
+    func start() throws {}
+    func stop() {}
+
+    func read(into buffer: UnsafeMutableRawPointer, offset: UInt64, length: Int) -> Int {
+        readCount += 1
+        let byte: UInt8 = readCount <= 2 ? 0xAB : 0xCD
+        memset(buffer, Int32(byte), length)
+        return length
+    }
+}
+
+private final class UnreadableSampleReader: PrivilegedDiskReading, @unchecked Sendable {
+    var isSeekable: Bool {
+        true
+    }
+
+    func start() throws {}
+    func stop() {}
+
+    func read(into buffer: UnsafeMutableRawPointer, offset: UInt64, length: Int) -> Int {
+        0
     }
 }

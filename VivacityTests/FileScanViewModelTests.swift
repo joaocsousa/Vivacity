@@ -95,6 +95,7 @@ final class FileScanViewModelTests: XCTestCase {
     func testRecoveryConfidenceClassification() {
         let fast = RecoverableFile.fixture(id: 1, source: .fastScan, contiguous: true)
         XCTAssertEqual(fast.recoveryConfidence, .high)
+        XCTAssertEqual(fast.corruptionLikelihood, .low)
 
         let deepContiguous = RecoverableFile.fixture(
             id: 2,
@@ -104,6 +105,7 @@ final class FileScanViewModelTests: XCTestCase {
             contiguous: true
         )
         XCTAssertEqual(deepContiguous.recoveryConfidence, .medium)
+        XCTAssertEqual(deepContiguous.corruptionLikelihood, .medium)
 
         let deepLikelyFragmented = RecoverableFile.fixture(
             id: 3,
@@ -111,6 +113,7 @@ final class FileScanViewModelTests: XCTestCase {
             contiguous: false
         )
         XCTAssertEqual(deepLikelyFragmented.recoveryConfidence, .low)
+        XCTAssertEqual(deepLikelyFragmented.corruptionLikelihood, .high)
 
         let deepUnknownWithNoSize = RecoverableFile.fixture(
             id: 4,
@@ -119,6 +122,7 @@ final class FileScanViewModelTests: XCTestCase {
             contiguous: nil
         )
         XCTAssertEqual(deepUnknownWithNoSize.recoveryConfidence, .low)
+        XCTAssertEqual(deepUnknownWithNoSize.corruptionLikelihood, .high)
     }
 }
 
