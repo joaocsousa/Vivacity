@@ -92,7 +92,6 @@ final class FileRecoveryServiceTests: XCTestCase {
         XCTAssertEqual(result.recoveredFiles.count, 1)
         XCTAssertEqual(result.recoveredFiles[0].lastPathComponent, "20241123_184501+0200_Canon.jpg")
     }
-
 }
 
 extension FileRecoveryServiceTests {

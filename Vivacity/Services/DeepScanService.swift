@@ -105,6 +105,24 @@ struct DeepScanService: DeepScanServicing {
         let endExclusive: UInt64
     }
 
+    private struct CandidateTracker {
+        var allOffsets: Set<UInt64>
+        var offsetBloom: RollingOffsetBloomFilter
+        var claimedRanges: [ClaimedRange]
+    }
+
+    private struct ScanAccumulator {
+        var filesFound: Int
+        var tracker: CandidateTracker
+    }
+
+    private struct CarvedCandidate {
+        let fileName: String
+        let fileExtension: String
+        let sizeInBytes: Int64
+        let offsetOnDisk: UInt64
+    }
+
     private struct RollingOffsetBloomFilter {
         private var bits: [UInt64]
         private let mask: UInt64
@@ -201,16 +219,20 @@ struct DeepScanService: DeepScanServicing {
         var chunkSize = Self.sectorSize * currentChunkSectors
         var buffer = [UInt8](repeating: 0, count: chunkSize + Self.maxSignatureLength)
         var bytesScanned: UInt64 = startOffset - (startOffset % UInt64(Self.sectorSize))
-        var filesFound = 0
+        var scanAccumulator = ScanAccumulator(
+            filesFound: 0,
+            tracker: CandidateTracker(
+                allOffsets: existingOffsets,
+                offsetBloom: RollingOffsetBloomFilter(capacityBits: Self.bloomCapacityBits),
+                claimedRanges: []
+            )
+        )
         var lastProgressReport: Double = -1
         var lastCheckpointOffset = bytesScanned
         var carryOver = 0 // Bytes carried over from previous read for cross-boundary matching
-        var allOffsets = existingOffsets
-        var offsetBloom = RollingOffsetBloomFilter(capacityBits: Self.bloomCapacityBits)
         for offset in existingOffsets {
-            offsetBloom.insert(offset)
+            scanAccumulator.tracker.offsetBloom.insert(offset)
         }
-        var claimedRanges: [ClaimedRange] = []
 
         logger.info("Deep scanning \(totalBytes) bytes (\(totalBytes / (1024 * 1024)) MB)")
 
@@ -256,54 +278,51 @@ struct DeepScanService: DeepScanServicing {
 
                 // Process FAT carved files
                 for carvedFile in carvedFiles {
-                    if allOffsets.contains(carvedFile.offsetOnDisk) { continue }
+                    if scanAccumulator.tracker.allOffsets.contains(carvedFile.offsetOnDisk) { continue }
                     processCarvedFile(
-                        fileName: carvedFile.fileName,
-                        fileExtension: carvedFile.fileExtension,
-                        sizeInBytes: carvedFile.sizeInBytes,
-                        offsetOnDisk: carvedFile.offsetOnDisk,
+                        candidate: CarvedCandidate(
+                            fileName: carvedFile.fileName,
+                            fileExtension: carvedFile.fileExtension,
+                            sizeInBytes: carvedFile.sizeInBytes,
+                            offsetOnDisk: carvedFile.offsetOnDisk
+                        ),
                         reader: reader,
-                        allOffsets: &allOffsets,
-                        offsetBloom: &offsetBloom,
-                        claimedRanges: &claimedRanges,
+                        scanAccumulator: &scanAccumulator,
                         totalBytes: totalBytes,
-                        filesFound: &filesFound,
                         continuation: continuation
                     )
                 }
 
                 // Process APFS carved files
                 for carvedFile in carvedAPFS {
-                    if allOffsets.contains(carvedFile.offsetOnDisk) { continue }
+                    if scanAccumulator.tracker.allOffsets.contains(carvedFile.offsetOnDisk) { continue }
                     processCarvedFile(
-                        fileName: carvedFile.fileName,
-                        fileExtension: carvedFile.fileExtension,
-                        sizeInBytes: carvedFile.sizeInBytes,
-                        offsetOnDisk: carvedFile.offsetOnDisk,
+                        candidate: CarvedCandidate(
+                            fileName: carvedFile.fileName,
+                            fileExtension: carvedFile.fileExtension,
+                            sizeInBytes: carvedFile.sizeInBytes,
+                            offsetOnDisk: carvedFile.offsetOnDisk
+                        ),
                         reader: reader,
-                        allOffsets: &allOffsets,
-                        offsetBloom: &offsetBloom,
-                        claimedRanges: &claimedRanges,
+                        scanAccumulator: &scanAccumulator,
                         totalBytes: totalBytes,
-                        filesFound: &filesFound,
                         continuation: continuation
                     )
                 }
 
                 // Process HFS+ carved files
                 for carvedFile in carvedHFS {
-                    if allOffsets.contains(carvedFile.offsetOnDisk) { continue }
+                    if scanAccumulator.tracker.allOffsets.contains(carvedFile.offsetOnDisk) { continue }
                     processCarvedFile(
-                        fileName: carvedFile.fileName,
-                        fileExtension: carvedFile.fileExtension,
-                        sizeInBytes: carvedFile.sizeInBytes,
-                        offsetOnDisk: carvedFile.offsetOnDisk,
+                        candidate: CarvedCandidate(
+                            fileName: carvedFile.fileName,
+                            fileExtension: carvedFile.fileExtension,
+                            sizeInBytes: carvedFile.sizeInBytes,
+                            offsetOnDisk: carvedFile.offsetOnDisk
+                        ),
                         reader: reader,
-                        allOffsets: &allOffsets,
-                        offsetBloom: &offsetBloom,
-                        claimedRanges: &claimedRanges,
+                        scanAccumulator: &scanAccumulator,
                         totalBytes: totalBytes,
-                        filesFound: &filesFound,
                         continuation: continuation
                     )
                 }
@@ -321,10 +340,7 @@ struct DeepScanService: DeepScanServicing {
             let detectedMatches = await scanChunk(
                 context: context,
                 reader: reader,
-                allOffsets: &allOffsets,
-                offsetBloom: &offsetBloom,
-                claimedRanges: &claimedRanges,
-                filesFound: &filesFound,
+                scanAccumulator: &scanAccumulator,
                 continuation: continuation
             )
 
@@ -362,70 +378,62 @@ struct DeepScanService: DeepScanServicing {
             }
         }
 
-        logger.info("Deep scan complete: \(filesFound) file(s) found after scanning \(bytesScanned) bytes")
+        logger
+            .info(
+                "Deep scan complete: \(scanAccumulator.filesFound) file(s) found after scanning \(bytesScanned) bytes"
+            )
         continuation.yield(.checkpoint(bytesScanned))
         continuation.yield(.completed)
         continuation.finish()
     }
 
-    // swiftlint:disable:next function_parameter_count
     private func processCarvedFile(
-        fileName: String,
-        fileExtension: String,
-        sizeInBytes: Int64,
-        offsetOnDisk: UInt64,
+        candidate: CarvedCandidate,
         reader: PrivilegedDiskReading,
-        allOffsets: inout Set<UInt64>,
-        offsetBloom: inout RollingOffsetBloomFilter,
-        claimedRanges: inout [ClaimedRange],
+        scanAccumulator: inout ScanAccumulator,
         totalBytes: UInt64,
-        filesFound: inout Int,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) {
         // Verify signature by reading the cluster from disk
         var header = [UInt8](repeating: 0, count: 16)
         let headRead = header.withUnsafeMutableBytes { hBuf in
-            reader.read(into: hBuf.baseAddress!, offset: offsetOnDisk, length: 16)
+            reader.read(into: hBuf.baseAddress!, offset: candidate.offsetOnDisk, length: 16)
         }
 
         if headRead == 16 {
-            if let sig = verifyMagicBytes(header, expectedExtension: fileExtension) {
+            if let sig = verifyMagicBytes(header, expectedExtension: candidate.fileExtension) {
                 let file = RecoverableFile(
                     id: UUID(),
-                    fileName: fileName,
-                    fileExtension: fileExtension,
+                    fileName: candidate.fileName,
+                    fileExtension: candidate.fileExtension,
                     fileType: sig.category,
-                    sizeInBytes: sizeInBytes,
-                    offsetOnDisk: offsetOnDisk,
+                    sizeInBytes: candidate.sizeInBytes,
+                    offsetOnDisk: candidate.offsetOnDisk,
                     signatureMatch: sig,
                     source: .deepScan,
-                    isLikelyContiguous: sizeInBytes > 0,
+                    isLikelyContiguous: candidate.sizeInBytes > 0,
                     confidenceScore: confidenceScore(
                         signature: sig,
-                        sizeInBytes: sizeInBytes,
+                        sizeInBytes: candidate.sizeInBytes,
                         entropy: shannonEntropy(of: header),
-                        hasStructureSignal: sizeInBytes > 0
+                        hasStructureSignal: candidate.sizeInBytes > 0
                     )
                 )
 
                 if shouldEmit(file),
                    canAcceptCandidate(
-                       offset: offsetOnDisk,
-                       sizeInBytes: sizeInBytes,
+                       offset: candidate.offsetOnDisk,
+                       sizeInBytes: candidate.sizeInBytes,
                        totalBytes: totalBytes,
-                       allOffsets: allOffsets,
-                       offsetBloom: offsetBloom,
-                       claimedRanges: claimedRanges
+                       tracker: scanAccumulator.tracker
                    )
                 {
                     registerCandidate(
-                        offset: offsetOnDisk,
-                        sizeInBytes: sizeInBytes,
-                        allOffsets: &allOffsets,
-                        offsetBloom: &offsetBloom,
-                        claimedRanges: &claimedRanges
+                        offset: candidate.offsetOnDisk,
+                        sizeInBytes: candidate.sizeInBytes,
+                        tracker: &scanAccumulator.tracker
                     )
-                    filesFound += 1
+                    scanAccumulator.filesFound += 1
                     continuation.yield(.fileFound(file))
                 }
             }
@@ -435,10 +443,7 @@ struct DeepScanService: DeepScanServicing {
     private func scanChunk(
         context: ScanContext,
         reader: PrivilegedDiskReading,
-        allOffsets: inout Set<UInt64>,
-        offsetBloom: inout RollingOffsetBloomFilter,
-        claimedRanges: inout [ClaimedRange],
-        filesFound: inout Int,
+        scanAccumulator: inout ScanAccumulator,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async -> Int {
         let candidatePositions = stride(from: 0, to: context.scanLength - Self.maxSignatureLength, by: Self.sectorSize)
@@ -449,118 +454,154 @@ struct DeepScanService: DeepScanServicing {
             cameraProfile: context.cameraProfile
         )
 
-        for (i, match) in matches {
-            let offset = context.bytesScanned + UInt64(i) - UInt64(context.readOffset)
-
-            if offsetBloom.probablyContains(offset), allOffsets.contains(offset) {
-                continue
-            }
-
-            let candidateNumber = filesFound + 1
-
-            var fileName = "\(context.cameraProfile.defaultFilePrefix)\(String(format: "%04d", candidateNumber))"
-
-            if match.category == .image {
-                let availableBytes = context.buffer.count - i
-                let checkLength = min(availableBytes, 65536)
-                let headerSlice = Array(context.buffer[i ..< i + checkLength])
-
-                if let exifName = EXIFDateExtractor.extractFilenamePrefix(from: headerSlice) {
-                    fileName = "\(exifName)_\(String(format: "%04d", candidateNumber))"
-                }
-            }
-
-            var sizeInBytes: Int64 = 0
-
-            if match == .jpeg || match == .png,
-               let estimatedSize = try? await fileFooterDetector.estimateSize(
-                   signature: match,
-                   startOffset: offset,
-                   reader: reader,
-                   maxScanBytes: 32 * 1024 * 1024
-               )
-            {
-                sizeInBytes = estimatedSize
-            }
-
-            if match == .mp4 || match == .mov || match == .m4v || match == .threeGP ||
-                match == .heic || match == .heif || match == .avif || match == .cr3
-            {
-                let mp4Reconstructor = MP4Reconstructor()
-                if let contiguousSize = mp4Reconstructor.calculateContiguousSize(
-                    startingAt: offset,
-                    reader: reader
-                ) {
-                    sizeInBytes = Int64(contiguousSize)
-                }
-            } else if match == .jpeg, sizeInBytes == 0 {
-                let imageReconstructor = ImageReconstructor()
-
-                let availableBytes = context.buffer.count - i
-                let checkLength = min(availableBytes, 65536)
-                let headerSlice = Data(context.buffer[i ..< i + checkLength])
-
-                if let result = await imageReconstructor.reconstruct(
-                    headerOffset: offset,
-                    initialChunk: headerSlice,
-                    reader: reader
-                ) {
-                    sizeInBytes = Int64(result.count)
-                }
-            }
-
-            let availableBytes = context.scanLength - i
-            let entropySampleLength = min(max(availableBytes, 0), Self.entropySampleBytes)
-            let entropyBytes: [UInt8] = if entropySampleLength > 0 {
-                Array(context.buffer[i ..< i + entropySampleLength])
-            } else {
-                []
-            }
-            let entropy = shannonEntropy(of: entropyBytes)
-            let structureSignal = true
-            let score = confidenceScore(
-                signature: match,
-                sizeInBytes: sizeInBytes,
-                entropy: entropy,
-                hasStructureSignal: structureSignal
+        for matchEntry in matches {
+            await processMatch(
+                matchEntry,
+                context: context,
+                reader: reader,
+                scanAccumulator: &scanAccumulator,
+                continuation: continuation
             )
-
-            let file = RecoverableFile(
-                id: UUID(),
-                fileName: fileName,
-                fileExtension: match.fileExtension,
-                fileType: match.category,
-                sizeInBytes: sizeInBytes,
-                offsetOnDisk: offset,
-                signatureMatch: match,
-                source: .deepScan,
-                isLikelyContiguous: sizeInBytes > 0,
-                confidenceScore: score
-            )
-
-            if shouldEmit(file, entropy: entropy),
-               canAcceptCandidate(
-                   offset: offset,
-                   sizeInBytes: sizeInBytes,
-                   totalBytes: context.totalBytes,
-                   allOffsets: allOffsets,
-                   offsetBloom: offsetBloom,
-                   claimedRanges: claimedRanges
-               )
-            {
-                registerCandidate(
-                    offset: offset,
-                    sizeInBytes: sizeInBytes,
-                    allOffsets: &allOffsets,
-                    offsetBloom: &offsetBloom,
-                    claimedRanges: &claimedRanges
-                )
-                filesFound += 1
-                continuation.yield(.fileFound(file))
-            }
         }
 
         return matches.count
+    }
+
+    private func processMatch(
+        _ matchEntry: (Int, FileSignature),
+        context: ScanContext,
+        reader: PrivilegedDiskReading,
+        scanAccumulator: inout ScanAccumulator,
+        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
+    ) async {
+        let (index, signature) = matchEntry
+        let offset = context.bytesScanned + UInt64(index) - UInt64(context.readOffset)
+        if scanAccumulator.tracker.offsetBloom.probablyContains(offset),
+           scanAccumulator.tracker.allOffsets.contains(offset)
+        {
+            return
+        }
+
+        let candidateNumber = scanAccumulator.filesFound + 1
+        let fileName = extractCandidateFileName(
+            signature: signature,
+            context: context,
+            index: index,
+            candidateNumber: candidateNumber
+        )
+        let sizeInBytes = await estimateCandidateSize(
+            signature: signature,
+            offset: offset,
+            context: context,
+            index: index,
+            reader: reader
+        )
+
+        let entropy = sampleEntropy(buffer: context.buffer, scanLength: context.scanLength, index: index)
+        let score = confidenceScore(
+            signature: signature,
+            sizeInBytes: sizeInBytes,
+            entropy: entropy,
+            hasStructureSignal: true
+        )
+
+        let file = RecoverableFile(
+            id: UUID(),
+            fileName: fileName,
+            fileExtension: signature.fileExtension,
+            fileType: signature.category,
+            sizeInBytes: sizeInBytes,
+            offsetOnDisk: offset,
+            signatureMatch: signature,
+            source: .deepScan,
+            isLikelyContiguous: sizeInBytes > 0,
+            confidenceScore: score
+        )
+
+        if shouldEmit(file, entropy: entropy),
+           canAcceptCandidate(
+               offset: offset,
+               sizeInBytes: sizeInBytes,
+               totalBytes: context.totalBytes,
+               tracker: scanAccumulator.tracker
+           )
+        {
+            registerCandidate(offset: offset, sizeInBytes: sizeInBytes, tracker: &scanAccumulator.tracker)
+            scanAccumulator.filesFound += 1
+            continuation.yield(.fileFound(file))
+        }
+    }
+
+    private func extractCandidateFileName(
+        signature: FileSignature,
+        context: ScanContext,
+        index: Int,
+        candidateNumber: Int
+    ) -> String {
+        var fileName = "\(context.cameraProfile.defaultFilePrefix)\(String(format: "%04d", candidateNumber))"
+        guard signature.category == .image else { return fileName }
+
+        let availableBytes = context.buffer.count - index
+        let checkLength = min(availableBytes, 65536)
+        let headerSlice = Array(context.buffer[index ..< index + checkLength])
+        if let exifName = EXIFDateExtractor.extractFilenamePrefix(from: headerSlice) {
+            fileName = "\(exifName)_\(String(format: "%04d", candidateNumber))"
+        }
+        return fileName
+    }
+
+    private func estimateCandidateSize(
+        signature: FileSignature,
+        offset: UInt64,
+        context: ScanContext,
+        index: Int,
+        reader: PrivilegedDiskReading
+    ) async -> Int64 {
+        var sizeInBytes: Int64 = 0
+
+        if signature == .jpeg || signature == .png,
+           let estimatedSize = try? await fileFooterDetector.estimateSize(
+               signature: signature,
+               startOffset: offset,
+               reader: reader,
+               maxScanBytes: 32 * 1024 * 1024
+           )
+        {
+            sizeInBytes = estimatedSize
+        }
+
+        let mp4LikeSignatures: Set<FileSignature> = [.mp4, .mov, .m4v, .threeGP, .heic, .heif, .avif, .cr3]
+        if mp4LikeSignatures.contains(signature) {
+            let mp4Reconstructor = MP4Reconstructor()
+            if let contiguousSize = mp4Reconstructor.calculateContiguousSize(startingAt: offset, reader: reader) {
+                sizeInBytes = Int64(contiguousSize)
+            }
+            return sizeInBytes
+        }
+
+        if signature == .jpeg, sizeInBytes == 0 {
+            let imageReconstructor = ImageReconstructor()
+            let availableBytes = context.buffer.count - index
+            let checkLength = min(availableBytes, 65536)
+            let headerSlice = Data(context.buffer[index ..< index + checkLength])
+            if let result = await imageReconstructor.reconstruct(
+                headerOffset: offset,
+                initialChunk: headerSlice,
+                reader: reader
+            ) {
+                sizeInBytes = Int64(result.count)
+            }
+        }
+
+        return sizeInBytes
+    }
+
+    private func sampleEntropy(buffer: [UInt8], scanLength: Int, index: Int) -> Double {
+        let availableBytes = scanLength - index
+        let entropySampleLength = min(max(availableBytes, 0), Self.entropySampleBytes)
+        guard entropySampleLength > 0 else { return shannonEntropy(of: []) }
+        let entropyBytes = Array(buffer[index ..< index + entropySampleLength])
+        return shannonEntropy(of: entropyBytes)
     }
 
     private func detectMatchesInParallel(
@@ -626,11 +667,9 @@ struct DeepScanService: DeepScanServicing {
         offset: UInt64,
         sizeInBytes: Int64,
         totalBytes: UInt64,
-        allOffsets: Set<UInt64>,
-        offsetBloom: RollingOffsetBloomFilter,
-        claimedRanges: [ClaimedRange]
+        tracker: CandidateTracker
     ) -> Bool {
-        if offsetBloom.probablyContains(offset), allOffsets.contains(offset) {
+        if tracker.offsetBloom.probablyContains(offset), tracker.allOffsets.contains(offset) {
             return false
         }
 
@@ -639,14 +678,14 @@ struct DeepScanService: DeepScanServicing {
                 return false
             }
 
-            for range in claimedRanges {
+            for range in tracker.claimedRanges {
                 if rangesOverlap(candidateRange, range) {
                     return false
                 }
             }
         } else {
             // Unknown-sized candidate still must not start inside an already claimed range.
-            if claimedRanges.contains(where: { offset >= $0.start && offset < $0.endExclusive }) {
+            if tracker.claimedRanges.contains(where: { offset >= $0.start && offset < $0.endExclusive }) {
                 return false
             }
         }
@@ -657,14 +696,12 @@ struct DeepScanService: DeepScanServicing {
     private func registerCandidate(
         offset: UInt64,
         sizeInBytes: Int64,
-        allOffsets: inout Set<UInt64>,
-        offsetBloom: inout RollingOffsetBloomFilter,
-        claimedRanges: inout [ClaimedRange]
+        tracker: inout CandidateTracker
     ) {
-        allOffsets.insert(offset)
-        offsetBloom.insert(offset)
+        tracker.allOffsets.insert(offset)
+        tracker.offsetBloom.insert(offset)
         if let range = buildCandidateRange(offset: offset, sizeInBytes: sizeInBytes, totalBytes: UInt64.max) {
-            claimedRanges.append(range)
+            tracker.claimedRanges.append(range)
         }
     }
 
@@ -963,46 +1000,58 @@ struct DeepScanService: DeepScanServicing {
 
     /// Checks whether the header bytes match a file signature.
     private func matchesSignature(_ header: [UInt8], signature: FileSignature) -> Bool {
+        guard matchesMagicPrefix(header, signature: signature) else { return false }
+
+        if let riffResult = matchesRIFFSubtypeIfNeeded(header, signature: signature) {
+            return riffResult
+        }
+
+        if let ftypResult = matchesFTYPBrandIfNeeded(header, signature: signature) {
+            return ftypResult
+        }
+
+        return true
+    }
+
+    private func matchesMagicPrefix(_ header: [UInt8], signature: FileSignature) -> Bool {
         let magic = signature.magicBytes
         guard header.count >= magic.count else { return false }
-
-        for i in 0 ..< magic.count {
-            if header[i] != magic[i] { return false }
+        for i in 0 ..< magic.count where header[i] != magic[i] {
+            return false
         }
+        return true
+    }
 
-        // Disambiguate RIFF-based formats
-        if signature == .avi || signature == .webp {
-            guard header.count >= 12 else { return true }
-            let sub = String(bytes: header[8 ..< 12], encoding: .ascii) ?? ""
-            switch signature {
-            case .avi: return sub == "AVI "
-            case .webp: return sub == "WEBP"
-            default: break
-            }
-        }
+    private func matchesRIFFSubtypeIfNeeded(_ header: [UInt8], signature: FileSignature) -> Bool? {
+        guard signature == .avi || signature == .webp else { return nil }
+        guard header.count >= 12 else { return true }
+        let subType = String(bytes: header[8 ..< 12], encoding: .ascii) ?? ""
+        if signature == .avi { return subType == "AVI " }
+        return subType == "WEBP"
+    }
 
-        // Disambiguate ftyp-based formats
+    private func matchesFTYPBrandIfNeeded(_ header: [UInt8], signature: FileSignature) -> Bool? {
+        let ftypSignatures: Set<FileSignature> = [.mp4, .mov, .heic, .heif, .m4v, .threeGP, .avif, .cr3]
+        guard ftypSignatures.contains(signature) else { return nil }
+        guard header.count >= 8 else { return true }
+
+        let ftyp = String(bytes: header[4 ..< 8], encoding: .ascii) ?? ""
+        guard ftyp == "ftyp", header.count >= 12 else { return false }
+
+        let brand = String(bytes: header[8 ..< 12], encoding: .ascii)?
+            .trimmingCharacters(in: .whitespaces)
+            .lowercased() ?? ""
+
         switch signature {
-        case .mp4, .mov, .heic, .heif, .m4v, .threeGP, .avif, .cr3:
-            guard header.count >= 8 else { return true }
-            let ftyp = String(bytes: header[4 ..< 8], encoding: .ascii) ?? ""
-            guard ftyp == "ftyp", header.count >= 12 else { return false }
-            let brand = String(bytes: header[8 ..< 12], encoding: .ascii)?
-                .trimmingCharacters(in: .whitespaces)
-                .lowercased() ?? ""
-            switch signature {
-            case .mp4: return ["isom", "iso2", "mp41", "mp42", "avc1"].contains(brand)
-            case .mov: return ["qt", "qt  ", "wide"].contains(brand)
-            case .heic: return ["heic", "heix"].contains(brand)
-            case .heif: return brand == "mif1"
-            case .m4v: return brand == "m4v"
-            case .threeGP: return ["3gp4", "3gp5", "3gp6", "3ge6"].contains(brand)
-            case .avif: return ["avif", "avis"].contains(brand)
-            case .cr3: return ["cr3", "crx"].contains(brand)
-            default: return true
-            }
-        default:
-            return true
+        case .mp4: return ["isom", "iso2", "mp41", "mp42", "avc1"].contains(brand)
+        case .mov: return ["qt", "qt  ", "wide"].contains(brand)
+        case .heic: return ["heic", "heix"].contains(brand)
+        case .heif: return brand == "mif1"
+        case .m4v: return brand == "m4v"
+        case .threeGP: return ["3gp4", "3gp5", "3gp6", "3ge6"].contains(brand)
+        case .avif: return ["avif", "avis"].contains(brand)
+        case .cr3: return ["cr3", "crx"].contains(brand)
+        default: return true
         }
     }
 }
