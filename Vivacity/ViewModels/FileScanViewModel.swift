@@ -1,14 +1,13 @@
 import Foundation
 import os
 
+// swiftlint:disable file_length
 // MARK: - Scan Phase
 
-/// The current phase of the dual-scan flow.
+/// The current phase of the unified single-run scan flow.
 enum ScanPhase: Sendable, Equatable {
     case idle
-    case fastScanning
-    case fastComplete
-    case deepScanning
+    case scanning
     case complete
 }
 
@@ -16,10 +15,12 @@ enum ScanPhase: Sendable, Equatable {
 
 /// ViewModel for the file scan screen.
 ///
-/// Manages a two-phase scan flow (Fast Scan → optional Deep Scan) and exposes
-/// the cumulative file list, selection state, and progress to the view layer.
+/// Manages a single user-facing scan flow that runs all available scan methods
+/// and exposes the cumulative file list, selection state, and progress to the
+/// view layer.
 @Observable
 @MainActor
+// swiftlint:disable:next type_body_length
 final class FileScanViewModel {
     struct SampleVerificationSummary: Sendable, Equatable {
         let verifiedCount: Int
@@ -50,7 +51,7 @@ final class FileScanViewModel {
     /// The detected camera profile of the scanned device.
     private(set) var cameraProfile: CameraProfile = .generic
 
-    /// All recoverable files found across both phases.
+    /// All recoverable files found across all scanning methods.
     private(set) var foundFiles: [RecoverableFile] = []
 
     /// IDs of user-selected files for recovery.
@@ -59,11 +60,14 @@ final class FileScanViewModel {
     /// ID of the file currently selected for preview.
     var previewFileID: UUID?
 
-    /// Current scan progress (0–1) for the active phase.
+    /// Current scan progress (0–1) for the active unified scan.
     private(set) var progress: Double = 0
 
-    /// Duration of the fast scan in seconds (set when fast scan completes).
-    private(set) var fastScanDuration: TimeInterval?
+    /// Estimated remaining scan time in seconds.
+    private(set) var estimatedTimeRemaining: TimeInterval?
+
+    /// Duration of the completed scan, if available.
+    private(set) var scanDuration: TimeInterval?
 
     /// User-facing error message.
     var errorMessage: String?
@@ -76,6 +80,28 @@ final class FileScanViewModel {
 
     /// Whether pre-recovery sample verification is currently running.
     private(set) var isVerifyingSamples: Bool = false
+
+    /// Human-readable percentage label for current progress.
+    var progressPercentageText: String {
+        "\(Int((progress * 100).rounded()))%"
+    }
+
+    /// Human-readable ETA label for scan progress.
+    var estimatedTimeRemainingText: String? {
+        guard isScanning, let remaining = estimatedTimeRemaining, remaining.isFinite else {
+            return nil
+        }
+        if remaining <= 60 {
+            return "< 1 min"
+        }
+        return Self.etaFormatter.string(from: remaining)
+    }
+
+    /// Human-readable total scan duration label (available after completion).
+    var scanDurationText: String? {
+        guard let duration = scanDuration else { return nil }
+        return Self.durationFormatter.string(from: duration)
+    }
 
     // MARK: - Filters
 
@@ -142,12 +168,12 @@ final class FileScanViewModel {
 
     /// Whether recovery can be started (not scanning + at least one selected).
     var canRecover: Bool {
-        (scanPhase == .fastComplete || scanPhase == .complete) && !selectedFileIDs.isEmpty
+        scanPhase == .complete && !selectedFileIDs.isEmpty
     }
 
     /// Whether scanning is currently in progress.
     var isScanning: Bool {
-        scanPhase == .fastScanning || scanPhase == .deepScanning
+        scanPhase == .scanning
     }
 
     /// Whether there are any files to filter.
@@ -186,16 +212,6 @@ final class FileScanViewModel {
         }
     }
 
-    /// Files found by the fast scan matching current filters.
-    var filteredFastScanFiles: [RecoverableFile] {
-        filteredFiles.filter { $0.source == .fastScan }
-    }
-
-    /// Files found by the deep scan matching current filters.
-    var filteredDeepScanFiles: [RecoverableFile] {
-        filteredFiles.filter { $0.source == .deepScan }
-    }
-
     /// Whether the filtered result set is empty while files exist.
     var showFilteredEmptyState: Bool {
         hasFiles && filteredFiles.isEmpty
@@ -220,16 +236,6 @@ final class FileScanViewModel {
         return "Selected \(selectedCount)"
     }
 
-    /// Files found by the fast scan.
-    var fastScanFiles: [RecoverableFile] {
-        foundFiles.filter { $0.source == .fastScan }
-    }
-
-    /// Files found by the deep scan.
-    var deepScanFiles: [RecoverableFile] {
-        foundFiles.filter { $0.source == .deepScan }
-    }
-
     // MARK: - Dependencies
 
     private let fastScanService: FastScanServicing
@@ -239,15 +245,60 @@ final class FileScanViewModel {
     private let fileSampleVerifier: FileSampleVerifying
     private let logger = Logger(subsystem: "com.vivacity.app", category: "FileScan")
 
-    /// Handle for the currently running scan task (for cancellation).
+    /// Handle for the currently running unified scan task (for cancellation).
     private var scanTask: Task<Void, Never>?
-    /// Periodic session checkpoint task while deep scan is active.
+    /// Periodic session checkpoint task while scan is active.
     private var sessionAutoSaveTask: Task<Void, Never>?
     /// Exact deep-scan cursor reported by the scanner.
     private var lastDeepScanOffset: UInt64 = 0
 
-    /// Timestamp when the fast scan started.
-    private var fastScanStartTime: Date?
+    /// Whether the metadata/catalog scan worker has finished.
+    private var hasCompletedFastWorker = false
+    /// Whether the deep/raw scan worker has finished.
+    private var hasCompletedDeepWorker = false
+
+    /// Last reported fast scan progress (0...1), used for fallback ETA near the end.
+    private var latestFastProgress: Double = 0
+
+    /// Timestamp when the unified scan started.
+    private var scanStartTime: Date?
+    /// Timestamp when the fast worker started.
+    private var fastWorkerStartTime: Date?
+    /// Timestamp when the deep worker started.
+    private var deepWorkerStartTime: Date?
+
+    /// Last checkpoint used for throughput estimation.
+    private var etaLastOffset: UInt64?
+    /// Timestamp of the last checkpoint used for throughput estimation.
+    private var etaLastTimestamp: Date?
+    /// Smoothed deep scan throughput (bytes/sec).
+    private var smoothedThroughputBytesPerSecond: Double?
+
+    /// Tracks files with real offsets to deduplicate overlaps between scan methods.
+    private var fileIndexByOffset: [UInt64: Int] = [:]
+    /// Tracks offset-less files (usually metadata hits) by key for dedupe.
+    private var offsetlessKeys: Set<String> = []
+
+    private enum WorkerOutcome {
+        case success
+        case failed(String)
+    }
+
+    private static let etaFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute]
+        formatter.unitsStyle = .abbreviated
+        formatter.maximumUnitCount = 2
+        return formatter
+    }()
+
+    private static let durationFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.unitsStyle = .abbreviated
+        formatter.maximumUnitCount = 2
+        return formatter
+    }()
 
     // MARK: - Init
 
@@ -267,135 +318,39 @@ final class FileScanViewModel {
 
     // MARK: - Actions
 
-    /// Starts the fast (metadata-based) scan on the given device.
-    func startFastScan(device: StorageDevice) {
+    /// Starts a single unified scan that runs all available scan methods.
+    func startScan(device: StorageDevice) {
         guard scanPhase == .idle else { return }
-
-        // Raw disk images are not mounted, so we can't use FileManager fast scan.
-        // Jump straight to the deep scan prompt phase.
-        if device.isDiskImage {
-            logger.info("Skipping fast scan for disk image: \(device.name)")
-            scanPhase = .fastComplete
-            return
-        }
-
-        scanPhase = .fastScanning
-        progress = 0
-        foundFiles = []
-        selectedFileIDs = []
-        errorMessage = nil
-        fastScanStartTime = Date()
-
-        scanTask = Task {
-            do {
-                let stream = fastScanService.scan(device: device)
-                for try await event in stream {
-                    handleScanEvent(event)
-                }
-                // If we reach here without .completed, mark as complete
-                if scanPhase == .fastScanning {
-                    cameraProfile = cameraRecoveryService.detectProfile(from: foundFiles)
-                    finishFastScan()
-                }
-            } catch is CancellationError {
-                logger.info("Fast scan cancelled by user")
-                cameraProfile = cameraRecoveryService.detectProfile(from: foundFiles)
-                scanPhase = .fastComplete
-            } catch {
-                logger.error("Fast scan error: \(error.localizedDescription)")
-                errorMessage = "Scan error: \(error.localizedDescription)"
-                scanPhase = .fastComplete
-            }
-        }
-    }
-
-    /// Starts the deep (byte-carving) scan on the given device.
-    func startDeepScan(device: StorageDevice) {
-        guard scanPhase == .fastComplete else { return }
-
-        scanPhase = .deepScanning
-        progress = 0
-        errorMessage = nil
-        lastDeepScanOffset = 0
-
-        // We use offsetOnDisk to deduplicate bytes found in the Deep Scan.
-        // FastScanService sets offsetOnDisk to 0 for files found by FileManager,
-        // so we filter those out (otherwise the Deep Scanner will skip sector 0 entirely).
-        let existingOffsets = Set(foundFiles.map(\.offsetOnDisk).filter { $0 > 0 })
-
-        scanTask = Task {
-            do {
-                let stream = deepScanService.scan(
-                    device: device,
-                    existingOffsets: existingOffsets,
-                    startOffset: 0,
-                    cameraProfile: cameraProfile
-                )
-                for try await event in stream {
-                    handleScanEvent(event)
-                }
-                if scanPhase == .deepScanning {
-                    scanPhase = .complete
-                }
-                stopSessionAutoSave()
-            } catch is CancellationError {
-                logger.info("Deep scan cancelled by user")
-                scanPhase = .complete
-                stopSessionAutoSave()
-            } catch {
-                logger.error("Deep scan error: \(error.localizedDescription)")
-                errorMessage = "Deep scan error: \(error.localizedDescription)"
-                scanPhase = .complete
-                stopSessionAutoSave()
-            }
-        }
-        startSessionAutoSave(device: device)
+        startUnifiedScan(device: device, startOffset: 0, seedFiles: [], includeFastWorker: !device.isDiskImage)
     }
 
     /// Stops the currently running scan phase early.
     func stopScanning() {
+        guard scanPhase == .scanning else { return }
+        logger.info("Scan stopped early by user. Transitioning to complete state.")
         scanTask?.cancel()
         scanTask = nil
-        stopSessionAutoSave()
-
-        // If the user manually stops the scan, we always jump to the final completion state
-        // (skipping any intermediate prompts like the Deep Scan prompt)
-        switch scanPhase {
-        case .fastScanning:
-            logger.info("Fast scan stopped early by user. Transitioning to final complete state.")
-            scanPhase = .complete
-
-        case .deepScanning:
-            logger.info("Deep scan stopped early by user. Transitioning to final complete state.")
-            scanPhase = .complete
-
-        default:
-            break
-        }
+        hasCompletedFastWorker = true
+        hasCompletedDeepWorker = true
+        markScanCompleted(forceProgressToFull: false)
     }
 
-    /// Skips the deep scan and transitions to `.complete`.
-    func skipDeepScan() {
-        guard scanPhase == .fastComplete else { return }
-        scanPhase = .complete
-        stopSessionAutoSave()
+    /// Backward-compatible wrappers for older call sites/tests.
+    func startFastScan(device: StorageDevice) {
+        startScan(device: device)
     }
+
+    func startDeepScan(device _: StorageDevice) {}
+
+    func skipDeepScan() {}
 
     // MARK: - Session Management
 
     /// Saves the current scan progress for the given device.
     func saveSession(device: StorageDevice) async {
-        guard isScanning || scanPhase == .fastComplete || scanPhase == .complete else { return }
+        guard isScanning || scanPhase == .complete else { return }
 
-        // Convert progress percentage back to approximate offset
-        let activeOffset: UInt64 = switch scanPhase {
-        case .deepScanning:
-            max(lastDeepScanOffset, UInt64(progress * Double(device.totalCapacity)))
-        case .complete:
-            max(lastDeepScanOffset, UInt64(device.totalCapacity))
-        default:
-            0
-        }
+        let activeOffset = max(lastDeepScanOffset, UInt64(progress * Double(device.totalCapacity)))
 
         let session = ScanSession(
             id: UUID(),
@@ -415,47 +370,16 @@ final class FileScanViewModel {
         }
     }
 
-    /// Loads a saved session and resumes deep scanning.
+    /// Loads a saved session and resumes the unified scan from the deep cursor.
     func resumeSession(_ session: ScanSession, device: StorageDevice) {
         guard scanPhase == .idle else { return }
-
-        scanPhase = .deepScanning
-        foundFiles = session.discoveredFiles
-        progress = Double(session.lastScannedOffset) / Double(device.totalCapacity)
-        lastDeepScanOffset = UInt64(max(session.lastScannedOffset, 0))
-        selectedFileIDs = []
-        errorMessage = nil
-
-        let existingOffsets = Set(foundFiles.map(\.offsetOnDisk).filter { $0 > 0 })
-        cameraProfile = cameraRecoveryService.detectProfile(from: foundFiles)
-
-        scanTask = Task {
-            do {
-                let stream = deepScanService.scan(
-                    device: device,
-                    existingOffsets: existingOffsets,
-                    startOffset: UInt64(session.lastScannedOffset),
-                    cameraProfile: cameraProfile
-                )
-                for try await event in stream {
-                    handleScanEvent(event)
-                }
-                if scanPhase == .deepScanning {
-                    scanPhase = .complete
-                }
-                stopSessionAutoSave()
-            } catch is CancellationError {
-                logger.info("Deep scan cancelled by user")
-                scanPhase = .complete
-                stopSessionAutoSave()
-            } catch {
-                logger.error("Deep scan error: \(error.localizedDescription)")
-                errorMessage = "Deep scan error: \(error.localizedDescription)"
-                scanPhase = .complete
-                stopSessionAutoSave()
-            }
-        }
-        startSessionAutoSave(device: device)
+        let startOffset = UInt64(max(session.lastScannedOffset, 0))
+        startUnifiedScan(
+            device: device,
+            startOffset: startOffset,
+            seedFiles: session.discoveredFiles,
+            includeFastWorker: false
+        )
     }
 
     // MARK: - Selection
@@ -519,32 +443,331 @@ final class FileScanViewModel {
 
     // MARK: - Private
 
-    private func handleScanEvent(_ event: ScanEvent) {
+    private func startUnifiedScan(
+        device: StorageDevice,
+        startOffset: UInt64,
+        seedFiles: [RecoverableFile],
+        includeFastWorker: Bool
+    ) {
+        scanTask?.cancel()
+        stopSessionAutoSave()
+
+        scanPhase = .scanning
+        progress = min(max(Double(startOffset) / max(Double(device.totalCapacity), 1), 0), 1)
+        estimatedTimeRemaining = nil
+        scanDuration = nil
+        errorMessage = nil
+
+        foundFiles = seedFiles
+        selectedFileIDs = Set(seedFiles.filter { $0.recoveryConfidence != .low }.map(\.id))
+        previewFileID = foundFiles.first?.id
+
+        initializeDedupeIndexes()
+
+        lastDeepScanOffset = startOffset
+        hasCompletedFastWorker = !includeFastWorker
+        hasCompletedDeepWorker = false
+        latestFastProgress = 0
+        scanStartTime = Date()
+        fastWorkerStartTime = nil
+        deepWorkerStartTime = nil
+        etaLastOffset = startOffset
+        etaLastTimestamp = nil
+        smoothedThroughputBytesPerSecond = nil
+
+        cameraProfile = cameraRecoveryService.detectProfile(from: foundFiles)
+        startSessionAutoSave(device: device)
+
+        scanTask = Task { [weak self] in
+            guard let self else { return }
+            async let fastOutcome = runFastScanIfNeeded(device: device, shouldRun: includeFastWorker)
+            async let deepOutcome = runDeepScan(device: device, startOffset: startOffset)
+
+            let (fastResult, deepResult) = await (fastOutcome, deepOutcome)
+            finishUnifiedScan(fastOutcome: fastResult, deepOutcome: deepResult)
+        }
+    }
+
+    private func runFastScanIfNeeded(device: StorageDevice, shouldRun: Bool) async -> WorkerOutcome {
+        guard shouldRun else {
+            return .success
+        }
+
+        fastWorkerStartTime = Date()
+        do {
+            let stream = fastScanService.scan(device: device)
+            for try await event in stream {
+                try Task.checkCancellation()
+                handleFastScanEvent(event)
+            }
+            hasCompletedFastWorker = true
+            cameraProfile = cameraRecoveryService.detectProfile(from: foundFiles)
+            if hasCompletedDeepWorker {
+                estimatedTimeRemaining = nil
+            }
+            return .success
+        } catch is CancellationError {
+            hasCompletedFastWorker = true
+            return .success
+        } catch {
+            hasCompletedFastWorker = true
+            logger.error("Fast scan worker error: \(error.localizedDescription)")
+            if hasCompletedDeepWorker {
+                estimatedTimeRemaining = nil
+            }
+            return .failed("Fast scan warning: \(error.localizedDescription)")
+        }
+    }
+
+    private func runDeepScan(device: StorageDevice, startOffset: UInt64) async -> WorkerOutcome {
+        deepWorkerStartTime = Date()
+        etaLastTimestamp = deepWorkerStartTime
+        do {
+            let existingOffsets = Set(foundFiles.map(\.offsetOnDisk).filter { $0 > 0 })
+            let stream = deepScanService.scan(
+                device: device,
+                existingOffsets: existingOffsets,
+                startOffset: startOffset,
+                cameraProfile: cameraProfile
+            )
+
+            for try await event in stream {
+                try Task.checkCancellation()
+                handleDeepScanEvent(event, totalBytes: UInt64(device.totalCapacity))
+            }
+
+            hasCompletedDeepWorker = true
+            if hasCompletedFastWorker {
+                progress = 1
+                estimatedTimeRemaining = nil
+            } else {
+                progress = max(progress, 0.99)
+                estimatedTimeRemaining = estimateFastRemainingTime()
+            }
+            return .success
+        } catch is CancellationError {
+            hasCompletedDeepWorker = true
+            return .success
+        } catch {
+            hasCompletedDeepWorker = true
+            logger.error("Deep scan worker error: \(error.localizedDescription)")
+            return .failed("Deep scan error: \(error.localizedDescription)")
+        }
+    }
+
+    private func finishUnifiedScan(fastOutcome: WorkerOutcome, deepOutcome: WorkerOutcome) {
+        var messages: [String] = []
+        if case let .failed(message) = deepOutcome {
+            messages.append(message)
+        }
+        if case let .failed(message) = fastOutcome {
+            messages.append(message)
+        }
+        if !messages.isEmpty {
+            errorMessage = messages.joined(separator: "\n")
+        }
+
+        cameraProfile = cameraRecoveryService.detectProfile(from: foundFiles)
+        if scanPhase == .scanning {
+            let forceComplete = !messages.contains(where: { $0.hasPrefix("Deep scan error:") })
+            markScanCompleted(forceProgressToFull: forceComplete)
+        }
+        scanTask = nil
+    }
+
+    private func handleFastScanEvent(_ event: ScanEvent) {
         switch event {
         case let .fileFound(file):
-            foundFiles.append(file)
-            if file.recoveryConfidence != .low {
-                selectedFileIDs.insert(file.id)
-            }
+            mergeFoundFile(file)
         case let .progress(value):
-            progress = value
-        case let .checkpoint(offset):
-            lastDeepScanOffset = offset
+            latestFastProgress = min(max(value, 0), 1)
+            if hasCompletedDeepWorker, !hasCompletedFastWorker {
+                estimatedTimeRemaining = estimateFastRemainingTime()
+            }
+        case .checkpoint:
+            break
         case .completed:
-            if scanPhase == .fastScanning {
-                finishFastScan()
-            } else if scanPhase == .deepScanning {
-                scanPhase = .complete
+            hasCompletedFastWorker = true
+            if hasCompletedDeepWorker {
+                estimatedTimeRemaining = nil
             }
         }
     }
 
-    private func finishFastScan() {
-        if let start = fastScanStartTime {
-            fastScanDuration = Date().timeIntervalSince(start)
+    private func handleDeepScanEvent(_ event: ScanEvent, totalBytes: UInt64) {
+        switch event {
+        case let .fileFound(file):
+            mergeFoundFile(file)
+        case let .progress(value):
+            updateProgressAndETA(
+                normalizedProgress: value,
+                offsetHint: lastDeepScanOffset,
+                totalBytes: totalBytes
+            )
+        case let .checkpoint(offset):
+            lastDeepScanOffset = offset
+            let normalized = Double(offset) / max(Double(totalBytes), 1)
+            updateProgressAndETA(normalizedProgress: normalized, offsetHint: offset, totalBytes: totalBytes)
+        case .completed:
+            hasCompletedDeepWorker = true
+            if hasCompletedFastWorker {
+                updateProgressAndETA(
+                    normalizedProgress: 1,
+                    offsetHint: totalBytes,
+                    totalBytes: totalBytes
+                )
+            } else {
+                progress = max(progress, 0.99)
+                estimatedTimeRemaining = estimateFastRemainingTime()
+            }
         }
-        scanPhase = .fastComplete
-        progress = 1
+    }
+
+    private func mergeFoundFile(_ file: RecoverableFile) {
+        if file.offsetOnDisk > 0 {
+            if let existingIndex = fileIndexByOffset[file.offsetOnDisk], foundFiles.indices.contains(existingIndex) {
+                let existing = foundFiles[existingIndex]
+                if shouldPrefer(file, over: existing) {
+                    let wasSelected = selectedFileIDs.contains(existing.id)
+                    let wasPreviewed = previewFileID == existing.id
+
+                    selectedFileIDs.remove(existing.id)
+                    foundFiles[existingIndex] = file
+
+                    if wasSelected || file.recoveryConfidence != .low {
+                        selectedFileIDs.insert(file.id)
+                    }
+                    if wasPreviewed {
+                        previewFileID = file.id
+                    }
+                }
+                return
+            }
+        } else {
+            let key = offsetlessKey(for: file)
+            if offsetlessKeys.contains(key) {
+                return
+            }
+            offsetlessKeys.insert(key)
+        }
+
+        let newIndex = foundFiles.count
+        foundFiles.append(file)
+        if file.offsetOnDisk > 0 {
+            fileIndexByOffset[file.offsetOnDisk] = newIndex
+        }
+        if previewFileID == nil {
+            previewFileID = file.id
+        }
+        if file.recoveryConfidence != .low {
+            selectedFileIDs.insert(file.id)
+        }
+    }
+
+    private func shouldPrefer(_ newFile: RecoverableFile, over existingFile: RecoverableFile) -> Bool {
+        if newFile.source == .fastScan, existingFile.source == .deepScan {
+            return true
+        }
+        if newFile.filePath != nil, existingFile.filePath == nil {
+            return true
+        }
+        if (newFile.confidenceScore ?? 0) > (existingFile.confidenceScore ?? 0) {
+            return true
+        }
+        return false
+    }
+
+    private func offsetlessKey(for file: RecoverableFile) -> String {
+        if let filePath = file.filePath?.lowercased() {
+            return "path:\(filePath)"
+        }
+        return "name:\(file.fullFileName.lowercased())|size:\(file.sizeInBytes)"
+    }
+
+    private func initializeDedupeIndexes() {
+        fileIndexByOffset.removeAll(keepingCapacity: true)
+        offsetlessKeys.removeAll(keepingCapacity: true)
+
+        for (index, file) in foundFiles.enumerated() {
+            if file.offsetOnDisk > 0 {
+                fileIndexByOffset[file.offsetOnDisk] = index
+            } else {
+                offsetlessKeys.insert(offsetlessKey(for: file))
+            }
+        }
+    }
+
+    private func updateProgressAndETA(
+        normalizedProgress: Double,
+        offsetHint: UInt64,
+        totalBytes: UInt64
+    ) {
+        let clampedProgress = min(max(normalizedProgress, 0), 1)
+        progress = max(progress, clampedProgress)
+
+        guard scanPhase == .scanning else {
+            estimatedTimeRemaining = nil
+            return
+        }
+
+        let now = Date()
+        let safeOffset = min(offsetHint, totalBytes)
+
+        if let previousOffset = etaLastOffset,
+           let previousTimestamp = etaLastTimestamp
+        {
+            let deltaBytes = Double(max(Int64(safeOffset) - Int64(previousOffset), 0))
+            let deltaTime = now.timeIntervalSince(previousTimestamp)
+            if deltaBytes > 0, deltaTime > 0.1 {
+                let instantaneousThroughput = deltaBytes / deltaTime
+                if instantaneousThroughput.isFinite, instantaneousThroughput > 0 {
+                    if let previous = smoothedThroughputBytesPerSecond {
+                        smoothedThroughputBytesPerSecond = previous * 0.75 + instantaneousThroughput * 0.25
+                    } else {
+                        smoothedThroughputBytesPerSecond = instantaneousThroughput
+                    }
+                }
+            }
+        }
+
+        etaLastOffset = safeOffset
+        etaLastTimestamp = now
+
+        if progress >= 0.999 {
+            estimatedTimeRemaining = hasCompletedFastWorker ? nil : estimateFastRemainingTime()
+            return
+        }
+
+        let total = Double(totalBytes)
+        let remainingBytes = max(0, total * (1 - progress))
+        if let throughput = smoothedThroughputBytesPerSecond, throughput > 0 {
+            estimatedTimeRemaining = remainingBytes / throughput
+            return
+        }
+
+        if let start = deepWorkerStartTime, progress > 0.01 {
+            let elapsed = now.timeIntervalSince(start)
+            estimatedTimeRemaining = max(0, elapsed * (1 - progress) / progress)
+        }
+    }
+
+    private func estimateFastRemainingTime() -> TimeInterval? {
+        guard let start = fastWorkerStartTime, latestFastProgress > 0.01 else { return nil }
+        let elapsed = Date().timeIntervalSince(start)
+        let estimatedTotal = elapsed / latestFastProgress
+        return max(0, estimatedTotal - elapsed)
+    }
+
+    private func markScanCompleted(forceProgressToFull: Bool) {
+        if forceProgressToFull {
+            progress = 1
+        }
+        estimatedTimeRemaining = nil
+        scanPhase = .complete
+        if let startedAt = scanStartTime {
+            scanDuration = Date().timeIntervalSince(startedAt)
+        }
+        stopSessionAutoSave()
     }
 
     private func startSessionAutoSave(device: StorageDevice) {

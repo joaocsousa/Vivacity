@@ -8,6 +8,42 @@
 
 ---
 
+### T-051 ✅ Unify Scan Into One Comprehensive Pass With Accurate Progress ETA
+
+**Description**: Simplify scanning to a single user action that runs all available scan methods automatically (metadata/catalog + deep/raw) without separate Fast vs Deep user steps, while exposing a unified progress bar with percentage and estimated time remaining.
+
+**Acceptance Criteria**:
+- Starting scan triggers one unified scan flow (no separate "Start Deep Scan" step).
+- Scan executes all available methods and merges findings into a single live result list.
+- File Scan UI no longer shows the Fast/Deep prompt split.
+- Progress UI shows a single percentage and time remaining estimate during active scanning.
+- Session resume remains supported and continues the unified flow.
+- Build, lint, unit tests, and UI tests pass.
+
+**Files**:
+- `Vivacity/ViewModels/FileScanViewModel.swift`
+- `Vivacity/Views/FileScan/FileScanView.swift`
+- `VivacityTests/FileScanViewModelTests.swift`
+- `PROJECT_PLAN.md`
+
+**Completion Notes**:
+- Replaced dual-phase scan state with unified `.idle -> .scanning -> .complete` flow in `FileScanViewModel`.
+- Added `startScan(device:)` orchestration that runs fast/catalog and deep/raw workers in one run and merges/deduplicates findings.
+- Added unified progress modeling with:
+  - live percentage (`progressPercentageText`)
+  - estimated remaining time (`estimatedTimeRemainingText`) based primarily on deep-scan throughput and fallback fast-worker estimate.
+- Removed Deep Scan prompt card and split sectioning in `FileScanView`; results now appear in a single unified list.
+- Updated FileScan view model tests to validate the unified phase behavior.
+- Verification on March 4, 2026:
+  - `xcodegen generate`
+  - `swiftformat .`
+  - `swiftlint` (0 violations)
+  - `xcodebuild build -scheme Vivacity -destination 'platform=macOS'`
+  - `xcodebuild test -scheme Vivacity -destination 'platform=macOS'` (140 tests, 0 failures)
+  - `xcodebuild test -scheme VivacityUI -destination 'platform=macOS'` (1 test, 0 failures)
+
+---
+
 ### T-050 ✅ Stabilize Default Test Scheme Against UI Runner Environment Flakes
 
 **Description**: Prevent routine `xcodebuild test -scheme Vivacity` runs from failing due macOS UI-test runner environment issues (activation/auth dialogs) by separating UI tests into a dedicated scheme while keeping unit-test coverage in the default scheme.
@@ -50,6 +86,7 @@
 | M12 | XcodeGen Migration | T-037 → T-039 | ✅ DONE |
 | M13 | Recovery Quality Improvements | T-040 → T-046 | ✅ DONE |
 | M14 | Test Reliability Hardening | T-050 | ✅ DONE |
+| M15 | Unified Scan Flow & ETA Progress | T-051 | ✅ DONE |
 
 ---
 
