@@ -26,7 +26,7 @@
 | M10 | Polish & Edge Cases | T-016 → T-018 | ✅ DONE |
 | M11 | Coverage & Quality Hardening | T-034 → T-036 | ✅ DONE |
 | M12 | XcodeGen Migration | T-037 → T-039 | ✅ DONE |
-| M13 | Recovery Quality Improvements | T-040 → T-046 | ⬜️ TODO |
+| M13 | Recovery Quality Improvements | T-040 → T-046 | ✅ DONE |
 
 ---
 
@@ -889,7 +889,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-046 Surface recovery quality in UI and verify samples
+### T-046 ✅ Surface recovery quality in UI and verify samples
 
 **Description**: Expose confidence/corruption likelihood in the UI and add a “Verify sample” action that hashes head/tail bytes before full recovery to catch stale/locked sectors.
 
@@ -903,3 +903,11 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `Vivacity/ViewModels/FileScanViewModel.swift`
 - `Vivacity/Services/FileRecoveryService.swift`
 - `VivacityTests/**` (UI snapshot/flow tests)
+
+**Completion Notes**:
+- Added explicit corruption likelihood modeling on `RecoverableFile` and surfaced it in `FileRow` alongside recovery confidence badges.
+- Added pre-recovery sample verification in `FileRecoveryService` by hashing head/tail samples twice and classifying files as `verified`, `mismatch`, or `unreadable`.
+- Added `FileSampleVerifying` integration into `FileScanViewModel` with verification summaries used before recovery.
+- Updated `FileScanView` to expose a dedicated **Verify Sample** action and to warn/confirm before recovery when verification detects mismatches or unreadable data.
+- Added unit tests for sample verification mismatch/unreadable cases and view-model verification summary behavior.
+- Verification on March 4, 2026: `swiftformat .`, `swiftlint` (0 violations), `xcodebuild build -scheme Vivacity`, and `xcodebuild test -scheme Vivacity -destination 'platform=macOS' -skip-testing:VivacityUITests` passed (UI test in this environment intermittently failed to activate app: Running Background).

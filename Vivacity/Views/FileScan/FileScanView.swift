@@ -1,5 +1,6 @@
 import SwiftUI
 
+// swiftlint:disable file_length
 /// Main scan screen showing progressive file discovery with dual-scan phases.
 ///
 /// Layout matches the Stitch designs:
@@ -19,6 +20,8 @@ struct FileScanView: View {
 
     @State private var viewModel = AppEnvironment.makeFileScanViewModel()
     @State private var recoveryNavigationState: RecoveryNavigationState?
+    @State private var verificationWarningMessage: String?
+    @State private var pendingRecoveryFiles: [RecoverableFile] = []
 
     init(device: StorageDevice, sessionToResume: ScanSession? = nil) {
         self.device = device
@@ -105,6 +108,27 @@ struct FileScanView: View {
                 }
             }
         )
+        .alert(
+            "Sample Verification Warning",
+            isPresented: Binding(
+                get: { verificationWarningMessage != nil },
+                set: { if !$0 { verificationWarningMessage = nil } }
+            ),
+            actions: {
+                Button("Cancel", role: .cancel) {}
+                Button("Continue Recovery", role: .destructive) {
+                    recoveryNavigationState = RecoveryNavigationState(
+                        device: device,
+                        selectedFiles: pendingRecoveryFiles
+                    )
+                }
+            },
+            message: {
+                if let warning = verificationWarningMessage {
+                    Text(warning)
+                }
+            }
+        )
         .navigationDestination(item: $recoveryNavigationState) { state in
             RecoveryDestinationView(scannedDevice: state.device, selectedFiles: state.selectedFiles)
         }
@@ -129,6 +153,29 @@ struct FileScanView: View {
 
     private var selectedFilesForRecovery: [RecoverableFile] {
         viewModel.foundFiles.filter { viewModel.selectedFileIDs.contains($0.id) }
+    }
+
+    private func verifyThenRecover() async {
+        let selectedFiles = selectedFilesForRecovery
+        guard !selectedFiles.isEmpty else { return }
+        pendingRecoveryFiles = selectedFiles
+
+        guard let summary = await viewModel.verifySelectedSamples(device: device) else {
+            return
+        }
+
+        if summary.hasWarnings {
+            verificationWarningMessage = summary.warningMessage
+        } else {
+            recoveryNavigationState = RecoveryNavigationState(
+                device: device,
+                selectedFiles: selectedFiles
+            )
+        }
+    }
+
+    private func verifySamplesOnly() async {
+        _ = await viewModel.verifySelectedSamples(device: device)
     }
 }
 
@@ -510,12 +557,26 @@ extension FileScanView {
 
             Spacer()
 
+            Button {
+                Task {
+                    await verifySamplesOnly()
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.shield")
+                        .font(.system(size: 11))
+                    Text(viewModel.isVerifyingSamples ? "Verifying…" : "Verify Sample")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(!viewModel.canRecover || viewModel.isVerifyingSamples)
+
             // Recover button
             Button {
-                recoveryNavigationState = RecoveryNavigationState(
-                    device: device,
-                    selectedFiles: selectedFilesForRecovery
-                )
+                Task {
+                    await verifyThenRecover()
+                }
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.down.to.line")
@@ -529,7 +590,7 @@ extension FileScanView {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(!viewModel.canRecover)
+            .disabled(!viewModel.canRecover || viewModel.isVerifyingSamples)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

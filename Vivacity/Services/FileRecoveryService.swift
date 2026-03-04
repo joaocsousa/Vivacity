@@ -1,3 +1,4 @@
+import CryptoKit
 import Darwin
 import Foundation
 import os
@@ -6,6 +7,13 @@ import os
 protocol FileRecoveryServicing: Sendable {
     /// Recovers selected files from a scanned device to a destination folder.
     func recover(files: [RecoverableFile], from sourceDevice: StorageDevice, to destinationURL: URL) async throws
+}
+
+/// API for pre-recovery sample verification to detect unreadable or unstable sectors.
+protocol FileSampleVerifying: Sendable {
+    /// Verifies selected files by hashing head/tail samples twice and comparing snapshots.
+    func verifySamples(files: [RecoverableFile], from sourceDevice: StorageDevice) async throws
+        -> [FileSampleVerification]
 }
 
 /// Per-file error captured during a batch recovery operation.
@@ -18,6 +26,19 @@ struct FileRecoveryFailure: Sendable {
 struct FileRecoveryResult: Sendable {
     let recoveredFiles: [URL]
     let failures: [FileRecoveryFailure]
+}
+
+enum FileSampleVerificationStatus: Sendable, Equatable {
+    case verified
+    case mismatch
+    case unreadable
+}
+
+struct FileSampleVerification: Sendable {
+    let file: RecoverableFile
+    let status: FileSampleVerificationStatus
+    let headHash: String?
+    let tailHash: String?
 }
 
 /// Progress payload emitted while recovering files.
@@ -36,7 +57,7 @@ struct FileRecoveryProgress: Sendable {
 }
 
 /// Recovers files by reading raw bytes from the scanned device and writing each file to a destination directory.
-struct FileRecoveryService: FileRecoveryServicing {
+struct FileRecoveryService: FileRecoveryServicing, FileSampleVerifying {
     typealias ProgressHandler = @Sendable (FileRecoveryProgress) -> Void
 
     private struct RecoveryState {
@@ -68,6 +89,20 @@ struct FileRecoveryService: FileRecoveryServicing {
             to: destinationURL,
             progressHandler: { _ in }
         )
+    }
+
+    func verifySamples(
+        files: [RecoverableFile],
+        from sourceDevice: StorageDevice
+    ) async throws -> [FileSampleVerification] {
+        let volumeInfo = VolumeInfo.detect(for: sourceDevice)
+        let reader = diskReaderFactory(volumeInfo.devicePath)
+        try reader.start()
+        defer { reader.stop() }
+
+        return files.map { file in
+            verifySample(file, reader: reader)
+        }
     }
 
     /// Recovers files and emits progress updates as bytes and files complete.
@@ -282,6 +317,57 @@ struct FileRecoveryService: FileRecoveryServicing {
             withIntermediateDirectories: true,
             attributes: nil
         )
+    }
+
+    private func verifySample(_ file: RecoverableFile, reader: PrivilegedDiskReading) -> FileSampleVerification {
+        guard file.sizeInBytes > 0 else {
+            return FileSampleVerification(file: file, status: .unreadable, headHash: nil, tailHash: nil)
+        }
+
+        let sampleSize = min(Int(file.sizeInBytes), 4096)
+        let tailOffset = file.offsetOnDisk + max(UInt64(file.sizeInBytes) - UInt64(sampleSize), 0)
+
+        guard
+            let firstHead = readSampleHash(reader: reader, offset: file.offsetOnDisk, length: sampleSize),
+            let firstTail = readSampleHash(reader: reader, offset: tailOffset, length: sampleSize),
+            let secondHead = readSampleHash(reader: reader, offset: file.offsetOnDisk, length: sampleSize),
+            let secondTail = readSampleHash(reader: reader, offset: tailOffset, length: sampleSize)
+        else {
+            return FileSampleVerification(file: file, status: .unreadable, headHash: nil, tailHash: nil)
+        }
+
+        if firstHead != secondHead || firstTail != secondTail {
+            return FileSampleVerification(
+                file: file,
+                status: .mismatch,
+                headHash: firstHead,
+                tailHash: firstTail
+            )
+        }
+
+        return FileSampleVerification(
+            file: file,
+            status: .verified,
+            headHash: firstHead,
+            tailHash: firstTail
+        )
+    }
+
+    private func readSampleHash(reader: PrivilegedDiskReading, offset: UInt64, length: Int) -> String? {
+        guard length > 0 else { return nil }
+        var buffer = [UInt8](repeating: 0, count: length)
+        let readBytes = buffer.withUnsafeMutableBytes { rawBuffer in
+            reader.read(
+                into: rawBuffer.baseAddress!,
+                offset: offset,
+                length: length
+            )
+        }
+
+        guard readBytes > 0 else { return nil }
+        let data = Data(buffer.prefix(readBytes))
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private func uniqueFileURL(
