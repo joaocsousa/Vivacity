@@ -99,6 +99,11 @@ struct RecoverableFile: Identifiable, Hashable, Sendable, Codable {
     /// `nil` for fast-scan discoveries that do not use carving heuristics.
     var confidenceScore: Double?
 
+    /// Optional ordered list of disk regions that should be concatenated to recover this file.
+    /// When present and count > 1, the file is fragmented and requires multi-region assembly.
+    /// `nil` means the file is a single contiguous region starting at `offsetOnDisk`.
+    var fragmentMap: [FragmentRange]?
+
     init(
         id: UUID,
         fileName: String,
@@ -110,7 +115,8 @@ struct RecoverableFile: Identifiable, Hashable, Sendable, Codable {
         source: ScanSource,
         filePath: String? = nil,
         isLikelyContiguous: Bool? = nil,
-        confidenceScore: Double? = nil
+        confidenceScore: Double? = nil,
+        fragmentMap: [FragmentRange]? = nil
     ) {
         self.id = id
         self.fileName = fileName
@@ -123,6 +129,7 @@ struct RecoverableFile: Identifiable, Hashable, Sendable, Codable {
         self.filePath = filePath
         self.isLikelyContiguous = isLikelyContiguous
         self.confidenceScore = confidenceScore
+        self.fragmentMap = fragmentMap
     }
 
     // MARK: - Computed

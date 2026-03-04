@@ -43,6 +43,12 @@ struct ImageReconstructor: ImageReconstructing {
     private let maxSearchDistance: UInt64 = 100 * 1024 * 1024 // 100 MB max distance to search for next chunk
     private let maxImageSize = 25 * 1024 * 1024 // 25 MB max total image size to prevent runaway memory
 
+    /// Validates candidate sectors before appending them to the reassembled JPEG stream.
+    private let streamValidator = JPEGStreamValidator()
+
+    /// Maximum consecutive implausible sectors before stopping reconstruction.
+    private let maxConsecutiveRejects = 10
+
     // JPEG Markers
     private let jpegSOIMarker: [UInt8] = [0xFF, 0xD8]
     private let jpegEOIMarker: [UInt8] = [0xFF, 0xD9]
@@ -108,6 +114,7 @@ struct ImageReconstructor: ImageReconstructing {
 
         var foundEOI = containsMarker(jpegEOIMarker, in: initialChunk)
         var consecutiveValidSectors = 0
+        var consecutiveRejects = 0
         let maxSectorsToTry = 1000 // Arbitrary limit for experimental chunk matching
 
         while currentSearchOffset < searchEndLimit, reassembledData.count < maxImageSize, !foundEOI {
@@ -123,11 +130,26 @@ struct ImageReconstructor: ImageReconstructing {
 
             if isZeros(sectorBuffer) || isBoundary(sectorBuffer) {
                 currentSearchOffset += UInt64(sectorSize)
+                consecutiveRejects += 1
+                if consecutiveRejects >= maxConsecutiveRejects {
+                    break
+                }
+                continue
+            }
+
+            // Validate that this sector contains plausible JPEG entropy data
+            if !streamValidator.isPlausibleJPEGScanData(sectorBuffer) {
+                currentSearchOffset += UInt64(sectorSize)
+                consecutiveRejects += 1
+                if consecutiveRejects >= maxConsecutiveRejects {
+                    break
+                }
                 continue
             }
 
             reassembledData.append(sectorData)
             consecutiveValidSectors += 1
+            consecutiveRejects = 0
 
             // Check if this newly appended sector contained the EOI marker
             if containsMarker(jpegEOIMarker, in: sectorData) {
