@@ -17,6 +17,19 @@ final class ImageReconstructorTests: XCTestCase {
         super.tearDown()
     }
 
+    private func containsMarker(_ marker: [UInt8], in bytes: [UInt8]) -> Bool {
+        guard bytes.count >= marker.count else { return false }
+        for i in 0 ... (bytes.count - marker.count) {
+            var matched = true
+            for j in 0 ..< marker.count where bytes[i + j] != marker[j] {
+                matched = false
+                break
+            }
+            if matched { return true }
+        }
+        return false
+    }
+
     func testReconstruct_withInvalidHeader_returnsNil() async {
         let invalidHeader = Data([0x00, 0x00, 0xFF, 0xD8]) // Not starting with FF D8
 
@@ -72,8 +85,8 @@ final class ImageReconstructorTests: XCTestCase {
         )
 
         XCTAssertNotNil(result)
-        // Result should be initial chunk + extension sector (skipping garbage sector)
-        XCTAssertEqual(result?.count, 1024)
+        // Result should contain the initial + continuation bytes, with optional DHT reseed expansion.
+        XCTAssertGreaterThanOrEqual(result?.count ?? 0, 1024)
 
         // Verify it stitched correctly
         let stitchedSuffix = result?.suffix(2)
@@ -101,10 +114,79 @@ final class ImageReconstructorTests: XCTestCase {
         // The garbage sector (all zeros) should be skipped.
         XCTAssertNotNil(result)
 
-        // The size should be initial chunk (512) + synthetic EOI (2) = 514
-        XCTAssertEqual(result?.count, 514)
+        // Reconstructor may insert a DHT table before finalizing partial output.
+        XCTAssertGreaterThanOrEqual(result?.count ?? 0, 514)
 
         let stitchedSuffix = result?.suffix(2)
         XCTAssertEqual(stitchedSuffix, Data([0xFF, 0xD9]))
+    }
+
+    func testReconstructDetailed_marksPartialWhenEOINotFound() async {
+        let initial = Data([0xFF, 0xD8, 0xFF, 0xDA] + Array(repeating: 0x11, count: 508))
+        reader.buffer = initial + Data(repeating: 0x00, count: 1024)
+
+        let result = await sut.reconstructDetailed(
+            headerOffset: 0,
+            initialChunk: initial,
+            reader: reader
+        )
+
+        XCTAssertEqual(result?.format, .jpeg)
+        XCTAssertEqual(result?.isPartial, true)
+    }
+
+    func testReconstructDetailed_reseedsJPEGHuffmanTableWhenMissing() async {
+        var initial = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10])
+        initial.append(Data(repeating: 0x00, count: 10))
+        initial.append(contentsOf: [0xFF, 0xDA, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44])
+        initial.append(Data(repeating: 0x55, count: 512 - initial.count))
+
+        var sector = Data(repeating: 0x77, count: 510)
+        sector.append(contentsOf: [0xFF, 0xD9])
+        reader.buffer = initial + sector
+
+        let result = await sut.reconstructDetailed(
+            headerOffset: 0,
+            initialChunk: initial,
+            reader: reader
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.isPartial, false)
+        let bytes = [UInt8](result?.data ?? Data())
+        XCTAssertTrue(containsMarker([0xFF, 0xC4], in: bytes))
+    }
+
+    func testReconstructDetailed_reassemblesSplitHEICSegments() async throws {
+        var ftyp = Data([0x00, 0x00, 0x00, 0x18])
+        try ftyp.append(XCTUnwrap("ftyp".data(using: .ascii)))
+        try ftyp.append(XCTUnwrap("heic".data(using: .ascii)))
+        ftyp.append(Data(repeating: 0x00, count: 12))
+        let initial = ftyp + Data(repeating: 0x00, count: 512 - ftyp.count)
+
+        var moov = Data([0x00, 0x00, 0x00, 0x20])
+        try moov.append(XCTUnwrap("moov".data(using: .ascii)))
+        moov.append(Data(repeating: 0x01, count: 24))
+        moov.append(Data(repeating: 0x00, count: 512 - moov.count))
+
+        var mdat = Data([0x00, 0x00, 0x00, 0x20])
+        try mdat.append(XCTUnwrap("mdat".data(using: .ascii)))
+        mdat.append(Data(repeating: 0x02, count: 24))
+        mdat.append(Data(repeating: 0x00, count: 512 - mdat.count))
+
+        reader.buffer = initial + Data(repeating: 0x00, count: 512) + moov + mdat
+
+        let result = await sut.reconstructDetailed(
+            headerOffset: 0,
+            initialChunk: initial,
+            reader: reader
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.format, .heic)
+        XCTAssertEqual(result?.isPartial, false)
+        let payload = result?.data ?? Data()
+        XCTAssertTrue(try payload.contains(XCTUnwrap("moov".data(using: .ascii))))
+        XCTAssertTrue(try payload.contains(XCTUnwrap("mdat".data(using: .ascii))))
     }
 }
