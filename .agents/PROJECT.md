@@ -50,6 +50,7 @@ Users who accidentally delete photos or videos need a clean, modern macOS-native
 | M11 Coverage & quality hardening | ✅ Done |
 | M12 XcodeGen migration         | ✅ Done |
 | M13 Recovery quality improvements | ⬜️ Todo |
+| M13 Recovery quality improvements | ⬜️ Todo |
 
 > **Minimum Supported OS**: macOS 14.0 (Sonoma). Also compatible with macOS 15.x (Sequoia).
 
