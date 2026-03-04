@@ -47,6 +47,22 @@ struct FileFooterDetector: FileFooterDetecting {
                 reader: reader,
                 maxScanBytes: maxScanBytes
             )
+        case .gif:
+            return try await estimateGIFSize(
+                startOffset: startOffset,
+                reader: reader,
+                maxScanBytes: maxScanBytes
+            )
+        case .bmp:
+            return estimateBMPSize(
+                startOffset: startOffset,
+                reader: reader
+            )
+        case .webp:
+            return estimateWebPSize(
+                startOffset: startOffset,
+                reader: reader
+            )
         default:
             return nil
         }
@@ -190,6 +206,176 @@ struct FileFooterDetector: FileFooterDetecting {
             maxScanBytes: maxScanBytes,
             minimumDistance: 1024
         )
+    }
+
+    // MARK: - GIF Size Estimation
+
+    /// Estimates GIF file size by scanning for the GIF trailer byte `0x3B`.
+    ///
+    /// GIF files always end with a single trailer byte. This is reliable because
+    /// the byte is expected to appear after all image data and extension blocks.
+    private func estimateGIFSize(
+        startOffset: UInt64,
+        reader: PrivilegedDiskReading,
+        maxScanBytes: Int
+    ) async throws -> Int64? {
+        // The GIF trailer is a single byte: 0x3B
+        // We can't just search for any 0x3B — it could appear in compressed data.
+        // Instead, walk the GIF block structure to find the true trailer.
+        guard let bytes = try await readWindow(
+            startOffset: startOffset,
+            reader: reader,
+            maxScanBytes: min(maxScanBytes, 32 * 1024 * 1024)
+        ) else {
+            return nil
+        }
+
+        // Verify GIF header: "GIF87a" or "GIF89a"
+        guard bytes.count >= 13,
+              bytes[0] == 0x47, bytes[1] == 0x49, bytes[2] == 0x46, // "GIF"
+              bytes[3] == 0x38, // "8"
+              bytes[4] == 0x37 || bytes[4] == 0x39, // "7" or "9"
+              bytes[5] == 0x61 // "a"
+        else {
+            return nil
+        }
+
+        // Parse Logical Screen Descriptor (7 bytes after header)
+        let packed = bytes[10]
+        let hasGlobalColorTable = (packed & 0x80) != 0
+        let globalColorTableSize = hasGlobalColorTable ? 3 * (1 << ((packed & 0x07) + 1)) : 0
+        var index = 13 + globalColorTableSize
+
+        // Walk through GIF blocks
+        while index < bytes.count {
+            let introducer = bytes[index]
+
+            if introducer == 0x3B {
+                // Trailer found
+                return Int64(index + 1)
+            }
+
+            if introducer == 0x2C {
+                // Image Descriptor
+                guard index + 10 < bytes.count else { break }
+                let imgPacked = bytes[index + 9]
+                let hasLocalColorTable = (imgPacked & 0x80) != 0
+                let localColorTableSize = hasLocalColorTable ? 3 * (1 << ((imgPacked & 0x07) + 1)) : 0
+                index += 10 + localColorTableSize
+
+                // Skip LZW Minimum Code Size byte
+                guard index < bytes.count else { break }
+                index += 1
+
+                // Skip sub-blocks
+                index = skipGIFSubBlocks(bytes: bytes, from: index)
+                continue
+            }
+
+            if introducer == 0x21 {
+                // Extension block
+                guard index + 2 < bytes.count else { break }
+                index += 2 // Skip introducer + label
+                index = skipGIFSubBlocks(bytes: bytes, from: index)
+                continue
+            }
+
+            // Unknown block type — bail out
+            break
+        }
+
+        // Fallback: search for trailer in the last portion of the read window
+        let trailer: [UInt8] = [0x3B]
+        if let footerEnd = try await findPatternEnd(
+            pattern: trailer,
+            startOffset: startOffset,
+            searchStart: 13,
+            reader: reader,
+            maxScanBytes: maxScanBytes
+        ) {
+            return Int64(footerEnd)
+        }
+
+        return nil
+    }
+
+    /// Skips GIF sub-blocks starting at `from`. Returns the index after the block terminator (0x00).
+    private func skipGIFSubBlocks(bytes: [UInt8], from index: Int) -> Int {
+        var pos = index
+        while pos < bytes.count {
+            let blockSize = Int(bytes[pos])
+            if blockSize == 0 {
+                return pos + 1 // Past the block terminator
+            }
+            pos += 1 + blockSize
+        }
+        return pos
+    }
+
+    // MARK: - BMP Size Estimation
+
+    /// Extracts exact BMP file size from the BMP header.
+    ///
+    /// The BMP file header stores the total file size as a 32-bit little-endian
+    /// integer at bytes 2–5. This gives an exact, authoritative size.
+    func estimateBMPSize(
+        startOffset: UInt64,
+        reader: PrivilegedDiskReading
+    ) -> Int64? {
+        var header = [UInt8](repeating: 0, count: 14)
+        let bytesRead = header.withUnsafeMutableBytes { buffer in
+            reader.read(into: buffer.baseAddress!, offset: startOffset, length: 14)
+        }
+
+        guard bytesRead >= 6,
+              header[0] == 0x42, header[1] == 0x4D // "BM"
+        else {
+            return nil
+        }
+
+        // Bytes 2-5: file size (little-endian uint32)
+        let fileSize = UInt32(header[2])
+            | (UInt32(header[3]) << 8)
+            | (UInt32(header[4]) << 16)
+            | (UInt32(header[5]) << 24)
+
+        guard fileSize >= 14 else { return nil } // Minimum BMP header size
+        return Int64(fileSize)
+    }
+
+    // MARK: - WebP Size Estimation
+
+    /// Extracts exact WebP file size from the RIFF container header.
+    ///
+    /// WebP uses the RIFF container. Bytes 4–7 contain the chunk size
+    /// (little-endian uint32). The total file size is chunk size + 8.
+    func estimateWebPSize(
+        startOffset: UInt64,
+        reader: PrivilegedDiskReading
+    ) -> Int64? {
+        var header = [UInt8](repeating: 0, count: 12)
+        let bytesRead = header.withUnsafeMutableBytes { buffer in
+            reader.read(into: buffer.baseAddress!, offset: startOffset, length: 12)
+        }
+
+        guard bytesRead >= 12,
+              header[0] == 0x52, header[1] == 0x49, // "RI"
+              header[2] == 0x46, header[3] == 0x46, // "FF"
+              header[8] == 0x57, header[9] == 0x45, // "WE"
+              header[10] == 0x42, header[11] == 0x50 // "BP"
+        else {
+            return nil
+        }
+
+        // Bytes 4-7: RIFF chunk size (little-endian uint32)
+        let chunkSize = UInt32(header[4])
+            | (UInt32(header[5]) << 8)
+            | (UInt32(header[6]) << 16)
+            | (UInt32(header[7]) << 24)
+
+        let totalSize = Int64(chunkSize) + 8
+        guard totalSize >= 12 else { return nil }
+        return totalSize
     }
 
     private func findPatternEnd(

@@ -64,12 +64,17 @@ final class ImageReconstructorTests: XCTestCase {
         var initialChunk = header
         initialChunk.append(contentsOf: [UInt8](repeating: 0x11, count: 512 - header.count))
 
-        // Sector 1: Garbage (e.g., another file's data)
-        let garbageSector = Data(repeating: 0x00, count: 512)
+        // Sector 1: Garbage (another file's data) — use high-entropy data that passes validator
+        var garbageSector = Data(count: 512)
+        for i in 0 ..< 512 {
+            garbageSector[i] = UInt8((i &* 37 &+ 13) % 256)
+        }
 
-        // Sector 2: The rest of the JPEG ending in EOI
+        // Sector 2: The rest of the JPEG ending in EOI — use high-entropy data
         var extensionSector = Data([0xFF, 0xDA, 0x01, 0x02, 0x03])
-        extensionSector.append(contentsOf: [UInt8](repeating: 0x22, count: 512 - extensionSector.count - 2))
+        for i in 0 ..< (512 - extensionSector.count - 2) {
+            extensionSector.append(UInt8((i &* 53 &+ 7) % 256))
+        }
         extensionSector.append(contentsOf: [0xFF, 0xD9])
 
         XCTAssertEqual(initialChunk.count, 512)
@@ -141,7 +146,14 @@ final class ImageReconstructorTests: XCTestCase {
         initial.append(contentsOf: [0xFF, 0xDA, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44])
         initial.append(Data(repeating: 0x55, count: 512 - initial.count))
 
-        var sector = Data(repeating: 0x77, count: 510)
+        // Use high-entropy data to pass JPEGStreamValidator
+        var sectorBytes = [UInt8](repeating: 0, count: 510)
+        var seed: UInt32 = 12345
+        for i in 0 ..< 510 {
+            seed = seed &* 1_664_525 &+ 1_013_904_223
+            sectorBytes[i] = UInt8((seed >> 16) & 0xFF)
+        }
+        var sector = Data(sectorBytes)
         sector.append(contentsOf: [0xFF, 0xD9])
         reader.buffer = initial + sector
 

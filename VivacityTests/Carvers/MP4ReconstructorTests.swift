@@ -115,4 +115,62 @@ final class MP4ReconstructorTests: XCTestCase {
         let size = reconstructor.calculateContiguousSize(startingAt: 0, reader: fakeReader)
         XCTAssertNil(size)
     }
+
+    // MARK: - Detailed Layout Reconstruction Tests
+
+    func testDetailedLayoutForContiguousFile() {
+        var buffer = Data()
+        buffer.append(createBox(type: "ftyp", size: 32))
+        buffer.append(createBox(type: "moov", size: 128))
+        buffer.append(createBox(type: "mdat", size: 1024))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: buffer)
+        let reconstructor = MP4Reconstructor()
+
+        let result = reconstructor.reconstructDetailedLayout(startingAt: 0, reader: fakeReader)
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.totalSize, 32 + 128 + 1024)
+        XCTAssertEqual(result?.fragments.count, 1)
+        XCTAssertFalse(result?.hasDisplacedMoov ?? true)
+    }
+
+    func testDetailedLayoutFindsDisplacedMoov() {
+        var buffer = Data()
+        // ftyp + mdat (no moov contiguous)
+        buffer.append(createBox(type: "ftyp", size: 32))
+        buffer.append(createBox(type: "mdat", size: 1024))
+        // Gap of 512 bytes (one sector)
+        buffer.append(Data(repeating: 0, count: 512))
+        // Displaced moov
+        buffer.append(createBox(type: "moov", size: 256))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: buffer)
+        let reconstructor = MP4Reconstructor()
+
+        let result = reconstructor.reconstructDetailedLayout(startingAt: 0, reader: fakeReader)
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result?.hasDisplacedMoov ?? false)
+        XCTAssertEqual(result?.fragments.count, 2)
+
+        // First fragment: ftyp + mdat
+        XCTAssertEqual(result?.fragments[0].start, 0)
+        XCTAssertEqual(result?.fragments[0].length, 32 + 1024)
+
+        // Second fragment: moov (after the gap)
+        let moovStart = UInt64(32 + 1024 + 512)
+        XCTAssertEqual(result?.fragments[1].start, moovStart)
+        XCTAssertEqual(result?.fragments[1].length, 256)
+    }
+
+    func testDetailedLayoutReturnsNilWhenNoMdat() {
+        var buffer = Data()
+        buffer.append(createBox(type: "ftyp", size: 32))
+        buffer.append(createBox(type: "moov", size: 512))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: buffer)
+        let reconstructor = MP4Reconstructor()
+
+        let result = reconstructor.reconstructDetailedLayout(startingAt: 0, reader: fakeReader)
+        XCTAssertNil(result)
+    }
 }

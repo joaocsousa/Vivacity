@@ -489,13 +489,27 @@ struct DeepScanService: DeepScanServicing {
             index: index,
             candidateNumber: candidateNumber
         )
-        let sizeInBytes = await estimateCandidateSize(
+        let sizeEstimate = await estimateCandidateSize(
             signature: signature,
             offset: offset,
             context: context,
             index: index,
             reader: reader
         )
+
+        // For MP4-like formats, try detailed layout reconstruction for displaced moov detection
+        var sizeInBytes = sizeEstimate
+        var fragmentMap: [FragmentRange]?
+        let mp4LikeSignatures: Set<FileSignature> = [.mp4, .mov, .m4v, .threeGP]
+        if mp4LikeSignatures.contains(signature) {
+            let reconstructor = MP4Reconstructor()
+            if let result = reconstructor.reconstructDetailedLayout(startingAt: offset, reader: reader) {
+                if result.hasDisplacedMoov {
+                    sizeInBytes = Int64(result.totalSize)
+                    fragmentMap = result.fragments
+                }
+            }
+        }
 
         let entropy = sampleEntropy(buffer: context.buffer, scanLength: context.scanLength, index: index)
         let score = confidenceScore(
@@ -514,8 +528,9 @@ struct DeepScanService: DeepScanServicing {
             offsetOnDisk: offset,
             signatureMatch: signature,
             source: .deepScan,
-            isLikelyContiguous: sizeInBytes > 0,
-            confidenceScore: score
+            isLikelyContiguous: sizeInBytes > 0 && fragmentMap == nil,
+            confidenceScore: score,
+            fragmentMap: fragmentMap
         )
 
         if shouldEmit(file, entropy: entropy),
@@ -559,7 +574,8 @@ struct DeepScanService: DeepScanServicing {
     ) async -> Int64 {
         var sizeInBytes: Int64 = 0
 
-        if signature == .jpeg || signature == .png,
+        let footerDetectableSignatures: Set<FileSignature> = [.jpeg, .png, .gif, .bmp, .webp]
+        if footerDetectableSignatures.contains(signature),
            let estimatedSize = try? await fileFooterDetector.estimateSize(
                signature: signature,
                startOffset: offset,
@@ -892,6 +908,14 @@ struct DeepScanService: DeepScanServicing {
             // Could be TIFF, CR2, ARW, or DNG
             if remaining >= 10, buffer[position + 8] == 0x43, buffer[position + 9] == 0x52 {
                 return .cr2 // "CR" at offset 8
+            }
+
+            // Try IFD0 Make/Model identification (higher priority than camera profile)
+            let ifdCheckLength = min(remaining, 65536)
+            let headerSlice = Array(buffer[position ..< position + ifdCheckLength])
+            let tiffParser = TIFFHeaderParser()
+            if let rawSignature = tiffParser.identifyRAWSignature(from: headerSlice) {
+                return rawSignature
             }
 
             // Signature promotion based on camera profile

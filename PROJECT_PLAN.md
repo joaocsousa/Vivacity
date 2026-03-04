@@ -911,3 +911,35 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - Updated `FileScanView` to expose a dedicated **Verify Sample** action and to warn/confirm before recovery when verification detects mismatches or unreadable data.
 - Added unit tests for sample verification mismatch/unreadable cases and view-model verification summary behavior.
 - Verification on March 4, 2026: `swiftformat .`, `swiftlint` (0 violations), `xcodebuild build -scheme Vivacity`, and `xcodebuild test -scheme Vivacity -destination 'platform=macOS' -skip-testing:VivacityUITests` passed (UI test in this environment intermittently failed to activate app: Running Background).
+
+---
+
+### T-047 ✅ Advanced Image and Video Recovery Improvements
+
+**Description**: Enhance recovery accuracy for GIF/BMP/WebP footers, add heuristic JPEG stream validation, promote raw TIFFs via EXIF MakerNotes, and implement displaced MP4 moov reconstruction.
+
+**Acceptance Criteria**:
+- `FileFooterDetector` handles GIF trailers, BMP header sizes, and WebP RIFF sizes.
+- `JPEGStreamValidator` filters out implausible sectors during reconstruction.
+- `TIFFHeaderParser` identifies specific RAW formats from generic TIFF magic bytes.
+- `MP4Reconstructor` finds displaced `moov` atoms and populates `fragmentMap` for multi-region recovery.
+- All 50/50 unit tests pass.
+
+**Files**:
+- `Vivacity/Services/FileFooterDetector.swift`
+- `Vivacity/Services/DeepScanService.swift`
+- `Vivacity/Services/Carvers/JPEGStreamValidator.swift` [NEW]
+- `Vivacity/Services/Carvers/ImageReconstructor.swift`
+- `Vivacity/Services/TIFFHeaderParser.swift` [NEW]
+- `Vivacity/Services/Carvers/MP4Reconstructor.swift`
+- `Vivacity/Models/RecoverableFile.swift`
+- `VivacityTests/**`
+
+**Completion Notes**:
+- Added GIF (`0x3B`), BMP (size at 2-5), and WebP (RIFF size at 4-7) footer/size detection to `FileFooterDetector` and wired into deep scan.
+- Created `JPEGStreamValidator` with 3-factor heuristic (zero ratio, marker density, Shannon entropy) and integrated it into `ImageReconstructor` to reject corrupted sectors.
+- Created `TIFFHeaderParser` to extract camera Make/Model from IFD0 and promote generic TIFFs to `.cr2`, `.arw`, `.nef`, etc., in `DeepScanService`.
+- Enhanced `MP4Reconstructor` with `reconstructDetailedLayout` and `scanForDisplacedMoov` to handle DASH/GoPro-style displaced indices (64MB search radius).
+- Added `fragmentMap` to `RecoverableFile` and its constructor to support multi-region recovery emission.
+- Fixed 3 test failures in `MP4ReconstructorTests` (zero-size box) and `ImageReconstructorTests` (low-entropy test data vs new validator).
+- Verification on March 4, 2026: `swiftformat .`, `xcodebuild build` successful, and `xcodebuild test` passed with 50/50 results.

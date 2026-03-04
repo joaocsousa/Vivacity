@@ -10,10 +10,30 @@ struct MP4BoxHeader: Equatable {
     let headerLength: UInt64
 }
 
+/// Represents a contiguous byte range on disk.
+struct FragmentRange: Sendable, Equatable, Codable, Hashable {
+    let start: UInt64
+    let length: UInt64
+}
+
+/// Detailed result from MP4 reconstruction including fragment information.
+struct MP4ReconstructionResult: Sendable, Equatable {
+    /// Total size of all fragments combined.
+    let totalSize: UInt64
+    /// Ordered fragment ranges that should be concatenated to produce a playable file.
+    /// If `fragments` has more than one entry, the file requires reassembly.
+    let fragments: [FragmentRange]
+    /// Whether the moov atom was found displaced from the contiguous region.
+    let hasDisplacedMoov: Bool
+}
+
 protocol MP4Reconstructing: Sendable {
     /// Calculates the contiguous file size by parsing top-level ISOBMFF boxes.
     /// Returns the total size in bytes if parsing succeeds and finds media data, or nil.
     func calculateContiguousSize(startingAt offset: UInt64, reader: PrivilegedDiskReading) -> UInt64?
+
+    /// Performs a detailed layout reconstruction, potentially locating a displaced moov atom.
+    func reconstructDetailedLayout(startingAt offset: UInt64, reader: PrivilegedDiskReading) -> MP4ReconstructionResult?
 }
 
 struct MP4Reconstructor: MP4Reconstructing {
@@ -25,59 +45,150 @@ struct MP4Reconstructor: MP4Reconstructing {
     /// Absolute maximum size for `mdat` to prevent out-of-bounds (100 GB).
     private let maxMediaBoxSize: UInt64 = 100 * 1024 * 1024 * 1024
 
+    /// Search radius for locating a displaced `moov` atom past the end of `mdat`.
+    private let moovSearchRadius: UInt64 = 64 * 1024 * 1024 // 64 MB
+
     func calculateContiguousSize(startingAt offset: UInt64, reader: PrivilegedDiskReading) -> UInt64? {
-        var currentOffset = offset
-        var boxesParsed = 0
+        let layout = parseTopLevelBoxes(startingAt: offset, reader: reader)
+        return layout.contiguousSize
+    }
+
+    func reconstructDetailedLayout(
+        startingAt offset: UInt64,
+        reader: PrivilegedDiskReading
+    ) -> MP4ReconstructionResult? {
+        let layout = parseTopLevelBoxes(startingAt: offset, reader: reader)
+
+        // Case 1: Fully contiguous file with moov
+        if let contiguousSize = layout.contiguousSize, layout.foundMoov || layout.foundMoof {
+            return MP4ReconstructionResult(
+                totalSize: contiguousSize,
+                fragments: [FragmentRange(start: offset, length: contiguousSize)],
+                hasDisplacedMoov: false
+            )
+        }
+
+        // Case 2: Has ftyp + mdat but no moov — search for displaced moov
+        if layout.foundFtyp, layout.foundMdat, !layout.foundMoov, layout.highestMediaEnd > 0 {
+            let mdatEnd = offset + layout.highestMediaEnd
+            if let moovBox = scanForDisplacedMoov(afterOffset: mdatEnd, reader: reader) {
+                let ftypAndMdatRange = FragmentRange(start: offset, length: layout.highestMediaEnd)
+                let moovRange = FragmentRange(start: moovBox.offset, length: moovBox.size)
+                let totalSize = layout.highestMediaEnd + moovBox.size
+
+                return MP4ReconstructionResult(
+                    totalSize: totalSize,
+                    fragments: [ftypAndMdatRange, moovRange],
+                    hasDisplacedMoov: true
+                )
+            }
+        }
+
+        // Case 3: Partial file (ftyp + mdat, no moov found nearby)
+        if let contiguousSize = layout.contiguousSize {
+            return MP4ReconstructionResult(
+                totalSize: contiguousSize,
+                fragments: [FragmentRange(start: offset, length: contiguousSize)],
+                hasDisplacedMoov: false
+            )
+        }
+
+        return nil
+    }
+
+    // MARK: - Box Layout
+
+    private struct BoxLayout {
         var foundFtyp = false
         var foundMoov = false
         var foundMoof = false
         var foundMdat = false
         var lastValidSize: UInt64 = 0
         var highestMediaEnd: UInt64 = 0
+        /// Set when a box with size 0 (extends to EOF) is encountered — bounds are not known.
+        var hasEOFBox = false
+
+        var contiguousSize: UInt64? {
+            // Cannot determine size when an EOF-extending box was encountered
+            guard !hasEOFBox else { return nil }
+
+            if foundMdat, foundMoov || foundMoof, highestMediaEnd > 0 {
+                return highestMediaEnd
+            }
+            if foundMdat, foundFtyp, lastValidSize > 0 {
+                return lastValidSize
+            }
+            return nil
+        }
+    }
+
+    private func parseTopLevelBoxes(startingAt offset: UInt64, reader: PrivilegedDiskReading) -> BoxLayout {
+        var layout = BoxLayout()
+        var currentOffset = offset
+        var boxesParsed = 0
 
         while boxesParsed < maxBoxesToParse {
             guard let box = readBoxHeader(at: currentOffset, reader: reader) else {
                 break
             }
-
-            // Validate the box to prevent runaway parsing on garbage data
             guard isPlausibleBox(box) else {
                 break
             }
 
-            if box.type == "ftyp" {
-                foundFtyp = true
-            }
-            if box.type == "moov" {
-                foundMoov = true
-            }
-            if box.type == "moof" {
-                foundMoof = true
-            }
-            if box.type == "mdat" {
-                foundMdat = true
+            if box.type == "ftyp" { layout.foundFtyp = true }
+            if box.type == "moov" { layout.foundMoov = true }
+            if box.type == "moof" { layout.foundMoof = true }
+            if box.type == "mdat" { layout.foundMdat = true }
+
+            if box.size == 0 {
+                layout.hasEOFBox = true
+                return layout
             }
 
             let nextOffset = currentOffset + box.size
             currentOffset = nextOffset
             boxesParsed += 1
-            lastValidSize = currentOffset - offset
-            highestMediaEnd = max(highestMediaEnd, lastValidSize)
+            layout.lastValidSize = currentOffset - offset
+            layout.highestMediaEnd = max(layout.highestMediaEnd, layout.lastValidSize)
+        }
 
-            // If the box size is 0, it extends to EOF, which we can't bounds-check natively.
-            if box.size == 0 {
-                return nil
+        return layout
+    }
+
+    // MARK: - Displaced Moov Search
+
+    private struct LocatedBox {
+        let offset: UInt64
+        let size: UInt64
+    }
+
+    /// Scans the disk after `afterOffset` looking for a `moov` box within the search radius.
+    ///
+    /// Many cameras write `ftyp | mdat | moov`. When files are fragmented, the `moov` may
+    /// not be adjacent to `mdat`. This method scans sector-by-sector looking for a valid
+    /// `moov` box header.
+    private func scanForDisplacedMoov(afterOffset: UInt64, reader: PrivilegedDiskReading) -> LocatedBox? {
+        let searchEnd = afterOffset + moovSearchRadius
+        var currentOffset = afterOffset
+        let stride: UInt64 = 512 // Sector-aligned
+
+        while currentOffset < searchEnd {
+            guard let box = readBoxHeader(at: currentOffset, reader: reader) else {
+                currentOffset += stride
+                continue
             }
-        }
 
-        // Preferred path: paired structure gives highest confidence size.
-        if foundMdat, foundMoov || foundMoof, highestMediaEnd > 0 {
-            return highestMediaEnd
-        }
+            if box.type == "moov", box.size >= 8, box.size <= 4 * 1024 * 1024 * 1024 {
+                logger.info("Found displaced moov at offset \(currentOffset), size \(box.size)")
+                return LocatedBox(offset: currentOffset, size: box.size)
+            }
 
-        // Graceful fallback on partial/corrupt files.
-        if foundMdat, foundFtyp, lastValidSize > 0 {
-            return lastValidSize
+            // If we found another valid top-level box, skip over it
+            if isPlausibleBox(box), box.size > 0 {
+                currentOffset += box.size
+            } else {
+                currentOffset += stride
+            }
         }
 
         return nil
