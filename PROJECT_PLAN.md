@@ -26,6 +26,7 @@
 | M10 | Polish & Edge Cases | T-016 → T-018 | ✅ DONE |
 | M11 | Coverage & Quality Hardening | T-034 → T-036 | ✅ DONE |
 | M12 | XcodeGen Migration | T-037 → T-039 | ✅ DONE |
+| M13 | Recovery Quality Improvements | T-040 → T-046 | ⬜️ TODO |
 
 ---
 
@@ -737,3 +738,122 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - Added `CONTRIBUTING.md` with explicit contribution workflow for regenerate → verify → test/build.
 - Documented and enforced decision to commit both `project.yml` and generated `Vivacity.xcodeproj`.
 - Added lightweight guard script `scripts/check-xcodegen.sh` to detect project/spec drift.
+---
+
+---
+
+## M13 — Recovery Quality Improvements
+
+### T-040 Design confidence scoring and entropy filtering
+
+**Description**: Introduce a confidence score for carved files combining signature strength, footer/structure presence, size plausibility, and entropy checks; drop low-confidence/low-entropy hits and surface confidence in the UI.
+
+**Acceptance Criteria**:
+- Confidence score computed for every `RecoverableFile` in deep scan path and persisted through the pipeline.
+- Entropy/structure check filters out noise before emission.
+- UI shows confidence badges and default-selects only medium/high confidence files.
+- Tests cover scoring components and an end-to-end fixture where low-entropy hits are removed.
+
+**Files**:
+- `Vivacity/Services/DeepScanService.swift`
+- `Vivacity/Models/RecoverableFile.swift`
+- `Vivacity/ViewModels/FileScanViewModel.swift`
+- `Vivacity/Views/FileScan/FileRow.swift`
+- `VivacityTests/**` (new fixtures + tests)
+
+---
+
+### T-041 Extend signatures and size inference
+
+**Description**: Expand signature coverage (CR3, RAF, RW2, AVIF, ProRes/MOV atom patterns, JPEG variants) and improve size estimation using format-aware footer/box parsing.
+
+**Acceptance Criteria**:
+- `FileSignature.swift` includes added formats/variants with tests.
+- JPEG size inference scans SOF/EOI; MP4/MOV size inference pairs `moov`/`mdat` boxes; graceful fallback on partials.
+- Unit tests per new format and size-estimation correctness on partial files.
+
+**Files**:
+- `Vivacity/Models/FileSignature.swift`
+- `Vivacity/Services/DeepScanService.swift`
+- `VivacityTests/**` (fixtures for new formats)
+
+---
+
+### T-042 Improve fragmented media reconstruction
+
+**Description**: Rebuild fragmented MP4/MOV (stco/co64 chunk tables, CTS/DTS ordering) and add JPEG/HEIC split-segment reassembly with Huffman table re-seeding; output playable or best-effort partials.
+
+**Acceptance Criteria**:
+- `FragmentedVideoAssembler` rebuilds chunk tables and orders fragments correctly; playable output validated by tests.
+- JPEG/HEIC reassembly merges split segments; falls back to partial save with clear flag.
+- Tests with fragmented MP4/JPEG fixtures demonstrating successful reconstruction.
+
+**Files**:
+- `Vivacity/Services/FragmentedVideoAssembler.swift`
+- `Vivacity/Services/ImageReconstructor.swift`
+- `VivacityTests/**` (fragmented media fixtures)
+
+---
+
+### T-043 Suppress false positives and deduplicate results
+
+**Description**: Reduce duplicate/false hits via rolling Bloom filter of offsets, overlap checks, and size-vs-available-bytes guards.
+
+**Acceptance Criteria**:
+- Duplicate/overlapping signature hits are emitted once per offset.
+- Matches that overrun device bounds or collide with existing ranges are rejected.
+- Tests include overlapping-signature and out-of-bounds fixtures ensuring single emission and proper rejection.
+
+**Files**:
+- `Vivacity/Services/DeepScanService.swift`
+- `VivacityTests/**`
+
+---
+
+### T-044 Optimize scan performance and add resumability
+
+**Description**: Add bounded-parallel scanning (TaskGroup) with adaptive chunk/read-ahead tuned to device block size; checkpoint scan cursor to resume after interruption.
+
+**Acceptance Criteria**:
+- Deep scan uses bounded concurrency with configurable limit; chunk size adapts to hit density/block size.
+- Scan cursor (offset + signature state) is persisted periodically and used to resume.
+- Benchmark test ensures max wall time on synthetic 1GB image stays within target; resume test continues after forced stop.
+
+**Files**:
+- `Vivacity/Services/DeepScanService.swift`
+- `Vivacity/ViewModels/FileScanViewModel.swift`
+- `VivacityTests/**` (benchmark/resume tests)
+
+---
+
+### T-045 Salvage metadata and improve naming
+
+**Description**: Extract EXIF/QuickTime metadata even from partial files to recover capture time/device; use for smarter filenames and grouping.
+
+**Acceptance Criteria**:
+- Partial files attempt EXIF/QuickTime atom extraction; failures do not crash.
+- Recovered filenames incorporate capture time/device when available; grouping respects timezone offsets.
+- Tests validate metadata extraction on partial JPEG/MOV fixtures and naming logic.
+
+**Files**:
+- `Vivacity/Services/EXIFDateExtractor.swift`
+- `Vivacity/Services/PreviewService.swift`
+- `Vivacity/Services/FileRecoveryService.swift`
+- `VivacityTests/**` (partial media fixtures)
+
+---
+
+### T-046 Surface recovery quality in UI and verify samples
+
+**Description**: Expose confidence/corruption likelihood in the UI and add a “Verify sample” action that hashes head/tail bytes before full recovery to catch stale/locked sectors.
+
+**Acceptance Criteria**:
+- UI shows confidence badge and corruption likelihood per file; default selection uses confidence thresholds.
+- “Verify sample” hashes head/tail and warns on mismatch/unreadable data before recovery.
+- UI snapshot and flow tests cover badges and verify action.
+
+**Files**:
+- `Vivacity/Views/FileScan/FileRow.swift`
+- `Vivacity/ViewModels/FileScanViewModel.swift`
+- `Vivacity/Services/FileRecoveryService.swift`
+- `VivacityTests/**` (UI snapshot/flow tests)
