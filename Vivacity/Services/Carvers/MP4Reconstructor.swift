@@ -25,6 +25,8 @@ struct MP4ReconstructionResult: Sendable, Equatable {
     let fragments: [FragmentRange]
     /// Whether the moov atom was found displaced from the contiguous region.
     let hasDisplacedMoov: Bool
+    /// Optional HEVC Annex-B parameter-set validation over sampled `mdat` payload.
+    let hevcValidation: HEVCNALValidation?
 }
 
 protocol MP4Reconstructing: Sendable {
@@ -48,6 +50,15 @@ struct MP4Reconstructor: MP4Reconstructing {
     /// Search radius for locating a displaced `moov` atom past the end of `mdat`.
     private let moovSearchRadius: UInt64 = 64 * 1024 * 1024 // 64 MB
 
+    /// Optional HEVC Annex-B parser over sampled media payload.
+    private let hevcParser = HEVCNALParser()
+
+    /// Runtime guardrails to keep HEVC validation lightweight.
+    private static let hevcValidationLimits = HEVCNALParser.Limits(
+        maxScanBytes: 128 * 1024,
+        maxNALUnits: 256
+    )
+
     func calculateContiguousSize(startingAt offset: UInt64, reader: PrivilegedDiskReading) -> UInt64? {
         let layout = parseTopLevelBoxes(startingAt: offset, reader: reader)
         return layout.contiguousSize
@@ -58,13 +69,15 @@ struct MP4Reconstructor: MP4Reconstructing {
         reader: PrivilegedDiskReading
     ) -> MP4ReconstructionResult? {
         let layout = parseTopLevelBoxes(startingAt: offset, reader: reader)
+        let hevcValidation = optionalHEVCValidation(layout: layout, reader: reader)
 
         // Case 1: Fully contiguous file with moov
         if let contiguousSize = layout.contiguousSize, layout.foundMoov || layout.foundMoof {
             return MP4ReconstructionResult(
                 totalSize: contiguousSize,
                 fragments: [FragmentRange(start: offset, length: contiguousSize)],
-                hasDisplacedMoov: false
+                hasDisplacedMoov: false,
+                hevcValidation: hevcValidation
             )
         }
 
@@ -79,7 +92,8 @@ struct MP4Reconstructor: MP4Reconstructing {
                 return MP4ReconstructionResult(
                     totalSize: totalSize,
                     fragments: [ftypAndMdatRange, moovRange],
-                    hasDisplacedMoov: true
+                    hasDisplacedMoov: true,
+                    hevcValidation: hevcValidation
                 )
             }
         }
@@ -89,7 +103,8 @@ struct MP4Reconstructor: MP4Reconstructing {
             return MP4ReconstructionResult(
                 totalSize: contiguousSize,
                 fragments: [FragmentRange(start: offset, length: contiguousSize)],
-                hasDisplacedMoov: false
+                hasDisplacedMoov: false,
+                hevcValidation: hevcValidation
             )
         }
 
@@ -107,6 +122,8 @@ struct MP4Reconstructor: MP4Reconstructing {
         var highestMediaEnd: UInt64 = 0
         /// Set when a box with size 0 (extends to EOF) is encountered — bounds are not known.
         var hasEOFBox = false
+        /// Absolute payload ranges for `mdat` boxes (excluding box headers).
+        var mdatPayloadRanges: [FragmentRange] = []
 
         var contiguousSize: UInt64? {
             // Cannot determine size when an EOF-extending box was encountered
@@ -139,6 +156,13 @@ struct MP4Reconstructor: MP4Reconstructing {
             if box.type == "moov" { layout.foundMoov = true }
             if box.type == "moof" { layout.foundMoof = true }
             if box.type == "mdat" { layout.foundMdat = true }
+            if box.type == "mdat", box.size > box.headerLength {
+                let payloadStart = currentOffset + box.headerLength
+                let payloadLength = box.size - box.headerLength
+                layout.mdatPayloadRanges.append(
+                    FragmentRange(start: payloadStart, length: payloadLength)
+                )
+            }
 
             if box.size == 0 {
                 layout.hasEOFBox = true
@@ -257,5 +281,48 @@ struct MP4Reconstructor: MP4Reconstructing {
             // If it claims to be massive, it's likely a false positive.
             return box.size <= 50 * 1024 * 1024 // 50 MB limit for unknown boxes
         }
+    }
+
+    private func optionalHEVCValidation(
+        layout: BoxLayout,
+        reader: PrivilegedDiskReading
+    ) -> HEVCNALValidation? {
+        guard !layout.mdatPayloadRanges.isEmpty else { return nil }
+        let sample = sampleMediaPayload(ranges: layout.mdatPayloadRanges, reader: reader)
+        guard !sample.isEmpty else { return nil }
+        let validation = hevcParser.validateParameterSets(
+            in: sample,
+            limits: Self.hevcValidationLimits
+        )
+        return validation.hasAnnexBData ? validation : nil
+    }
+
+    private func sampleMediaPayload(
+        ranges: [FragmentRange],
+        reader: PrivilegedDiskReading
+    ) -> Data {
+        var remainingBudget = Self.hevcValidationLimits.maxScanBytes
+        var sample = Data()
+        sample.reserveCapacity(remainingBudget)
+
+        for range in ranges where remainingBudget > 0 {
+            let readLength = min(Int(range.length), remainingBudget)
+            guard readLength > 0 else { continue }
+
+            var buffer = [UInt8](repeating: 0, count: readLength)
+            let bytesRead = buffer.withUnsafeMutableBytes { rawBuffer in
+                reader.read(
+                    into: rawBuffer.baseAddress!,
+                    offset: range.start,
+                    length: readLength
+                )
+            }
+            guard bytesRead > 0 else { continue }
+
+            sample.append(contentsOf: buffer.prefix(bytesRead))
+            remainingBudget -= bytesRead
+        }
+
+        return sample
     }
 }

@@ -16,6 +16,15 @@ final class MP4ReconstructorTests: XCTestCase {
         return data
     }
 
+    private func createBox(type: String, payload: Data) -> Data {
+        var data = Data()
+        var bigEndianSize = UInt32(payload.count + 8).bigEndian
+        data.append(Data(bytes: &bigEndianSize, count: 4))
+        data.append(type.data(using: .ascii)!)
+        data.append(payload)
+        return data
+    }
+
     /// Extended size box
     private func createExtendedBox(type: String, size: UInt64) -> Data {
         var data = Data()
@@ -132,6 +141,52 @@ final class MP4ReconstructorTests: XCTestCase {
         XCTAssertEqual(result?.totalSize, 32 + 128 + 1024)
         XCTAssertEqual(result?.fragments.count, 1)
         XCTAssertFalse(result?.hasDisplacedMoov ?? true)
+    }
+
+    func testDetailedLayoutIncludesHEVCValidationWhenAnnexBParameterSetsExist() {
+        var buffer = Data()
+        buffer.append(createBox(type: "ftyp", size: 32))
+        buffer.append(createBox(type: "moov", size: 128))
+
+        let hevcPayload = Data(
+            [
+                0x00, 0x00, 0x00, 0x01, 0x40, 0x01, 0xAA, // VPS
+                0x00, 0x00, 0x01, 0x42, 0x01, 0xBB, // SPS
+                0x00, 0x00, 0x01, 0x44, 0x01, 0xCC, // PPS
+            ]
+        )
+        buffer.append(createBox(type: "mdat", payload: hevcPayload))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: buffer)
+        let reconstructor = MP4Reconstructor()
+
+        let result = reconstructor.reconstructDetailedLayout(startingAt: 0, reader: fakeReader)
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result?.hevcValidation?.hasRequiredParameterSets ?? false)
+        XCTAssertFalse(result?.hevcValidation?.hasInvalidParameterSetSignal ?? true)
+    }
+
+    func testDetailedLayoutFlagsMissingHEVCParameterSetsWhenAnnexBExists() {
+        var buffer = Data()
+        buffer.append(createBox(type: "ftyp", size: 32))
+        buffer.append(createBox(type: "moov", size: 128))
+
+        let hevcPayload = Data(
+            [
+                0x00, 0x00, 0x01, 0x42, 0x01, 0xAA, // SPS
+                0x00, 0x00, 0x01, 0x44, 0x01, 0xBB, // PPS (no VPS)
+            ]
+        )
+        buffer.append(createBox(type: "mdat", payload: hevcPayload))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: buffer)
+        let reconstructor = MP4Reconstructor()
+
+        let result = reconstructor.reconstructDetailedLayout(startingAt: 0, reader: fakeReader)
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result?.hevcValidation?.hasAnnexBData ?? false)
+        XCTAssertFalse(result?.hevcValidation?.hasRequiredParameterSets ?? true)
+        XCTAssertTrue(result?.hevcValidation?.hasInvalidParameterSetSignal ?? false)
     }
 
     func testDetailedLayoutFindsDisplacedMoov() {

@@ -201,4 +201,43 @@ final class ImageReconstructorTests: XCTestCase {
         XCTAssertTrue(try payload.contains(XCTUnwrap("moov".data(using: .ascii))))
         XCTAssertTrue(try payload.contains(XCTUnwrap("mdat".data(using: .ascii))))
     }
+
+    func testReconstructDetailed_HEICIncludesOptionalHEVCValidation() async throws {
+        var ftyp = Data([0x00, 0x00, 0x00, 0x18])
+        try ftyp.append(XCTUnwrap("ftyp".data(using: .ascii)))
+        try ftyp.append(XCTUnwrap("heic".data(using: .ascii)))
+        ftyp.append(Data(repeating: 0x00, count: 12))
+        let initial = ftyp + Data(repeating: 0x00, count: 512 - ftyp.count)
+
+        var moov = Data([0x00, 0x00, 0x00, 0x20])
+        try moov.append(XCTUnwrap("moov".data(using: .ascii)))
+        moov.append(Data(repeating: 0x01, count: 24))
+        moov.append(Data(repeating: 0x00, count: 512 - moov.count))
+
+        let hevcPayload: [UInt8] = [
+            0x00, 0x00, 0x00, 0x01, 0x40, 0x01, 0xAA, // VPS
+            0x00, 0x00, 0x01, 0x42, 0x01, 0xBB, // SPS
+            0x00, 0x00, 0x01, 0x44, 0x01, 0xCC, // PPS
+        ]
+        var mdat = Data()
+        var mdatSize = UInt32(8 + hevcPayload.count).bigEndian
+        mdat.append(Data(bytes: &mdatSize, count: 4))
+        try mdat.append(XCTUnwrap("mdat".data(using: .ascii)))
+        mdat.append(contentsOf: hevcPayload)
+        mdat.append(Data(repeating: 0x00, count: 512 - mdat.count))
+
+        reader.buffer = initial + moov + mdat
+
+        let result = await sut.reconstructDetailed(
+            headerOffset: 0,
+            initialChunk: initial,
+            reader: reader
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.format, .heic)
+        XCTAssertFalse(result?.isPartial ?? true)
+        XCTAssertNotNil(result?.hevcValidation)
+        XCTAssertTrue(result?.hevcValidation?.hasRequiredParameterSets ?? false)
+    }
 }

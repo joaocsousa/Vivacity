@@ -972,7 +972,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-049 🔵 HEVC/H.265 NAL Unit Boundary Detection (Future Consideration)
+### T-049 ✅ HEVC/H.265 NAL Unit Boundary Detection
 
 **Description**: Add a lightweight HEVC bitstream parser to validate parameter sets (VPS/SPS/PPS) inside HEIC containers and fragmented MP4 files (specifically within the `mdat` payload). This will definitively verify if HEVC compressed video or photo data is intact, enabling precise confidence scoring where ISOBMFF atom analysis alone falls short.
 
@@ -988,5 +988,14 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `Vivacity/Services/Carvers/ImageReconstructor.swift` [MODIFY]
 - `Vivacity/Services/Carvers/MP4Reconstructor.swift` [MODIFY]
 - `VivacityTests/Carvers/HEVCNALParserTests.swift` [NEW]
+
+**Completion Notes**:
+- Added `HEVCNALParser` with bounded Annex-B scanning (`00 00 01` and `00 00 00 01`) and NAL-header decoding for VPS/SPS/PPS detection.
+- Added lightweight runtime guardrails (`maxScanBytes` and `maxNALUnits`) so HEVC validation remains bounded per candidate.
+- Wired optional HEVC validation into `ImageReconstructor` HEIC flow and surfaced metadata on `ImageReconstructionResult` without hard-failing reconstruction.
+- Wired optional HEVC validation into `MP4Reconstructor` by sampling bounded `mdat` payload ranges and surfacing metadata on `MP4ReconstructionResult`.
+- Added parser unit coverage for valid VPS/SPS/PPS streams, incomplete parameter sets, non-Annex-B payloads, and NAL-unit limit behavior.
+- Added integration coverage in `ImageReconstructorTests` and `MP4ReconstructorTests` to verify optional HEVC validation metadata is populated in reconstruction results.
+- Verification on March 4, 2026: `xcodegen generate`, `swiftformat .`, `swiftlint` (0 violations), `xcodebuild build -scheme Vivacity -destination 'platform=macOS'`, and `xcodebuild test -scheme Vivacity -destination 'platform=macOS' -skip-testing:VivacityUITests` passed (full UI test run in this environment hit an authentication/system-state runner issue).
 
 ---
