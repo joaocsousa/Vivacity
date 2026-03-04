@@ -795,7 +795,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-042 Improve fragmented media reconstruction
+### T-042 ✅ Improve fragmented media reconstruction
 
 **Description**: Rebuild fragmented MP4/MOV (stco/co64 chunk tables, CTS/DTS ordering) and add JPEG/HEIC split-segment reassembly with Huffman table re-seeding; output playable or best-effort partials.
 
@@ -808,6 +808,13 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `Vivacity/Services/FragmentedVideoAssembler.swift`
 - `Vivacity/Services/ImageReconstructor.swift`
 - `VivacityTests/**` (fragmented media fixtures)
+
+**Completion Notes**:
+- Implemented fragmented MP4/MOV assembly heuristics that scan and order nearby ISO BMFF boxes, detect playable `moov/moof` + `mdat` structures, and update unbounded video candidates with reconstructed best-effort size.
+- Extended image reconstruction with a detailed result API (`ImageReconstructionResult`) carrying format and partial-status metadata.
+- Added JPEG split-segment improvements including missing Huffman-table re-seeding before SOS and explicit partial output signaling when EOI is not found.
+- Added HEIC split-segment reassembly by merging relevant ISO BMFF box sectors and reporting partial vs complete outcomes based on `moov/moof` + `mdat` presence.
+- Added unit tests covering fragmented MP4 inference, JPEG/HEIC segment reconstruction, Huffman re-seeding, and partial-save signaling.
 
 ---
 
