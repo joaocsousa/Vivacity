@@ -446,6 +446,9 @@ final class FileScanViewModel {
         switch event {
         case let .fileFound(file):
             foundFiles.append(file)
+            if file.recoveryConfidence != .low {
+                selectedFileIDs.insert(file.id)
+            }
         case let .progress(value):
             progress = value
         case .completed:

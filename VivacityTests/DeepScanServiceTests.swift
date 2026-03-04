@@ -2,6 +2,61 @@ import XCTest
 @testable import Vivacity
 
 final class DeepScanServiceTests: XCTestCase {
+    func testDeepScanFiltersLowEntropyJPEGFalsePositive() async throws {
+        var bytes: [UInt8] = [0xFF, 0xD8, 0xFF]
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 512))
+        bytes.append(contentsOf: [0xFF, 0xD9])
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 4096 - bytes.count))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let device = StorageDevice(
+            id: "test", name: "test", volumePath: URL(fileURLWithPath: "/dev/null"),
+            volumeUUID: "test", filesystemType: .other, isExternal: true, isDiskImage: false,
+            partitionOffset: nil, partitionSize: nil, totalCapacity: Int64(bytes.count), availableCapacity: 0
+        )
+
+        let stream = deepScanService.scan(device: device, existingOffsets: [], startOffset: 0, cameraProfile: .generic)
+        var foundFiles: [RecoverableFile] = []
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                foundFiles.append(file)
+            }
+        }
+
+        XCTAssertTrue(foundFiles.isEmpty)
+    }
+
+    func testDeepScanEmitsHighEntropyJPEGWithConfidenceScore() async throws {
+        var bytes: [UInt8] = [0xFF, 0xD8, 0xFF]
+        while bytes.count < 4094 {
+            bytes.append(UInt8(bytes.count % 256))
+        }
+        bytes.append(contentsOf: [0xFF, 0xD9])
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let device = StorageDevice(
+            id: "test", name: "test", volumePath: URL(fileURLWithPath: "/dev/null"),
+            volumeUUID: "test", filesystemType: .other, isExternal: true, isDiskImage: false,
+            partitionOffset: nil, partitionSize: nil, totalCapacity: Int64(bytes.count), availableCapacity: 0
+        )
+
+        let stream = deepScanService.scan(device: device, existingOffsets: [], startOffset: 0, cameraProfile: .generic)
+        var firstFoundFile: RecoverableFile?
+
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                firstFoundFile = file
+                break
+            }
+        }
+
+        XCTAssertNotNil(firstFoundFile)
+        XCTAssertNotNil(firstFoundFile?.confidenceScore)
+        XCTAssertNotEqual(firstFoundFile?.recoveryConfidence, .low)
+    }
+
     func testFileFooterDetectorFindsJPEGFooter() async throws {
         var bytes: [UInt8] = [0xFF, 0xD8, 0xFF]
         bytes.append(contentsOf: Array(repeating: 0x11, count: 100))
