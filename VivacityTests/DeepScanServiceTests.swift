@@ -2,6 +2,118 @@ import XCTest
 @testable import Vivacity
 
 final class DeepScanServiceTests: XCTestCase {
+    func testDeepScanDetectsAVIFBrand() async throws {
+        var bytes: [UInt8] = [
+            0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66,
+            0x00, 0x00, 0x00, 0x00,
+        ]
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 2048 - bytes.count))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let stream = deepScanService.scan(
+            device: makeDevice(totalCapacity: Int64(bytes.count)),
+            existingOffsets: [],
+            startOffset: 0,
+            cameraProfile: .generic
+        )
+
+        var firstFoundFile: RecoverableFile?
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                firstFoundFile = file
+                break
+            }
+        }
+
+        XCTAssertEqual(firstFoundFile?.signatureMatch, .avif)
+        XCTAssertEqual(firstFoundFile?.fileExtension, "avif")
+    }
+
+    func testDeepScanDetectsCR3Brand() async throws {
+        var bytes: [UInt8] = [
+            0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x63, 0x72, 0x33, 0x20,
+            0x00, 0x00, 0x00, 0x00,
+        ]
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 2048 - bytes.count))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let stream = deepScanService.scan(
+            device: makeDevice(totalCapacity: Int64(bytes.count)),
+            existingOffsets: [],
+            startOffset: 0,
+            cameraProfile: .canon
+        )
+
+        var firstFoundFile: RecoverableFile?
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                firstFoundFile = file
+                break
+            }
+        }
+
+        XCTAssertEqual(firstFoundFile?.signatureMatch, .cr3)
+        XCTAssertEqual(firstFoundFile?.fileExtension, "cr3")
+    }
+
+    func testDeepScanDetectsRAFDirectSignature() async throws {
+        var bytes = FileSignature.raf.magicBytes
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 2048 - bytes.count))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let stream = deepScanService.scan(
+            device: makeDevice(totalCapacity: Int64(bytes.count)),
+            existingOffsets: [],
+            startOffset: 0,
+            cameraProfile: .generic
+        )
+
+        var firstFoundFile: RecoverableFile?
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                firstFoundFile = file
+                break
+            }
+        }
+
+        XCTAssertEqual(firstFoundFile?.signatureMatch, .raf)
+        XCTAssertEqual(firstFoundFile?.fileExtension, "raf")
+    }
+
+    func testDeepScanDetectsMOVUsingAtomPatternWithoutFtyp() async throws {
+        var bytes: [UInt8] = [
+            0x00, 0x00, 0x00, 0x20, 0x6D, 0x6F, 0x6F, 0x76, // moov
+        ]
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 24))
+        bytes.append(contentsOf: [
+            0x00, 0x00, 0x00, 0x20, 0x6D, 0x64, 0x61, 0x74, // mdat
+        ])
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 24))
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 4096 - bytes.count))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let stream = deepScanService.scan(
+            device: makeDevice(totalCapacity: Int64(bytes.count)),
+            existingOffsets: [],
+            startOffset: 0,
+            cameraProfile: .generic
+        )
+
+        var firstFoundFile: RecoverableFile?
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                firstFoundFile = file
+                break
+            }
+        }
+
+        XCTAssertEqual(firstFoundFile?.signatureMatch, .mov)
+    }
+
     func testDeepScanFiltersLowEntropyJPEGFalsePositive() async throws {
         var bytes: [UInt8] = [0xFF, 0xD8, 0xFF]
         bytes.append(contentsOf: Array(repeating: 0x00, count: 512))
@@ -249,5 +361,21 @@ final class DeepScanServiceTests: XCTestCase {
         XCTAssertEqual(file.signatureMatch, .tiff)
         XCTAssertEqual(file.fileExtension, "tiff")
         XCTAssertTrue(file.fileName.starts(with: "recovered_"))
+    }
+
+    private func makeDevice(totalCapacity: Int64 = 1024) -> StorageDevice {
+        StorageDevice(
+            id: "test",
+            name: "test",
+            volumePath: URL(fileURLWithPath: "/dev/null"),
+            volumeUUID: "test",
+            filesystemType: .other,
+            isExternal: true,
+            isDiskImage: false,
+            partitionOffset: nil,
+            partitionSize: nil,
+            totalCapacity: totalCapacity,
+            availableCapacity: 0
+        )
     }
 }

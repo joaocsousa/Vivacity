@@ -28,8 +28,12 @@ struct MP4Reconstructor: MP4Reconstructing {
     func calculateContiguousSize(startingAt offset: UInt64, reader: PrivilegedDiskReading) -> UInt64? {
         var currentOffset = offset
         var boxesParsed = 0
+        var foundFtyp = false
+        var foundMoov = false
+        var foundMoof = false
         var foundMdat = false
         var lastValidSize: UInt64 = 0
+        var highestMediaEnd: UInt64 = 0
 
         while boxesParsed < maxBoxesToParse {
             guard let box = readBoxHeader(at: currentOffset, reader: reader) else {
@@ -41,6 +45,15 @@ struct MP4Reconstructor: MP4Reconstructing {
                 break
             }
 
+            if box.type == "ftyp" {
+                foundFtyp = true
+            }
+            if box.type == "moov" {
+                foundMoov = true
+            }
+            if box.type == "moof" {
+                foundMoof = true
+            }
             if box.type == "mdat" {
                 foundMdat = true
             }
@@ -49,6 +62,7 @@ struct MP4Reconstructor: MP4Reconstructing {
             currentOffset = nextOffset
             boxesParsed += 1
             lastValidSize = currentOffset - offset
+            highestMediaEnd = max(highestMediaEnd, lastValidSize)
 
             // If the box size is 0, it extends to EOF, which we can't bounds-check natively.
             if box.size == 0 {
@@ -56,8 +70,13 @@ struct MP4Reconstructor: MP4Reconstructing {
             }
         }
 
-        // If we found mdat, we have at least a playable truncated video.
-        if foundMdat, lastValidSize > 0 {
+        // Preferred path: paired structure gives highest confidence size.
+        if foundMdat, foundMoov || foundMoof, highestMediaEnd > 0 {
+            return highestMediaEnd
+        }
+
+        // Graceful fallback on partial/corrupt files.
+        if foundMdat, foundFtyp, lastValidSize > 0 {
             return lastValidSize
         }
 

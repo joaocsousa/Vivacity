@@ -57,6 +57,14 @@ struct FileFooterDetector: FileFooterDetecting {
         reader: PrivilegedDiskReading,
         maxScanBytes: Int
     ) async throws -> Int64? {
+        if let segmentedSize = try await estimateJPEGSizeUsingSOFAndEOI(
+            startOffset: startOffset,
+            reader: reader,
+            maxScanBytes: maxScanBytes
+        ) {
+            return segmentedSize
+        }
+
         let footer: [UInt8] = [0xFF, 0xD9]
 
         if let footerEnd = try await findPatternEnd(
@@ -75,6 +83,87 @@ struct FileFooterDetector: FileFooterDetecting {
             maxScanBytes: maxScanBytes,
             minimumDistance: 512
         )
+    }
+
+    private func estimateJPEGSizeUsingSOFAndEOI(
+        startOffset: UInt64,
+        reader: PrivilegedDiskReading,
+        maxScanBytes: Int
+    ) async throws -> Int64? {
+        guard let bytes = try await readWindow(
+            startOffset: startOffset,
+            reader: reader,
+            maxScanBytes: maxScanBytes
+        ) else {
+            return nil
+        }
+        guard bytes.count >= 4, bytes[0] == 0xFF, bytes[1] == 0xD8 else { return nil }
+
+        var index = 2
+        var sawSOF = false
+        while index + 3 < bytes.count {
+            if bytes[index] != 0xFF {
+                index += 1
+                continue
+            }
+            var markerIndex = index + 1
+            while markerIndex < bytes.count, bytes[markerIndex] == 0xFF {
+                markerIndex += 1
+            }
+            guard markerIndex < bytes.count else { break }
+            let marker = bytes[markerIndex]
+
+            if marker == 0xD9 {
+                let fileEnd = markerIndex + 1
+                if sawSOF, fileEnd > 4 {
+                    return Int64(fileEnd)
+                }
+                return nil
+            }
+
+            if marker == 0xD8 || marker == 0x01 || (0xD0 ... 0xD7).contains(marker) {
+                index = markerIndex + 1
+                continue
+            }
+
+            guard markerIndex + 2 < bytes.count else { break }
+            let segmentLength = Int(bytes[markerIndex + 1]) << 8 | Int(bytes[markerIndex + 2])
+            if segmentLength < 2 { return nil }
+            if (0xC0 ... 0xCF).contains(marker), marker != 0xC4, marker != 0xC8, marker != 0xCC {
+                sawSOF = true
+            }
+            index = markerIndex + 1 + segmentLength
+        }
+
+        return nil
+    }
+
+    private func readWindow(
+        startOffset: UInt64,
+        reader: PrivilegedDiskReading,
+        maxScanBytes: Int
+    ) async throws -> [UInt8]? {
+        guard maxScanBytes > 0 else { return nil }
+        var scanned = 0
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(min(maxScanBytes, 256 * 1024))
+
+        while scanned < maxScanBytes {
+            try Task.checkCancellation()
+
+            let toRead = min(Self.readChunkSize, maxScanBytes - scanned)
+            var chunk = [UInt8](repeating: 0, count: toRead)
+            let offset = startOffset + UInt64(scanned)
+            let bytesRead = chunk.withUnsafeMutableBytes { buffer in
+                reader.read(into: buffer.baseAddress!, offset: offset, length: toRead)
+            }
+            guard bytesRead > 0 else { break }
+            bytes.append(contentsOf: chunk.prefix(bytesRead))
+            scanned += bytesRead
+            await Task.yield()
+        }
+
+        return bytes.isEmpty ? nil : bytes
     }
 
     private func estimatePNGSize(

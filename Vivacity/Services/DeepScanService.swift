@@ -27,14 +27,14 @@ struct DeepScanService: DeepScanServicing {
 
     private static let sectorSize = 512
     private static let readChunkSectors = 256
-    private static let maxSignatureLength = 12
+    private static let maxSignatureLength = 16
     private static let entropySampleBytes = 4096
     private static let entropyRejectThreshold = 2.2
     private static let confidenceRejectThreshold = 0.4
 
     private static let directSignatures: [(FileSignature, [UInt8])] = {
         let unambiguous: [FileSignature] = [
-            .jpeg, .png, .bmp, .gif, .mkv, .wmv, .flv,
+            .jpeg, .png, .bmp, .gif, .mkv, .wmv, .flv, .raf, .rw2,
         ]
         return unambiguous.map { ($0, $0.magicBytes) }
     }()
@@ -368,7 +368,9 @@ struct DeepScanService: DeepScanServicing {
                     sizeInBytes = estimatedSize
                 }
 
-                if match == .mp4 || match == .mov || match == .m4v || match == .threeGP {
+                if match == .mp4 || match == .mov || match == .m4v || match == .threeGP ||
+                    match == .heic || match == .heif || match == .avif || match == .cr3
+                {
                     let mp4Reconstructor = MP4Reconstructor()
                     if let contiguousSize = mp4Reconstructor.calculateContiguousSize(
                         startingAt: offset,
@@ -478,13 +480,13 @@ struct DeepScanService: DeepScanServicing {
 
     private func signatureStrength(for signature: FileSignature) -> Double {
         switch signature {
-        case .jpeg, .png, .gif, .bmp, .tiff, .tiffBigEndian, .heic, .heif:
+        case .jpeg, .png, .gif, .bmp, .tiff, .tiffBigEndian, .heic, .heif, .avif:
             0.95
         case .mp4, .mov, .m4v, .threeGP, .mkv, .avi:
             0.85
         case .webp, .wmv, .flv:
             0.75
-        case .cr2, .nef, .arw, .dng:
+        case .cr2, .cr3, .nef, .arw, .dng, .raf, .rw2:
             0.8
         }
     }
@@ -568,6 +570,10 @@ struct DeepScanService: DeepScanServicing {
             return ftyp
         }
 
+        if let movAtom = matchMOVAtomSignatures(buffer: buffer, position: position, remaining: remaining) {
+            return movAtom
+        }
+
         return nil
     }
 
@@ -593,6 +599,14 @@ struct DeepScanService: DeepScanServicing {
         remaining: Int,
         cameraProfile: CameraProfile
     ) -> FileSignature? {
+        // Panasonic RW2: 49 49 55 00
+        if remaining >= 4,
+           buffer[position] == 0x49, buffer[position + 1] == 0x49,
+           buffer[position + 2] == 0x55, buffer[position + 3] == 0x00
+        {
+            return .rw2
+        }
+
         // Little-endian TIFF: 49 49 2A 00
         if buffer[position] == 0x49, buffer[position + 1] == 0x49,
            buffer[position + 2] == 0x2A, buffer[position + 3] == 0x00
@@ -641,12 +655,16 @@ struct DeepScanService: DeepScanServicing {
                 switch brand.trimmingCharacters(in: .whitespaces).lowercased() {
                 case "isom", "iso2", "mp41", "mp42", "avc1":
                     return .mp4
-                case "qt":
+                case "qt", "qt  ", "wide":
                     return .mov
                 case "heic", "heix":
                     return .heic
                 case "mif1":
                     return .heif
+                case "avif", "avis":
+                    return .avif
+                case "cr3", "crx":
+                    return .cr3
                 case "m4v":
                     return .m4v
                 case "3gp4", "3gp5", "3gp6", "3ge6":
@@ -655,6 +673,25 @@ struct DeepScanService: DeepScanServicing {
                     return .mp4 // Default ftyp to mp4
                 }
             }
+        }
+        return nil
+    }
+
+    private func matchMOVAtomSignatures(buffer: [UInt8], position: Int, remaining: Int) -> FileSignature? {
+        guard remaining >= 16 else { return nil }
+        let firstType = String(bytes: buffer[(position + 4) ..< (position + 8)], encoding: .ascii) ?? ""
+        let firstSize = (Int(buffer[position]) << 24)
+            | (Int(buffer[position + 1]) << 16)
+            | (Int(buffer[position + 2]) << 8)
+            | Int(buffer[position + 3])
+        guard firstSize >= 8, firstSize <= remaining - 8 else { return nil }
+        let secondHeader = position + firstSize
+        guard secondHeader + 8 <= buffer.count else { return nil }
+        let secondType = String(bytes: buffer[(secondHeader + 4) ..< (secondHeader + 8)], encoding: .ascii) ?? ""
+
+        let knownAtoms: Set<String> = ["moov", "mdat", "free", "wide", "skip", "udta", "trak"]
+        if knownAtoms.contains(firstType), knownAtoms.contains(secondType) {
+            return .mov
         }
         return nil
     }
@@ -705,10 +742,24 @@ struct DeepScanService: DeepScanServicing {
 
         // Disambiguate ftyp-based formats
         switch signature {
-        case .mp4, .mov, .heic, .heif, .m4v, .threeGP:
+        case .mp4, .mov, .heic, .heif, .m4v, .threeGP, .avif, .cr3:
             guard header.count >= 8 else { return true }
             let ftyp = String(bytes: header[4 ..< 8], encoding: .ascii) ?? ""
-            return ftyp == "ftyp"
+            guard ftyp == "ftyp", header.count >= 12 else { return false }
+            let brand = String(bytes: header[8 ..< 12], encoding: .ascii)?
+                .trimmingCharacters(in: .whitespaces)
+                .lowercased() ?? ""
+            switch signature {
+            case .mp4: return ["isom", "iso2", "mp41", "mp42", "avc1"].contains(brand)
+            case .mov: return ["qt", "qt  ", "wide"].contains(brand)
+            case .heic: return ["heic", "heix"].contains(brand)
+            case .heif: return brand == "mif1"
+            case .m4v: return brand == "m4v"
+            case .threeGP: return ["3gp4", "3gp5", "3gp6", "3ge6"].contains(brand)
+            case .avif: return ["avif", "avis"].contains(brand)
+            case .cr3: return ["cr3", "crx"].contains(brand)
+            default: return true
+            }
         default:
             return true
         }
