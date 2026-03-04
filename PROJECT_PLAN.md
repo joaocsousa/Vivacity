@@ -27,7 +27,6 @@
 | M11 | Coverage & Quality Hardening | T-034 → T-036 | ✅ DONE |
 | M12 | XcodeGen Migration | T-037 → T-039 | ✅ DONE |
 | M13 | Recovery Quality Improvements | T-040 → T-046 | ⬜️ TODO |
-| M13 | Recovery Quality Improvements | T-040 → T-046 | ⬜️ TODO |
 
 ---
 
