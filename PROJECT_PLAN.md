@@ -771,7 +771,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-041 Extend signatures and size inference
+### T-041 ✅ Extend signatures and size inference
 
 **Description**: Expand signature coverage (CR3, RAF, RW2, AVIF, ProRes/MOV atom patterns, JPEG variants) and improve size estimation using format-aware footer/box parsing.
 
@@ -784,6 +784,14 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `Vivacity/Models/FileSignature.swift`
 - `Vivacity/Services/DeepScanService.swift`
 - `VivacityTests/**` (fixtures for new formats)
+
+**Completion Notes**:
+- Extended signature coverage with `cr3`, `raf`, `rw2`, and `avif` and wired extension/category mapping.
+- Added deep-scan matching for CR3/AVIF `ftyp` brands and MOV atom-pattern detection for files missing `ftyp`.
+- Increased cross-boundary signature window to support longer RAW signatures (e.g., RAF).
+- Improved JPEG size inference with SOF/EOI segment parsing before fallback heuristics.
+- Improved MP4/MOV size inference to prefer paired media structures (`moov`/`mdat` or `moof`/`mdat`) with graceful fallback on partials.
+- Added unit tests for new signatures, MOV atom detection, JPEG sizing path, and MP4 partial fallback behavior.
 
 ---
 

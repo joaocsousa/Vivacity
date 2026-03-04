@@ -26,9 +26,13 @@ enum FileSignature: String, Sendable, CaseIterable, Codable {
     case gif
     case webp
     case cr2
+    case cr3
     case nef
     case arw
     case dng
+    case raf
+    case rw2
+    case avif
 
     // Videos
     case mp4
@@ -55,9 +59,13 @@ enum FileSignature: String, Sendable, CaseIterable, Codable {
         case .gif: "gif"
         case .webp: "webp"
         case .cr2: "cr2"
+        case .cr3: "cr3"
         case .nef: "nef"
         case .arw: "arw"
         case .dng: "dng"
+        case .raf: "raf"
+        case .rw2: "rw2"
+        case .avif: "avif"
         case .mp4: "mp4"
         case .mov: "mov"
         case .avi: "avi"
@@ -85,9 +93,13 @@ enum FileSignature: String, Sendable, CaseIterable, Codable {
         case .gif: [0x47, 0x49, 0x46, 0x38]
         case .webp: [0x52, 0x49, 0x46, 0x46] // "RIFF", followed by "WEBP" at offset 8
         case .cr2: [0x49, 0x49, 0x2A, 0x00] // Same TIFF header; CR2 has "CR" at offset 8
+        case .cr3: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "cr3"/"crx"
         case .nef: [0x4D, 0x4D, 0x00, 0x2A] // Big-endian TIFF; Nikon-specific IFD
         case .arw: [0x49, 0x49, 0x2A, 0x00] // TIFF-based; Sony-specific
         case .dng: [0x49, 0x49, 0x2A, 0x00] // TIFF-based; Adobe DNG
+        case .raf: [0x46, 0x55, 0x4A, 0x49, 0x46, 0x49, 0x4C, 0x4D, 0x43, 0x43, 0x44, 0x2D, 0x52, 0x41, 0x57, 0x20]
+        case .rw2: [0x49, 0x49, 0x55, 0x00]
+        case .avif: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "avif"
         case .mp4: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "isom"/"mp4"
         case .mov: [0x00, 0x00, 0x00] // ftyp at offset 4; brand "qt  "
         case .avi: [0x52, 0x49, 0x46, 0x46] // "RIFF", followed by "AVI " at offset 8
@@ -103,7 +115,7 @@ enum FileSignature: String, Sendable, CaseIterable, Codable {
     var category: FileCategory {
         switch self {
         case .jpeg, .png, .heic, .heif, .tiff, .tiffBigEndian,
-             .bmp, .gif, .webp, .cr2, .nef, .arw, .dng:
+             .bmp, .gif, .webp, .cr2, .cr3, .nef, .arw, .dng, .raf, .rw2, .avif:
             .image
         case .mp4, .mov, .avi, .mkv, .m4v, .wmv, .flv, .threeGP:
             .video

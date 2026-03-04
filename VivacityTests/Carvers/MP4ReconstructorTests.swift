@@ -87,6 +87,18 @@ final class MP4ReconstructorTests: XCTestCase {
         XCTAssertNil(size)
     }
 
+    func testFallsBackToNilWhenOnlyMdatWithoutContainerMetadata() {
+        var buffer = Data()
+        buffer.append(createBox(type: "mdat", size: 512))
+        buffer.append(Data([0xFF, 0xFF, 0xFF, 0xFF]))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: buffer)
+        let reconstructor = MP4Reconstructor()
+
+        let size = reconstructor.calculateContiguousSize(startingAt: 0, reader: fakeReader)
+        XCTAssertNil(size)
+    }
+
     func testFailsOnZeroSizeBox() throws {
         var buffer = Data()
         buffer.append(createBox(type: "ftyp", size: 32))

@@ -718,6 +718,25 @@ final class AdditionalCoverageTests: XCTestCase {
     func testFileFooterDetectorJPEGAndPNGFallbackPaths() async throws {
         let detector = FileFooterDetector()
 
+        // SOF0 + EOI path
+        var structuredJPEG: [UInt8] = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]
+        structuredJPEG.append(contentsOf: Array(repeating: 0x00, count: 14))
+        structuredJPEG.append(contentsOf: [0xFF, 0xC0, 0x00, 0x11])
+        structuredJPEG.append(contentsOf: Array(repeating: 0x00, count: 15))
+        structuredJPEG.append(contentsOf: [0xFF, 0xDA, 0x00, 0x08])
+        structuredJPEG.append(contentsOf: Array(repeating: 0x11, count: 64))
+        structuredJPEG.append(contentsOf: [0xFF, 0xD9])
+        structuredJPEG.append(contentsOf: Array(repeating: 0x00, count: 4096 - structuredJPEG.count))
+        let structuredReader = FakePrivilegedDiskReader(buffer: Data(structuredJPEG))
+
+        let structuredJPEGSize = try await detector.estimateSize(
+            signature: .jpeg,
+            startOffset: 0,
+            reader: structuredReader,
+            maxScanBytes: 4096
+        )
+        XCTAssertNotNil(structuredJPEGSize)
+
         var jpegBytes = [UInt8](repeating: 0, count: 4096)
         jpegBytes[0] = 0xFF
         jpegBytes[1] = 0xD8
