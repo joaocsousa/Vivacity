@@ -6,6 +6,10 @@
 >
 > **Minimum OS**: macOS 14.0 (Sonoma) — also compatible with macOS 15.x (Sequoia)
 
+> [!NOTE]
+> **Current scan behavior (as of T-051, March 4, 2026):** Vivacity uses a single unified scan run that combines metadata/catalog methods and deep/raw carving, with one progress bar showing percentage + estimated time remaining.
+> Historical tickets below may reference the earlier dual-phase scan UX for implementation history.
+
 ---
 
 ### T-051 ✅ Unify Scan Into One Comprehensive Pass With Accurate Progress ETA
@@ -175,11 +179,11 @@
 
 ---
 
-## M3 — File Scan & Preview Screen (Dual Scan Mode)
+## M3 — File Scan & Preview Screen (Historical Dual Scan Mode)
 
-> Two-phase scanning: **Fast Scan** (metadata) runs first, then the user is
-> prompted to optionally run **Deep Scan** (raw file carving). Files from both
-> phases accumulate in a single list. Recovery is blocked while scanning.
+> Historical implementation at the time of M3:
+> Two-phase scanning with **Fast Scan** then optional **Deep Scan**.
+> This UX was superseded later by **T-051** unified scan flow.
 
 ### T-006 ✅ Define supported file formats
 
@@ -247,7 +251,7 @@
 
 ---
 
-### T-009 ✅ Create `FileScanViewModel` — dual-phase state machine
+### T-009 ✅ Create `FileScanViewModel` — dual-phase state machine (historical)
 
 **Description**: ViewModel for the scanning screen with two-phase scan flow.
 
@@ -267,7 +271,7 @@
 
 ---
 
-### T-010 ✅ Create `FileScanView` — progressive scan UI
+### T-010 ✅ Create `FileScanView` — progressive scan UI (historical)
 
 **Description**: Main scan UI with progressive file list, Deep Scan prompt, and scan controls.
 

@@ -17,7 +17,7 @@ For the canonical roadmap, status, and handoff details, see [PROJECT_PLAN.md](PR
   - **Deep raw carving** — Sector-by-sector signature carving with format-aware validation and reconstruction
 - **Live Preview** — Preview recovered images and videos in a split-view panel as results stream in
 - **20+ File Formats** — JPEG, PNG, HEIC, TIFF, CR2, ARW, DNG, BMP, GIF, WebP, MP4, MOV, AVI, MKV, M4V, WMV, FLV, 3GP
-- **EXIF-Based Naming** — Deep Scan results are named using embedded EXIF dates when available
+- **EXIF-Based Naming** — Carved media results are named using embedded EXIF dates when available
 - **Privileged Disk Access** — Transparent privilege escalation via macOS password dialog when raw device access is needed
 
 ## Getting Started
