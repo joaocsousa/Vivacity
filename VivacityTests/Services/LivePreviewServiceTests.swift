@@ -24,10 +24,10 @@ final class LivePreviewServiceTests: XCTestCase {
             id: UUID(),
             fileName: "test",
             fileExtension: "txt",
-            fileType: .document,
+            fileType: .image,
             sizeInBytes: 100,
             offsetOnDisk: 0,
-            signatureMatch: nil,
+            signatureMatch: .jpeg,
             source: .fastScan
         )
 
@@ -50,10 +50,10 @@ final class LivePreviewServiceTests: XCTestCase {
             id: UUID(),
             fileName: "test",
             fileExtension: "bin",
-            fileType: .document,
-            sizeInBytes: UInt64(fileData.count),
+            fileType: .image,
+            sizeInBytes: Int64(fileData.count),
             offsetOnDisk: offset,
-            signatureMatch: nil,
+            signatureMatch: .jpeg,
             source: .deepScan
         )
 
@@ -72,10 +72,10 @@ final class LivePreviewServiceTests: XCTestCase {
             id: UUID(),
             fileName: "cached",
             fileExtension: "bin",
-            fileType: .document,
-            sizeInBytes: UInt64(fileData.count),
+            fileType: .image,
+            sizeInBytes: Int64(fileData.count),
             offsetOnDisk: 0,
-            signatureMatch: nil,
+            signatureMatch: .jpeg,
             source: .deepScan
         )
 

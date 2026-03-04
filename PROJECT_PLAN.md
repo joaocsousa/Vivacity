@@ -24,6 +24,7 @@
 | M8 | Scan Results UX | T-022 → T-024 | ✅ DONE |
 | M9 | Recovery Destination Screen | T-013 → T-015 | ✅ DONE |
 | M10 | Polish & Edge Cases | T-016 → T-018 | ✅ DONE |
+| M11 | Coverage & Quality Hardening | T-034 → T-036 | ✅ DONE |
 
 ---
 
@@ -601,3 +602,119 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - Final contrast + semantic-color polish applied to device and scan rows/overlays.
 - Placeholder app icon assets added and wired in `Assets.xcassets`.
 - End-to-end flow verified by app/UI tests (device selection → scan → preview/list interaction → recovery destination flow).
+
+---
+
+## M11 — Coverage & Quality Hardening
+
+### T-034 ✅ Increase Fast Scan critical-path coverage
+
+**Description**: Add unit tests for `FastScanService` to cover high-risk behavior currently at 0% line coverage, starting with filesystem trash discovery and APFS snapshot enumeration paths.
+
+**Acceptance Criteria**:
+- `FastScanServiceTests` added under `VivacityTests`
+- Covers trash-directory discovery of supported media files and ignores unsupported files
+- Covers APFS snapshot flow (discover snapshot names, mount callback usage, only emit files missing from live volume)
+- Verifies stream emits completion/progress events for successful scan runs
+
+**Files**:
+- `VivacityTests/Services/FastScanServiceTests.swift` [NEW]
+- `Vivacity/Services/FastScanService.swift` [NO API CHANGE EXPECTED]
+
+**Completion Notes**:
+- Added `FastScanServiceTests` covering trash discovery and APFS snapshot enumeration paths.
+- Fixed snapshot/live-path comparison in `FastScanService.enumerateSnapshot` so files still present on the live volume are not emitted as deleted.
+- Coverage improved for `FastScanService.swift` from 0% to 58.93% (340/577 lines) in the latest coverage run.
+
+---
+
+### T-035 ✅ Add filesystem catalog scanner test coverage
+
+**Description**: Add deterministic unit tests for `FATDirectoryScanner`, `ExFATScanner`, and `NTFSScanner` using synthetic buffers/readers to validate deleted-entry parsing and edge cases.
+
+**Acceptance Criteria**:
+- Scanner-specific tests exist for happy path and malformed/corrupt entry paths
+- At least one test per scanner validates deleted-entry detection and emitted `RecoverableFile`
+- Coverage for each scanner file improves from 0%
+
+**Files**:
+- `VivacityTests/Services/FATDirectoryScannerTests.swift` [NEW]
+- `VivacityTests/Services/ExFATScannerTests.swift` [NEW]
+- `VivacityTests/Services/NTFSScannerTests.swift` [NEW]
+
+**Completion Notes**:
+- Added deterministic raw-buffer unit tests for FAT, ExFAT, and NTFS scanner flows with deleted-entry fixtures.
+- Each scanner now has at least one happy-path deleted-file detection test that validates emitted `RecoverableFile` metadata.
+- Coverage after this task:
+  - `FATDirectoryScanner.swift`: 82.56% (303/367)
+  - `ExFATScanner.swift`: 79.50% (256/322)
+  - `NTFSScanner.swift`: 85.01% (312/367)
+
+---
+
+### T-036 ✅ Eliminate Swift 6 compatibility warnings in scan pipeline
+
+**Description**: Resolve warnings that become Swift 6 errors, starting with async iteration over `FileManager` enumerators in `FastScanService`.
+
+**Acceptance Criteria**:
+- No `makeIterator` async-context warnings in `FastScanService.swift`
+- Release build completes without Swift 6 migration warnings in modified files
+- Behavior remains unchanged (scan results and cancellation semantics)
+
+**Files**:
+- `Vivacity/Services/FastScanService.swift`
+
+**Completion Notes**:
+- Replaced async `for-in` enumeration over `FileManager` enumerators with `while let ... = enumerator.nextObject() as? URL` in `FastScanService`.
+- Removed Swift 6 migration warnings related to `makeIterator` in `FastScanService` while preserving scan behavior.
+- Release builds now complete without Swift 6 migration warnings in `FastScanService.swift` (other pre-existing non-Swift6 warnings remain in carver files).
+
+---
+
+## M12 — XcodeGen Migration
+
+### T-037 Define XcodeGen source-of-truth project spec
+
+**Description**: Introduce a `project.yml` that reproduces the current `Vivacity.xcodeproj` structure and build settings so the project can be generated deterministically.
+
+**Acceptance Criteria**:
+- `project.yml` exists and defines `Vivacity`, `VivacityTests`, and `VivacityUITests` targets
+- Target build settings, deployment target, entitlements, test host/bundle settings, and Swift versions match current behavior
+- Existing run script phases (e.g., SwiftLint) are represented in XcodeGen spec
+- `xcodegen generate` produces a buildable project
+
+**Files**:
+- `project.yml` [NEW]
+- `Vivacity.xcodeproj/project.pbxproj` [GENERATED]
+
+---
+
+### T-038 Validate generated-project parity
+
+**Description**: Verify that the generated `.xcodeproj` is functionally equivalent to the current hand-maintained project.
+
+**Acceptance Criteria**:
+- `xcodebuild test -scheme Vivacity -destination 'platform=macOS'` passes using generated project
+- `xcodebuild build -scheme Vivacity -destination 'platform=macOS'` passes using generated project
+- `swiftlint` and `swiftformat` workflows still run without project configuration regressions
+- No missing target membership issues (all source and test files compile in the expected targets)
+
+**Files**:
+- `project.yml` [MODIFY]
+- `Vivacity.xcodeproj/project.pbxproj` [GENERATED]
+
+---
+
+### T-039 Document and enforce XcodeGen workflow
+
+**Description**: Finalize repository workflow so contributors use XcodeGen as the canonical project definition.
+
+**Acceptance Criteria**:
+- README documents `xcodegen generate` as the standard setup step
+- Decision is explicitly documented on whether `Vivacity.xcodeproj` is committed or regenerated locally
+- Add lightweight guardrails (documentation and/or script) to prevent manual drift from `project.yml`
+
+**Files**:
+- `README.md` [MODIFY]
+- `CONTRIBUTING.md` [NEW/MODIFY if present]
+- `scripts/` [NEW/MODIFY if guard script is added]

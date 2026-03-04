@@ -7,12 +7,30 @@ import SwiftUI
 /// Shows thumbnails for images, video players for video files, and a
 /// placeholder for files that cannot be previewed.
 struct FilePreviewView: View {
+    typealias DiskReaderFactory = @Sendable (StorageDevice) -> PrivilegedDiskReading
+
     let file: RecoverableFile?
     let device: StorageDevice
+    private let previewService: LivePreviewServicing
+    private let diskReaderFactory: DiskReaderFactory
 
     @State private var previewURL: URL?
     @State private var isExtracting = false
-    @State private var previewService = LivePreviewService()
+
+    init(
+        file: RecoverableFile?,
+        device: StorageDevice,
+        previewService: LivePreviewServicing = LivePreviewService(),
+        diskReaderFactory: @escaping DiskReaderFactory = { device in
+            let volumeInfo = VolumeInfo.detect(for: device)
+            return PrivilegedDiskReader(devicePath: volumeInfo.devicePath)
+        }
+    ) {
+        self.file = file
+        self.device = device
+        self.previewService = previewService
+        self.diskReaderFactory = diskReaderFactory
+    }
 
     var body: some View {
         Group {
@@ -48,8 +66,7 @@ struct FilePreviewView: View {
         // Deep Scan files
         if file.source == .deepScan {
             do {
-                let volumeInfo = VolumeInfo.detect(for: device)
-                let reader = PrivilegedDiskReader(devicePath: volumeInfo.devicePath)
+                let reader = diskReaderFactory(device)
                 try reader.start()
                 defer { reader.stop() }
 
