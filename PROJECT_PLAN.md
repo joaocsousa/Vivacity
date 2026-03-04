@@ -818,7 +818,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-043 Suppress false positives and deduplicate results
+### T-043 ✅ Suppress false positives and deduplicate results
 
 **Description**: Reduce duplicate/false hits via rolling Bloom filter of offsets, overlap checks, and size-vs-available-bytes guards.
 
@@ -830,6 +830,13 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 **Files**:
 - `Vivacity/Services/DeepScanService.swift`
 - `VivacityTests/**`
+
+**Completion Notes**:
+- Added a rolling Bloom filter + exact offset set to short-circuit duplicate deep-scan hits while preserving exact dedupe correctness.
+- Added claimed byte-range tracking for emitted candidates and rejected new candidates whose inferred ranges overlap existing claims.
+- Added explicit size-vs-device-bounds guards to reject candidates whose inferred size would overrun available bytes on the scanned device.
+- Applied the dedupe/overlap/bounds checks to both filesystem-carved and linear signature-scan candidates.
+- Added targeted tests for overlapping JPEG candidates (single emission) and out-of-bounds PNG size inference rejection.
 
 ---
 

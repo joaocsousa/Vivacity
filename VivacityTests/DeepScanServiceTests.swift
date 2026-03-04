@@ -363,6 +363,86 @@ final class DeepScanServiceTests: XCTestCase {
         XCTAssertTrue(file.fileName.starts(with: "recovered_"))
     }
 
+    func testDeepScanEmitsOnlyOneFileForOverlappingJPEGCandidates() async throws {
+        var bytes = [UInt8](repeating: 0, count: 4096)
+        for i in 0 ..< bytes.count {
+            bytes[i] = UInt8(i % 256)
+        }
+
+        // First JPEG candidate at offset 0
+        bytes[0] = 0xFF
+        bytes[1] = 0xD8
+        bytes[2] = 0xFF
+        bytes[700] = 0xFF
+        bytes[701] = 0xD9
+
+        // Overlapping JPEG candidate at offset 512 (inside first candidate's inferred range)
+        bytes[512] = 0xFF
+        bytes[513] = 0xD8
+        bytes[514] = 0xFF
+        bytes[900] = 0xFF
+        bytes[901] = 0xD9
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let stream = deepScanService.scan(
+            device: makeDevice(totalCapacity: Int64(bytes.count)),
+            existingOffsets: [],
+            startOffset: 0,
+            cameraProfile: .generic
+        )
+
+        var found: [RecoverableFile] = []
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                found.append(file)
+            }
+        }
+
+        XCTAssertEqual(found.count, 1)
+        XCTAssertEqual(found.first?.offsetOnDisk, 0)
+    }
+
+    func testDeepScanRejectsCandidateThatOverrunsDeviceBounds() async throws {
+        var bytes = [UInt8](repeating: 0, count: 4096)
+        bytes[512] = 0x89
+        bytes[513] = 0x50
+        bytes[514] = 0x4E
+        bytes[515] = 0x47
+        bytes[516] = 0x0D
+        bytes[517] = 0x0A
+        bytes[518] = 0x1A
+        bytes[519] = 0x0A
+
+        // Place IEND well beyond the declared device capacity.
+        bytes[1700] = 0x49
+        bytes[1701] = 0x45
+        bytes[1702] = 0x4E
+        bytes[1703] = 0x44
+        bytes[1704] = 0xAE
+        bytes[1705] = 0x42
+        bytes[1706] = 0x60
+        bytes[1707] = 0x82
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let stream = deepScanService.scan(
+            device: makeDevice(totalCapacity: 1024),
+            existingOffsets: [],
+            startOffset: 0,
+            cameraProfile: .generic
+        )
+
+        var found: [RecoverableFile] = []
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                found.append(file)
+            }
+        }
+
+        XCTAssertTrue(found.isEmpty)
+    }
+
     private func makeDevice(totalCapacity: Int64 = 1024) -> StorageDevice {
         StorageDevice(
             id: "test",
