@@ -864,7 +864,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-045 Salvage metadata and improve naming
+### T-045 ✅ Salvage metadata and improve naming
 
 **Description**: Extract EXIF/QuickTime metadata even from partial files to recover capture time/device; use for smarter filenames and grouping.
 
@@ -878,6 +878,14 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `Vivacity/Services/PreviewService.swift`
 - `Vivacity/Services/FileRecoveryService.swift`
 - `VivacityTests/**` (partial media fixtures)
+
+**Completion Notes**:
+- Extended `EXIFDateExtractor` with resilient partial-media metadata extraction returning capture date, timezone offset, and device hints.
+- Added QuickTime/MOV extraction from partial atom streams via `mvhd` creation time parsing plus ISO8601 fallback scanning.
+- Added timezone-aware filename tokens (e.g. `yyyyMMdd_HHmmss+HHMM`) and filename-safe device tokens for naming/grouping.
+- Updated `FileRecoveryService` to infer metadata-driven output filenames from head samples before writing recovered files, with safe fallback to original scan names.
+- Added tests for partial JPEG metadata extraction with timezone, partial MOV `mvhd` extraction, and metadata-driven naming in recovery output.
+- Regenerated Xcode project via XcodeGen so new tests are included in the test target.
 
 ---
 
