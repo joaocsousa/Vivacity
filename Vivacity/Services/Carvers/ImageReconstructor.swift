@@ -10,6 +10,8 @@ struct ImageReconstructionResult: Sendable, Equatable {
     let data: Data
     let isPartial: Bool
     let format: ImageContainerFormat
+    /// Optional HEVC Annex-B parameter-set validation, when available.
+    let hevcValidation: HEVCNALValidation?
 }
 
 /// Handles reassembly of fragmented image files, primarily JPEGs.
@@ -45,6 +47,14 @@ struct ImageReconstructor: ImageReconstructing {
 
     /// Validates candidate sectors before appending them to the reassembled JPEG stream.
     private let streamValidator = JPEGStreamValidator()
+    /// Optional HEVC Annex-B validator for HEIC payload inspection.
+    private let hevcParser = HEVCNALParser()
+
+    /// Runtime guardrails to keep HEVC validation lightweight.
+    private static let hevcValidationLimits = HEVCNALParser.Limits(
+        maxScanBytes: 256 * 1024,
+        maxNALUnits: 512
+    )
 
     /// Maximum consecutive implausible sectors before stopping reconstruction.
     private let maxConsecutiveRejects = 10
@@ -175,7 +185,12 @@ struct ImageReconstructor: ImageReconstructing {
         // Re-seed a baseline Huffman table if the stream has SOS but no DHT.
         reassembledData = reseedHuffmanTablesIfNeeded(reassembledData)
 
-        return ImageReconstructionResult(data: reassembledData, isPartial: isPartial, format: .jpeg)
+        return ImageReconstructionResult(
+            data: reassembledData,
+            isPartial: isPartial,
+            format: .jpeg,
+            hevcValidation: nil
+        )
     }
 
     private func reconstructHEIC(
@@ -209,14 +224,24 @@ struct ImageReconstructor: ImageReconstructing {
             }
 
             if seenBoxes.contains("mdat"), seenBoxes.contains("moov") || seenBoxes.contains("moof") {
-                return ImageReconstructionResult(data: result, isPartial: false, format: .heic)
+                return ImageReconstructionResult(
+                    data: result,
+                    isPartial: false,
+                    format: .heic,
+                    hevcValidation: optionalHEVCValidation(in: result)
+                )
             }
 
             currentSearchOffset += UInt64(sectorSize)
             await Task.yield()
         }
 
-        return ImageReconstructionResult(data: result, isPartial: true, format: .heic)
+        return ImageReconstructionResult(
+            data: result,
+            isPartial: true,
+            format: .heic,
+            hevcValidation: optionalHEVCValidation(in: result)
+        )
     }
 
     // MARK: - Helpers
@@ -337,5 +362,13 @@ struct ImageReconstructor: ImageReconstructing {
             index += size
         }
         return found
+    }
+
+    private func optionalHEVCValidation(in data: Data) -> HEVCNALValidation? {
+        let validation = hevcParser.validateParameterSets(
+            in: data,
+            limits: Self.hevcValidationLimits
+        )
+        return validation.hasAnnexBData ? validation : nil
     }
 }
