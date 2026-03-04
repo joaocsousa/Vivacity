@@ -31,6 +31,7 @@ struct DeepScanService: DeepScanServicing {
     private static let entropySampleBytes = 4096
     private static let entropyRejectThreshold = 2.2
     private static let confidenceRejectThreshold = 0.4
+    private static let bloomCapacityBits = 1 << 20
 
     private static let directSignatures: [(FileSignature, [UInt8])] = {
         let unambiguous: [FileSignature] = [
@@ -77,8 +78,49 @@ struct DeepScanService: DeepScanServicing {
         let scanLength: Int
         let readOffset: Int
         let bytesScanned: UInt64
-        let existingOffsets: Set<UInt64>
         let cameraProfile: CameraProfile
+        let totalBytes: UInt64
+    }
+
+    private struct ClaimedRange: Sendable {
+        let start: UInt64
+        let endExclusive: UInt64
+    }
+
+    private struct RollingOffsetBloomFilter {
+        private var bits: [UInt64]
+        private let mask: UInt64
+
+        init(capacityBits: Int) {
+            let roundedBits = max(64, 1 << Int(log2(Double(max(capacityBits, 64)))))
+            bits = Array(repeating: 0, count: roundedBits / 64)
+            mask = UInt64(roundedBits - 1)
+        }
+
+        mutating func insert(_ value: UInt64) {
+            for hash in hashes(for: value) {
+                let idx = Int(hash >> 6)
+                let bit = UInt64(1) << (hash & 63)
+                bits[idx] |= bit
+            }
+        }
+
+        func probablyContains(_ value: UInt64) -> Bool {
+            for hash in hashes(for: value) {
+                let idx = Int(hash >> 6)
+                let bit = UInt64(1) << (hash & 63)
+                if bits[idx] & bit == 0 { return false }
+            }
+            return true
+        }
+
+        private func hashes(for value: UInt64) -> [UInt64] {
+            let h1 = (value &* 0x9E37_79B9_7F4A_7C15) & mask
+            let h2 = ((value ^ 0xC2B2_AE3D_27D4_EB4F) &* 0x1656_67B1_9E37_79F9) & mask
+            let rotated = (value << 13) | (value >> (64 - 13))
+            let h3 = (rotated &* 0x85EB_CA6B_27D4_EB2F) & mask
+            return [h1, h2, h3]
+        }
     }
 
     // swiftlint:disable:next cyclomatic_complexity function_body_length
@@ -143,6 +185,11 @@ struct DeepScanService: DeepScanServicing {
         var lastProgressReport: Double = -1
         var carryOver = 0 // Bytes carried over from previous read for cross-boundary matching
         var allOffsets = existingOffsets
+        var offsetBloom = RollingOffsetBloomFilter(capacityBits: Self.bloomCapacityBits)
+        for offset in existingOffsets {
+            offsetBloom.insert(offset)
+        }
+        var claimedRanges: [ClaimedRange] = []
 
         logger.info("Deep scanning \(totalBytes) bytes (\(totalBytes / (1024 * 1024)) MB)")
 
@@ -191,6 +238,9 @@ struct DeepScanService: DeepScanServicing {
                         offsetOnDisk: carvedFile.offsetOnDisk,
                         reader: reader,
                         allOffsets: &allOffsets,
+                        offsetBloom: &offsetBloom,
+                        claimedRanges: &claimedRanges,
+                        totalBytes: totalBytes,
                         filesFound: &filesFound,
                         continuation: continuation
                     )
@@ -206,6 +256,9 @@ struct DeepScanService: DeepScanServicing {
                         offsetOnDisk: carvedFile.offsetOnDisk,
                         reader: reader,
                         allOffsets: &allOffsets,
+                        offsetBloom: &offsetBloom,
+                        claimedRanges: &claimedRanges,
+                        totalBytes: totalBytes,
                         filesFound: &filesFound,
                         continuation: continuation
                     )
@@ -221,6 +274,9 @@ struct DeepScanService: DeepScanServicing {
                         offsetOnDisk: carvedFile.offsetOnDisk,
                         reader: reader,
                         allOffsets: &allOffsets,
+                        offsetBloom: &offsetBloom,
+                        claimedRanges: &claimedRanges,
+                        totalBytes: totalBytes,
                         filesFound: &filesFound,
                         continuation: continuation
                     )
@@ -233,19 +289,18 @@ struct DeepScanService: DeepScanServicing {
                 scanLength: scanLength,
                 readOffset: readOffset,
                 bytesScanned: bytesScanned,
-                existingOffsets: allOffsets,
-                cameraProfile: cameraProfile
+                cameraProfile: cameraProfile,
+                totalBytes: totalBytes
             )
-            let newlyFoundOffsets = await scanChunk(
+            await scanChunk(
                 context: context,
                 reader: reader,
+                allOffsets: &allOffsets,
+                offsetBloom: &offsetBloom,
+                claimedRanges: &claimedRanges,
                 filesFound: &filesFound,
                 continuation: continuation
             )
-
-            for offset in newlyFoundOffsets {
-                allOffsets.insert(offset)
-            }
 
             bytesScanned += UInt64(bytesRead)
 
@@ -282,6 +337,9 @@ struct DeepScanService: DeepScanServicing {
         offsetOnDisk: UInt64,
         reader: PrivilegedDiskReading,
         allOffsets: inout Set<UInt64>,
+        offsetBloom: inout RollingOffsetBloomFilter,
+        claimedRanges: inout [ClaimedRange],
+        totalBytes: UInt64,
         filesFound: inout Int,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) {
@@ -293,8 +351,6 @@ struct DeepScanService: DeepScanServicing {
 
         if headRead == 16 {
             if let sig = verifyMagicBytes(header, expectedExtension: fileExtension) {
-                allOffsets.insert(offsetOnDisk)
-
                 let file = RecoverableFile(
                     id: UUID(),
                     fileName: fileName,
@@ -313,7 +369,23 @@ struct DeepScanService: DeepScanServicing {
                     )
                 )
 
-                if shouldEmit(file) {
+                if shouldEmit(file),
+                   canAcceptCandidate(
+                       offset: offsetOnDisk,
+                       sizeInBytes: sizeInBytes,
+                       totalBytes: totalBytes,
+                       allOffsets: allOffsets,
+                       offsetBloom: offsetBloom,
+                       claimedRanges: claimedRanges
+                   )
+                {
+                    registerCandidate(
+                        offset: offsetOnDisk,
+                        sizeInBytes: sizeInBytes,
+                        allOffsets: &allOffsets,
+                        offsetBloom: &offsetBloom,
+                        claimedRanges: &claimedRanges
+                    )
                     filesFound += 1
                     continuation.yield(.fileFound(file))
                 }
@@ -324,26 +396,27 @@ struct DeepScanService: DeepScanServicing {
     private func scanChunk(
         context: ScanContext,
         reader: PrivilegedDiskReading,
+        allOffsets: inout Set<UInt64>,
+        offsetBloom: inout RollingOffsetBloomFilter,
+        claimedRanges: inout [ClaimedRange],
         filesFound: inout Int,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
-    ) async -> [UInt64] {
-        var newOffsets: [UInt64] = []
-
+    ) async {
         // Scan the chunk for magic bytes
         var i = 0
         while i < context.scanLength - Self.maxSignatureLength {
             let offset = context.bytesScanned + UInt64(i) - UInt64(context.readOffset)
 
             // Skip if already found by fast scan
-            if context.existingOffsets.contains(offset) {
+            if offsetBloom.probablyContains(offset), allOffsets.contains(offset) {
                 i += Self.sectorSize
                 continue
             }
 
             if let match = matchSignatureAt(buffer: context.buffer, position: i, cameraProfile: context.cameraProfile) {
-                filesFound += 1
+                let candidateNumber = filesFound + 1
 
-                var fileName = "\(context.cameraProfile.defaultFilePrefix)\(String(format: "%04d", filesFound))"
+                var fileName = "\(context.cameraProfile.defaultFilePrefix)\(String(format: "%04d", candidateNumber))"
 
                 if match.category == .image {
                     let availableBytes = context.buffer.count - i
@@ -351,7 +424,7 @@ struct DeepScanService: DeepScanServicing {
                     let headerSlice = Array(context.buffer[i ..< i + checkLength])
 
                     if let exifName = EXIFDateExtractor.extractFilenamePrefix(from: headerSlice) {
-                        fileName = "\(exifName)_\(String(format: "%04d", filesFound))"
+                        fileName = "\(exifName)_\(String(format: "%04d", candidateNumber))"
                     }
                 }
 
@@ -423,14 +496,28 @@ struct DeepScanService: DeepScanServicing {
                     confidenceScore: score
                 )
 
-                if shouldEmit(file, entropy: entropy) {
+                if shouldEmit(file, entropy: entropy),
+                   canAcceptCandidate(
+                       offset: offset,
+                       sizeInBytes: sizeInBytes,
+                       totalBytes: context.totalBytes,
+                       allOffsets: allOffsets,
+                       offsetBloom: offsetBloom,
+                       claimedRanges: claimedRanges
+                   )
+                {
+                    registerCandidate(
+                        offset: offset,
+                        sizeInBytes: sizeInBytes,
+                        allOffsets: &allOffsets,
+                        offsetBloom: &offsetBloom,
+                        claimedRanges: &claimedRanges
+                    )
+                    filesFound += 1
                     continuation.yield(.fileFound(file))
-                } else {
-                    filesFound -= 1
                 }
 
                 // Skip ahead past this header to avoid re-matching
-                newOffsets.append(offset)
                 i += Self.sectorSize
                 continue
             }
@@ -438,8 +525,67 @@ struct DeepScanService: DeepScanServicing {
             // Move forward by sector alignment for efficiency
             i += Self.sectorSize
         }
+    }
 
-        return newOffsets
+    private func canAcceptCandidate(
+        offset: UInt64,
+        sizeInBytes: Int64,
+        totalBytes: UInt64,
+        allOffsets: Set<UInt64>,
+        offsetBloom: RollingOffsetBloomFilter,
+        claimedRanges: [ClaimedRange]
+    ) -> Bool {
+        if offsetBloom.probablyContains(offset), allOffsets.contains(offset) {
+            return false
+        }
+
+        if let candidateRange = buildCandidateRange(offset: offset, sizeInBytes: sizeInBytes, totalBytes: totalBytes) {
+            if candidateRange.endExclusive > totalBytes {
+                return false
+            }
+
+            for range in claimedRanges {
+                if rangesOverlap(candidateRange, range) {
+                    return false
+                }
+            }
+        } else {
+            // Unknown-sized candidate still must not start inside an already claimed range.
+            if claimedRanges.contains(where: { offset >= $0.start && offset < $0.endExclusive }) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    private func registerCandidate(
+        offset: UInt64,
+        sizeInBytes: Int64,
+        allOffsets: inout Set<UInt64>,
+        offsetBloom: inout RollingOffsetBloomFilter,
+        claimedRanges: inout [ClaimedRange]
+    ) {
+        allOffsets.insert(offset)
+        offsetBloom.insert(offset)
+        if let range = buildCandidateRange(offset: offset, sizeInBytes: sizeInBytes, totalBytes: UInt64.max) {
+            claimedRanges.append(range)
+        }
+    }
+
+    private func buildCandidateRange(offset: UInt64, sizeInBytes: Int64, totalBytes: UInt64) -> ClaimedRange? {
+        guard sizeInBytes > 0 else { return nil }
+        let size = UInt64(sizeInBytes)
+        let (end, overflow) = offset.addingReportingOverflow(size)
+        guard !overflow else { return nil }
+        if totalBytes != UInt64.max, end > totalBytes {
+            return ClaimedRange(start: offset, endExclusive: end)
+        }
+        return ClaimedRange(start: offset, endExclusive: end)
+    }
+
+    private func rangesOverlap(_ lhs: ClaimedRange, _ rhs: ClaimedRange) -> Bool {
+        lhs.start < rhs.endExclusive && rhs.start < lhs.endExclusive
     }
 
     private func shouldEmit(_ file: RecoverableFile, entropy: Double? = nil) -> Bool {
