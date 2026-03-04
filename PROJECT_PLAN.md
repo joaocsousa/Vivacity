@@ -6,6 +6,46 @@
 >
 > **Minimum OS**: macOS 14.0 (Sonoma) — also compatible with macOS 15.x (Sequoia)
 
+> [!NOTE]
+> **Current scan behavior (as of T-051, March 4, 2026):** Vivacity uses a single unified scan run that combines metadata/catalog methods and deep/raw carving, with one progress bar showing percentage + estimated time remaining.
+> Historical tickets below may reference the earlier dual-phase scan UX for implementation history.
+
+---
+
+### T-051 ✅ Unify Scan Into One Comprehensive Pass With Accurate Progress ETA
+
+**Description**: Simplify scanning to a single user action that runs all available scan methods automatically (metadata/catalog + deep/raw) without separate Fast vs Deep user steps, while exposing a unified progress bar with percentage and estimated time remaining.
+
+**Acceptance Criteria**:
+- Starting scan triggers one unified scan flow (no separate "Start Deep Scan" step).
+- Scan executes all available methods and merges findings into a single live result list.
+- File Scan UI no longer shows the Fast/Deep prompt split.
+- Progress UI shows a single percentage and time remaining estimate during active scanning.
+- Session resume remains supported and continues the unified flow.
+- Build, lint, unit tests, and UI tests pass.
+
+**Files**:
+- `Vivacity/ViewModels/FileScanViewModel.swift`
+- `Vivacity/Views/FileScan/FileScanView.swift`
+- `VivacityTests/FileScanViewModelTests.swift`
+- `PROJECT_PLAN.md`
+
+**Completion Notes**:
+- Replaced dual-phase scan state with unified `.idle -> .scanning -> .complete` flow in `FileScanViewModel`.
+- Added `startScan(device:)` orchestration that runs fast/catalog and deep/raw workers in one run and merges/deduplicates findings.
+- Added unified progress modeling with:
+  - live percentage (`progressPercentageText`)
+  - estimated remaining time (`estimatedTimeRemainingText`) based primarily on deep-scan throughput and fallback fast-worker estimate.
+- Removed Deep Scan prompt card and split sectioning in `FileScanView`; results now appear in a single unified list.
+- Updated FileScan view model tests to validate the unified phase behavior.
+- Verification on March 4, 2026:
+  - `xcodegen generate`
+  - `swiftformat .`
+  - `swiftlint` (0 violations)
+  - `xcodebuild build -scheme Vivacity -destination 'platform=macOS'`
+  - `xcodebuild test -scheme Vivacity -destination 'platform=macOS'` (140 tests, 0 failures)
+  - `xcodebuild test -scheme VivacityUI -destination 'platform=macOS'` (1 test, 0 failures)
+
 ---
 
 ### T-050 ✅ Stabilize Default Test Scheme Against UI Runner Environment Flakes
@@ -50,6 +90,7 @@
 | M12 | XcodeGen Migration | T-037 → T-039 | ✅ DONE |
 | M13 | Recovery Quality Improvements | T-040 → T-046 | ✅ DONE |
 | M14 | Test Reliability Hardening | T-050 | ✅ DONE |
+| M15 | Unified Scan Flow & ETA Progress | T-051 | ✅ DONE |
 
 ---
 
@@ -138,11 +179,11 @@
 
 ---
 
-## M3 — File Scan & Preview Screen (Dual Scan Mode)
+## M3 — File Scan & Preview Screen (Historical Dual Scan Mode)
 
-> Two-phase scanning: **Fast Scan** (metadata) runs first, then the user is
-> prompted to optionally run **Deep Scan** (raw file carving). Files from both
-> phases accumulate in a single list. Recovery is blocked while scanning.
+> Historical implementation at the time of M3:
+> Two-phase scanning with **Fast Scan** then optional **Deep Scan**.
+> This UX was superseded later by **T-051** unified scan flow.
 
 ### T-006 ✅ Define supported file formats
 
@@ -210,7 +251,7 @@
 
 ---
 
-### T-009 ✅ Create `FileScanViewModel` — dual-phase state machine
+### T-009 ✅ Create `FileScanViewModel` — dual-phase state machine (historical)
 
 **Description**: ViewModel for the scanning screen with two-phase scan flow.
 
@@ -230,7 +271,7 @@
 
 ---
 
-### T-010 ✅ Create `FileScanView` — progressive scan UI
+### T-010 ✅ Create `FileScanView` — progressive scan UI (historical)
 
 **Description**: Main scan UI with progressive file list, Deep Scan prompt, and scan controls.
 

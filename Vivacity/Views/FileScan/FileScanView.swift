@@ -1,13 +1,11 @@
 import SwiftUI
 
-// swiftlint:disable file_length
-/// Main scan screen showing progressive file discovery with dual-scan phases.
+/// Main scan screen showing progressive file discovery with a single unified scan.
 ///
 /// Layout matches the Stitch designs:
 /// 1. Header with status/progress bar and stop button
-/// 2. Deep Scan prompt card (shown after fast scan completes)
-/// 3. Scrolling file list with checkboxes
-/// 4. Footer with select all/deselect, file count, and recover button
+/// 2. Scrolling file list with checkboxes
+/// 3. Footer with select all/deselect, file count, and recover button
 struct FileScanView: View {
     struct RecoveryNavigationState: Identifiable, Hashable {
         let id = UUID()
@@ -32,7 +30,6 @@ struct FileScanView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            deepScanPrompt
             FilterToolbar(
                 fileNameQuery: $viewModel.fileNameQuery,
                 fileTypeFilter: $viewModel.fileTypeFilter,
@@ -42,7 +39,7 @@ struct FileScanView: View {
 
             if viewModel.permissionDenied {
                 PermissionDeniedView(
-                    onTryAgain: { startDeepScan() },
+                    onTryAgain: { checkPermissionsAndScan() },
                     onContinueLimited: {
                         viewModel.permissionDenied = false
                     }
@@ -136,19 +133,9 @@ struct FileScanView: View {
 
     // MARK: - Scan Helpers
 
-    /// Starts fast scan immediately — no elevated access required.
-    ///
-    /// Fast Scan uses FileManager to walk the mounted filesystem, which
-    /// macOS allows without special permissions for external volumes.
+    /// Starts the unified scan immediately, combining all available methods.
     private func checkPermissionsAndScan() {
-        viewModel.startFastScan(device: device)
-    }
-
-    /// Starts deep scan. PrivilegedDiskReader handles authorization
-    /// internally — it will show the macOS password dialog if the device
-    /// is not directly accessible.
-    private func startDeepScan() {
-        viewModel.startDeepScan(device: device)
+        viewModel.startScan(device: device)
     }
 
     private var selectedFilesForRecovery: [RecoverableFile] {
@@ -275,7 +262,7 @@ extension FileScanView {
                     }
                     .buttonStyle(.bordered)
                     .tint(.red)
-                } else if viewModel.scanPhase == .fastComplete || viewModel.scanPhase == .complete {
+                } else if viewModel.scanPhase == .complete {
                     Button {
                         Task {
                             await viewModel.saveSession(device: device)
@@ -305,53 +292,28 @@ extension FileScanView {
         case .idle:
             EmptyView()
 
-        case .fastScanning:
+        case .scanning:
             VStack(spacing: 8) {
                 HStack {
-                    Text("Fast Scan in Progress…")
+                    Text("Scanning in Progress…")
                         .font(.system(size: 15, weight: .semibold))
                     Spacer()
-                    Text("\(Int(viewModel.progress * 100))%")
+                    Text(viewModel.progressPercentageText)
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.blue)
                 }
 
                 ProgressView(value: viewModel.progress)
                     .tint(.blue)
-            }
 
-        case .fastComplete:
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.green)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Fast Scan Complete")
-                        .font(.system(size: 15, weight: .semibold))
-                    if let duration = viewModel.fastScanDuration {
-                        Text("Completed in \(Int(duration)) seconds")
+                if let eta = viewModel.estimatedTimeRemainingText {
+                    HStack {
+                        Text("About \(eta) remaining")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
+                        Spacer()
                     }
                 }
-
-                Spacer()
-            }
-
-        case .deepScanning:
-            VStack(spacing: 8) {
-                HStack {
-                    Text("Deep Scan in Progress…")
-                        .font(.system(size: 15, weight: .semibold))
-                    Spacer()
-                    Text("\(Int(viewModel.progress * 100))%")
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.purple)
-                }
-
-                ProgressView(value: viewModel.progress)
-                    .tint(.purple)
             }
 
         case .complete:
@@ -363,75 +325,14 @@ extension FileScanView {
                 Text("Scan Complete")
                     .font(.system(size: 15, weight: .semibold))
 
-                Spacer()
-            }
-        }
-    }
-}
-
-// MARK: - Deep Scan Prompt
-
-extension FileScanView {
-    @ViewBuilder
-    private var deepScanPrompt: some View {
-        if viewModel.scanPhase == .fastComplete {
-            VStack(spacing: 12) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.blue.opacity(0.12))
-                            .frame(width: 44, height: 44)
-
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.blue)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("\(viewModel.foundFiles.count) files found. Run Deep Scan for more?")
-                            .font(.system(size: 14, weight: .semibold))
-
-                        Text(
-                            "Deep Scan reads every sector of the drive to find older or " +
-                                "corrupted files. This may take several hours but yields more thorough results."
-                        )
+                if let duration = viewModel.scanDurationText {
+                    Text("in \(duration)")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                    }
                 }
 
-                HStack(spacing: 12) {
-                    Spacer()
-
-                    Button {
-                        viewModel.skipDeepScan()
-                    } label: {
-                        Text("Skip")
-                            .font(.system(size: 13))
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button {
-                        startDeepScan()
-                    } label: {
-                        Text("Start Deep Scan")
-                            .font(.system(size: 13))
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
+                Spacer()
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color(.separatorColor).opacity(0.35), lineWidth: 1)
-            )
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
         }
     }
 }
@@ -456,36 +357,13 @@ extension FileScanView {
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
-                        // Deep scan prompt card
-                        deepScanPrompt
-
-                        // Section: Fast Scan Results
-                        if !viewModel.filteredFastScanFiles.isEmpty {
+                        if !viewModel.filteredFiles.isEmpty {
                             sectionHeader(
-                                title: "FAST SCAN RESULTS",
-                                count: viewModel.filteredFastScanFiles.count
+                                title: "SCAN RESULTS",
+                                count: viewModel.filteredFiles.count
                             )
 
-                            ForEach(viewModel.filteredFastScanFiles) { file in
-                                FileRow(
-                                    file: file,
-                                    isSelected: viewModel.selectedFileIDs.contains(file.id),
-                                    isPreviewSelected: viewModel.previewFileID == file.id,
-                                    onToggle: { viewModel.toggleSelection(file.id) },
-                                    onSelectForPreview: { viewModel.previewFileID = file.id }
-                                )
-                                Divider().opacity(0.2)
-                            }
-                        }
-
-                        // Section: Deep Scan Results
-                        if !viewModel.filteredDeepScanFiles.isEmpty {
-                            sectionHeader(
-                                title: "DEEP SCAN RESULTS",
-                                count: viewModel.filteredDeepScanFiles.count
-                            )
-
-                            ForEach(viewModel.filteredDeepScanFiles) { file in
+                            ForEach(viewModel.filteredFiles) { file in
                                 FileRow(
                                     file: file,
                                     isSelected: viewModel.selectedFileIDs.contains(file.id),

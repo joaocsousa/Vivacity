@@ -11,12 +11,13 @@ For the canonical roadmap, status, and handoff details, see [PROJECT_PLAN.md](PR
 ## Features
 
 - **Device Discovery** — Lists all mounted internal and external volumes with auto-refresh on mount/unmount
-- **Dual-Phase Scanning**
-  - **Fast Scan** — Walks filesystem metadata (`.Trashes`, FAT 0xE5 markers) to find recently deleted files with original names
-  - **Deep Scan** — Sector-by-sector scan using magic byte signatures to carve files from raw disk data
+- **Unified Multi-Method Scan**
+  - **Filesystem metadata scan** — Walks mounted metadata (`.Trashes`, APFS snapshots, etc.) for recently deleted files
+  - **Raw catalog scan** — FAT32, ExFAT, and NTFS directory/MFT scanning for deleted entries
+  - **Deep raw carving** — Sector-by-sector signature carving with format-aware validation and reconstruction
 - **Live Preview** — Preview recovered images and videos in a split-view panel as results stream in
 - **20+ File Formats** — JPEG, PNG, HEIC, TIFF, CR2, ARW, DNG, BMP, GIF, WebP, MP4, MOV, AVI, MKV, M4V, WMV, FLV, 3GP
-- **EXIF-Based Naming** — Deep Scan results are named using embedded EXIF dates when available
+- **EXIF-Based Naming** — Carved media results are named using embedded EXIF dates when available
 - **Privileged Disk Access** — Transparent privilege escalation via macOS password dialog when raw device access is needed
 
 ## Getting Started
@@ -76,18 +77,36 @@ Before committing, format your code:
 swiftformat .
 ```
 SwiftLint runs automatically during the Xcode build phase to surface warnings.
+Lint suppressions are not allowed: never add `swiftlint:disable` / `swiftlint:enable`; fix warnings in code.
 
 ## How It Works
 
 ```
-Select Device → Fast Scan → Deep Scan (optional) → Select Files → Recover
+Select Device → Unified Scan (all methods) → Select Files → Recover
 ```
 
 1. **Select a device** — Pick an internal or external volume from the device list
-2. **Fast Scan** runs automatically — Finds recently deleted files using filesystem metadata (no admin access needed)
-3. **Deep Scan** (optional) — Scans every sector for file signatures. Requires admin password for raw device access on external drives
-4. **Preview & select** — Browse found files, preview images, select what to recover
-5. **Recover** — Save selected files to a destination folder
+2. **Unified scan** runs once — Vivacity runs all available scan methods in one pass and streams combined results
+3. **Preview & select** — Browse found files, preview images, select what to recover
+4. **Recover** — Save selected files to a destination folder
+
+## Scan Methods
+
+During one scan run, Vivacity combines these methods:
+
+1. **Filesystem metadata scan**
+   - Mounted volume walks (including trash locations).
+   - APFS snapshot inspection to find files removed from the live view.
+2. **Raw catalog/index scan** (filesystem-aware)
+   - FAT32 directory entry recovery (`0xE5` markers).
+   - ExFAT deleted entry-set recovery.
+   - NTFS MFT deleted-record recovery.
+3. **Deep sector carving**
+   - Full-device byte scan for known file signatures.
+   - Footer/structure validation (for example JPEG/PNG/WebP/GIF/MP4-family logic).
+   - Fragment/contiguity heuristics and confidence scoring.
+
+Results are merged into a single list in real time, with one progress bar, percentage, and ETA.
 
 ## Architecture
 

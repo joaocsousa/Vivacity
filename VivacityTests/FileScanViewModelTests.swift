@@ -18,7 +18,7 @@ final class FileScanViewModelTests: XCTestCase {
         sut.startFastScan(device: .fakeDevice())
         try? await Task.sleep(nanoseconds: 1_000_000_000)
 
-        XCTAssertEqual(sut.scanPhase, .fastComplete)
+        XCTAssertEqual(sut.scanPhase, .complete)
         XCTAssertEqual(sut.foundFiles.count, 1)
         XCTAssertEqual(sut.progress, 1.0)
     }
@@ -215,7 +215,7 @@ extension StorageDevice {
 
 @MainActor
 final class FileScanViewModelAdditionalTests: XCTestCase {
-    func testDiskImageSkipsFastScanImmediately() {
+    func testDiskImageSkipsFastScanImmediately() async {
         let sut = FileScanViewModel(
             fastScanService: FakeFastScanService(events: []),
             deepScanService: FakeDeepScanService(events: [])
@@ -224,9 +224,10 @@ final class FileScanViewModelAdditionalTests: XCTestCase {
         image.isDiskImage = true
 
         sut.startFastScan(device: image)
+        try? await Task.sleep(nanoseconds: 30_000_000)
 
-        XCTAssertEqual(sut.scanPhase, .fastComplete)
-        XCTAssertEqual(sut.progress, 0)
+        XCTAssertEqual(sut.scanPhase, .complete)
+        XCTAssertEqual(sut.progress, 1.0)
     }
 
     func testSaveSessionFailureSetsErrorMessage() async {
@@ -307,7 +308,7 @@ final class FileScanViewModelAdditionalTests: XCTestCase {
 
         sut.startFastScan(device: .fakeDevice())
         try? await Task.sleep(nanoseconds: 20_000_000)
-        XCTAssertEqual(sut.scanPhase, .fastScanning)
+        XCTAssertEqual(sut.scanPhase, .scanning)
         sut.stopScanning()
         XCTAssertEqual(sut.scanPhase, .complete)
 
@@ -319,7 +320,7 @@ final class FileScanViewModelAdditionalTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 20_000_000)
         sut2.startDeepScan(device: .fakeDevice())
         try? await Task.sleep(nanoseconds: 20_000_000)
-        XCTAssertEqual(sut2.scanPhase, .deepScanning)
+        XCTAssertEqual(sut2.scanPhase, .scanning)
         sut2.stopScanning()
         XCTAssertEqual(sut2.scanPhase, .complete)
     }

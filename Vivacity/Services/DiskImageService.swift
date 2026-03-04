@@ -25,7 +25,6 @@ struct DiskImageService: DiskImageServicing {
         injectedReader = diskReader
     }
 
-    // swiftlint:disable:next function_body_length
     func createImage(from device: StorageDevice, to destinationURL: URL) -> AsyncThrowingStream<Double, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -42,73 +41,28 @@ struct DiskImageService: DiskImageServicing {
                     return
                 }
 
-                // Ensure destination is clear
-                if FileManager.default.fileExists(atPath: destinationURL.path) {
-                    try? FileManager.default.removeItem(at: destinationURL)
-                }
-
-                guard FileManager.default.createFile(atPath: destinationURL.path, contents: nil, attributes: nil) else {
-                    logger.error("Failed to create destination file at \(destinationURL.path)")
-                    continuation.finish(throwing: NSError(
-                        domain: "DiskImageServiceError",
-                        code: 2,
-                        userInfo: [NSLocalizedDescriptionKey: "Failed to create destination file."]
-                    ))
+                let fileHandle: FileHandle
+                do {
+                    fileHandle = try prepareDestinationFile(at: destinationURL)
+                } catch {
+                    continuation.finish(throwing: error)
                     return
                 }
-
-                guard let fileHandle = try? FileHandle(forWritingTo: destinationURL) else {
-                    logger.error("Failed to open destination file for writing at \(destinationURL.path)")
-                    continuation.finish(throwing: NSError(
-                        domain: "DiskImageServiceError",
-                        code: 3,
-                        userInfo: [NSLocalizedDescriptionKey: "Failed to open destination file for writing."]
-                    ))
-                    return
-                }
-
-                defer {
-                    try? fileHandle.close()
-                }
+                defer { try? fileHandle.close() }
 
                 let activeReader = injectedReader ?? PrivilegedDiskReader(devicePath: volumeInfo.devicePath)
 
                 do {
                     try activeReader.start()
 
-                    var currentOffset: UInt64 = device.partitionOffset ?? 0
-                    let endOffset = currentOffset + UInt64(totalBytes)
-                    var totalRead: UInt64 = 0
-
-                    while currentOffset < endOffset, !Task.isCancelled {
-                        let remaining = endOffset - currentOffset
-                        let bytesToRead = min(Int(remaining), chunkSize)
-
-                        var data = Data(count: bytesToRead)
-                        let bytesRead = data.withUnsafeMutableBytes { rawBuffer in
-                            activeReader.read(
-                                into: rawBuffer.baseAddress!,
-                                offset: currentOffset,
-                                length: bytesToRead
-                            )
-                        }
-
-                        // Handle short reads if any
-                        if bytesRead <= 0 {
-                            logger.warning("Short read or end of device reached at offset \(currentOffset)")
-                            break
-                        }
-
-                        try fileHandle.seekToEnd()
-                        fileHandle.write(data.prefix(upTo: bytesRead))
-
-                        currentOffset += UInt64(bytesRead)
-                        totalRead += UInt64(bytesRead)
-
-                        // Calculate and yield progress
-                        let progress = Double(totalRead) / Double(totalBytes)
-                        continuation.yield(progress)
-                    }
+                    let partitionOffset = device.partitionOffset ?? 0
+                    let totalRead = try copyDeviceBytes(
+                        reader: activeReader,
+                        fileHandle: fileHandle,
+                        startOffset: partitionOffset,
+                        totalBytes: totalBytes,
+                        continuation: continuation
+                    )
 
                     if Task.isCancelled {
                         logger.info("Image creation cancelled for \(device.name)")
@@ -133,5 +87,71 @@ struct DiskImageService: DiskImageServicing {
                 }
             }
         }
+    }
+
+    private func prepareDestinationFile(at destinationURL: URL) throws -> FileHandle {
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            try? FileManager.default.removeItem(at: destinationURL)
+        }
+
+        guard FileManager.default.createFile(atPath: destinationURL.path, contents: nil, attributes: nil) else {
+            logger.error("Failed to create destination file at \(destinationURL.path)")
+            throw diskImageError(code: 2, description: "Failed to create destination file.")
+        }
+
+        do {
+            return try FileHandle(forWritingTo: destinationURL)
+        } catch {
+            logger.error("Failed to open destination file for writing at \(destinationURL.path)")
+            throw diskImageError(code: 3, description: "Failed to open destination file for writing.")
+        }
+    }
+
+    private func copyDeviceBytes(
+        reader: PrivilegedDiskReading,
+        fileHandle: FileHandle,
+        startOffset: UInt64,
+        totalBytes: Int64,
+        continuation: AsyncThrowingStream<Double, Error>.Continuation
+    ) throws -> UInt64 {
+        var currentOffset = startOffset
+        let endOffset = startOffset + UInt64(totalBytes)
+        var totalRead: UInt64 = 0
+
+        while currentOffset < endOffset, !Task.isCancelled {
+            let remaining = endOffset - currentOffset
+            let bytesToRead = min(Int(remaining), chunkSize)
+
+            var data = Data(count: bytesToRead)
+            let bytesRead = data.withUnsafeMutableBytes { rawBuffer in
+                reader.read(
+                    into: rawBuffer.baseAddress!,
+                    offset: currentOffset,
+                    length: bytesToRead
+                )
+            }
+
+            if bytesRead <= 0 {
+                logger.warning("Short read or end of device reached at offset \(currentOffset)")
+                break
+            }
+
+            try fileHandle.seekToEnd()
+            fileHandle.write(data.prefix(upTo: bytesRead))
+
+            currentOffset += UInt64(bytesRead)
+            totalRead += UInt64(bytesRead)
+            continuation.yield(Double(totalRead) / Double(totalBytes))
+        }
+
+        return totalRead
+    }
+
+    private func diskImageError(code: Int, description: String) -> NSError {
+        NSError(
+            domain: "DiskImageServiceError",
+            code: code,
+            userInfo: [NSLocalizedDescriptionKey: description]
+        )
     }
 }
