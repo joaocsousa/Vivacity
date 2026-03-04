@@ -943,3 +943,43 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - Added `fragmentMap` to `RecoverableFile` and its constructor to support multi-region recovery emission.
 - Fixed 3 test failures in `MP4ReconstructorTests` (zero-size box) and `ImageReconstructorTests` (low-entropy test data vs new validator).
 - Verification on March 4, 2026: `swiftformat .`, `xcodebuild build` successful, and `xcodebuild test` passed with 50/50 results.
+
+---
+
+### T-048 🔵 PNG Chunk CRC Validation
+
+**Description**: Improve confidence scoring for recovered PNG files by validating the CRC checksums of critical chunks (like IHDR, IDAT, IEND) during the footer detection phase. This allows the app to surface whether a PNG with a valid boundary might actually contain corrupted internal data.
+
+**Acceptance Criteria**:
+- `FileFooterDetector.estimatePNGSize` is updated to optionally validate CRCs while scanning for IEND.
+- A new `PNGChunkValidator` utility calculates standard CRC-32 checksums for scanned chunk types.
+- `RecoverableFile`'s `confidenceScore` calculation rules (T-040) are adjusted to penalize PNGs with invalid CRCs, lowering their confidence bucket.
+- Files with invalid chunks should NOT be completely rejected, merely flagged with lower confidence bounds.
+- Valid unit tests cover `PNGChunkValidator` using known valid and corrupted mock buffers.
+
+**Files**:
+- `Vivacity/Services/FileFooterDetector.swift`
+- `Vivacity/Services/Carvers/PNGChunkValidator.swift` [NEW]
+- `Vivacity/Services/DeepScanService.swift`
+- `VivacityTests/Carvers/PNGChunkValidatorTests.swift` [NEW]
+
+---
+
+### T-049 🔵 HEVC/H.265 NAL Unit Boundary Detection (Future Consideration)
+
+**Description**: Add a lightweight HEVC bitstream parser to validate parameter sets (VPS/SPS/PPS) inside HEIC containers and fragmented MP4 files (specifically within the `mdat` payload). This will definitively verify if HEVC compressed video or photo data is intact, enabling precise confidence scoring where ISOBMFF atom analysis alone falls short.
+
+**Acceptance Criteria**:
+- Note: This is a **low priority** task deferred until HEIC corruption feedback is received.
+- Provide a `HEVCNALParser` utility capable of scanning for Annex B byte stream identifiers (`0x00 0x00 0x00 0x01` or `0x00 0x00 0x01`).
+- Ability to parse the NAL unit header to identify Video Parameter Sets, Sequence Parameter Sets, and Picture Parameter Sets.
+- Wiring to `ImageReconstructor` (for HEIC) and `MP4Reconstructor` (for HEVC videos) as an optional validation layer, similar to the JPEG heuristics.
+- Include boundary constraints on parser runtime to prevent excessive processing overhead per file.
+
+**Files**:
+- `Vivacity/Services/Carvers/HEVCNALParser.swift` [NEW]
+- `Vivacity/Services/Carvers/ImageReconstructor.swift` [MODIFY]
+- `Vivacity/Services/Carvers/MP4Reconstructor.swift` [MODIFY]
+- `VivacityTests/Carvers/HEVCNALParserTests.swift` [NEW]
+
+---
