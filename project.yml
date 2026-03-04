@@ -76,9 +76,18 @@ schemes:
       targets:
         Vivacity: all
         VivacityTests: [test]
-        VivacityUITests: [test]
     test:
       gatherCoverageData: true
       targets:
         - name: VivacityTests
+
+  VivacityUI:
+    shared: true
+    build:
+      targets:
+        Vivacity: all
+        VivacityUITests: [test]
+    test:
+      gatherCoverageData: true
+      targets:
         - name: VivacityUITests
