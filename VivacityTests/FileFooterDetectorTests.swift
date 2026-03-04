@@ -213,4 +213,63 @@ final class FileFooterDetectorTests: XCTestCase {
         )
         XCTAssertEqual(size, Int64(data.count))
     }
+
+    func testPNGSizeValidationFlagsInvalidCriticalChunkCRC() async throws {
+        var pngBytes = makePNGBytes(corruptIHDR: true)
+        let expectedSize = Int64(pngBytes.count)
+        pngBytes.append(contentsOf: Array(repeating: 0x00, count: 1024 - pngBytes.count))
+
+        let reader = FakePrivilegedDiskReader(buffer: Data(pngBytes))
+        let estimate = try await detector.estimatePNGSize(
+            startOffset: 0,
+            reader: reader,
+            maxScanBytes: pngBytes.count,
+            validateCriticalChunkCRCs: true
+        )
+
+        XCTAssertEqual(estimate?.sizeInBytes, expectedSize)
+        XCTAssertEqual(estimate?.criticalChunkValidation?.validatedCriticalChunkCount, 2)
+        XCTAssertEqual(estimate?.criticalChunkValidation?.invalidCriticalChunkCount, 1)
+        XCTAssertEqual(estimate?.hasInvalidCriticalChunkCRC, true)
+    }
+
+    func testPNGSizeValidationCanBeSkipped() async throws {
+        var pngBytes = makePNGBytes(corruptIHDR: false)
+        let expectedSize = Int64(pngBytes.count)
+        pngBytes.append(contentsOf: Array(repeating: 0x00, count: 1024 - pngBytes.count))
+
+        let reader = FakePrivilegedDiskReader(buffer: Data(pngBytes))
+        let estimate = try await detector.estimatePNGSize(
+            startOffset: 0,
+            reader: reader,
+            maxScanBytes: pngBytes.count,
+            validateCriticalChunkCRCs: false
+        )
+
+        XCTAssertEqual(estimate?.sizeInBytes, expectedSize)
+        XCTAssertNil(estimate?.criticalChunkValidation)
+    }
+
+    private func makePNGBytes(corruptIHDR: Bool) -> [UInt8] {
+        var bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+
+        // IHDR chunk.
+        bytes.append(contentsOf: [0x00, 0x00, 0x00, 0x0D])
+        bytes.append(contentsOf: [0x49, 0x48, 0x44, 0x52])
+        bytes.append(contentsOf: [
+            0x00, 0x00, 0x00, 0x01,
+            0x00, 0x00, 0x00, 0x01,
+            0x08, 0x02, 0x00, 0x00, 0x00,
+        ])
+        if corruptIHDR {
+            bytes[16] ^= 0x01
+        }
+        bytes.append(contentsOf: [0x90, 0x77, 0x53, 0xDE])
+
+        // IEND chunk.
+        bytes.append(contentsOf: [0x00, 0x00, 0x00, 0x00])
+        bytes.append(contentsOf: [0x49, 0x45, 0x4E, 0x44])
+        bytes.append(contentsOf: [0xAE, 0x42, 0x60, 0x82])
+        return bytes
+    }
 }

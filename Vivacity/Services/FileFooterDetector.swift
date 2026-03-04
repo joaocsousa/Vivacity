@@ -8,8 +8,26 @@ protocol FileFooterDetecting: Sendable {
         reader: PrivilegedDiskReading,
         maxScanBytes: Int
     ) async throws -> Int64?
+
+    func estimatePNGSize(
+        startOffset: UInt64,
+        reader: PrivilegedDiskReading,
+        maxScanBytes: Int,
+        validateCriticalChunkCRCs: Bool
+    ) async throws -> PNGSizeEstimation?
 }
 
+/// PNG size estimate with optional critical-chunk CRC validation details.
+struct PNGSizeEstimation: Sendable, Equatable {
+    let sizeInBytes: Int64
+    let criticalChunkValidation: PNGCriticalChunkValidation?
+
+    var hasInvalidCriticalChunkCRC: Bool {
+        criticalChunkValidation?.hasInvalidCriticalChunkCRC == true
+    }
+}
+
+// swiftlint:disable type_body_length
 struct FileFooterDetector: FileFooterDetecting {
     /// Conservative cap so deep scan does not read the full disk to estimate one file.
     private static let defaultMaxScanBytes = 32 * 1024 * 1024
@@ -45,8 +63,9 @@ struct FileFooterDetector: FileFooterDetecting {
             return try await estimatePNGSize(
                 startOffset: startOffset,
                 reader: reader,
-                maxScanBytes: maxScanBytes
-            )
+                maxScanBytes: maxScanBytes,
+                validateCriticalChunkCRCs: false
+            )?.sizeInBytes
         case .gif:
             return try await estimateGIFSize(
                 startOffset: startOffset,
@@ -182,11 +201,12 @@ struct FileFooterDetector: FileFooterDetecting {
         return bytes.isEmpty ? nil : bytes
     }
 
-    private func estimatePNGSize(
+    func estimatePNGSize(
         startOffset: UInt64,
         reader: PrivilegedDiskReading,
-        maxScanBytes: Int
-    ) async throws -> Int64? {
+        maxScanBytes: Int,
+        validateCriticalChunkCRCs: Bool = false
+    ) async throws -> PNGSizeEstimation? {
         // IEND chunk type + fixed CRC bytes.
         let iendTrailer: [UInt8] = [0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82]
 
@@ -197,15 +217,33 @@ struct FileFooterDetector: FileFooterDetecting {
             reader: reader,
             maxScanBytes: maxScanBytes
         ) {
-            return Int64(footerEnd)
+            var criticalChunkValidation: PNGCriticalChunkValidation?
+            if validateCriticalChunkCRCs,
+               let pngBytes = try await readWindow(
+                   startOffset: startOffset,
+                   reader: reader,
+                   maxScanBytes: Int(footerEnd)
+               )
+            {
+                criticalChunkValidation = PNGChunkValidator().validateCriticalChunkCRCs(in: pngBytes)
+            }
+
+            return PNGSizeEstimation(
+                sizeInBytes: Int64(footerEnd),
+                criticalChunkValidation: criticalChunkValidation
+            )
         }
 
-        return try await estimateUsingNextHeaderBoundary(
+        if let fallbackSize = try await estimateUsingNextHeaderBoundary(
             startOffset: startOffset,
             reader: reader,
             maxScanBytes: maxScanBytes,
             minimumDistance: 1024
-        )
+        ) {
+            return PNGSizeEstimation(sizeInBytes: fallbackSize, criticalChunkValidation: nil)
+        }
+
+        return nil
     }
 
     // MARK: - GIF Size Estimation
@@ -504,3 +542,5 @@ struct FileFooterDetector: FileFooterDetecting {
         return nil
     }
 }
+
+// swiftlint:enable type_body_length

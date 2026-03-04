@@ -123,6 +123,11 @@ struct DeepScanService: DeepScanServicing {
         let offsetOnDisk: UInt64
     }
 
+    private struct CandidateEstimation {
+        var sizeInBytes: Int64
+        var hasInvalidCriticalChunkCRC: Bool
+    }
+
     private struct RollingOffsetBloomFilter {
         private var bits: [UInt64]
         private let mask: UInt64
@@ -489,16 +494,17 @@ struct DeepScanService: DeepScanServicing {
             index: index,
             candidateNumber: candidateNumber
         )
-        let sizeEstimate = await estimateCandidateSize(
+        let candidateEstimation = await estimateCandidateSize(
             signature: signature,
             offset: offset,
             context: context,
             index: index,
             reader: reader
         )
+        var sizeInBytes = candidateEstimation.sizeInBytes
+        let hasInvalidCriticalChunkCRC = candidateEstimation.hasInvalidCriticalChunkCRC
 
         // For MP4-like formats, try detailed layout reconstruction for displaced moov detection
-        var sizeInBytes = sizeEstimate
         var fragmentMap: [FragmentRange]?
         let mp4LikeSignatures: Set<FileSignature> = [.mp4, .mov, .m4v, .threeGP]
         if mp4LikeSignatures.contains(signature) {
@@ -516,7 +522,8 @@ struct DeepScanService: DeepScanServicing {
             signature: signature,
             sizeInBytes: sizeInBytes,
             entropy: entropy,
-            hasStructureSignal: true
+            hasStructureSignal: true,
+            hasInvalidPNGCriticalChunkCRC: hasInvalidCriticalChunkCRC
         )
 
         let file = RecoverableFile(
@@ -571,10 +578,22 @@ struct DeepScanService: DeepScanServicing {
         context: ScanContext,
         index: Int,
         reader: PrivilegedDiskReading
-    ) async -> Int64 {
-        var sizeInBytes: Int64 = 0
+    ) async -> CandidateEstimation {
+        var estimate = CandidateEstimation(sizeInBytes: 0, hasInvalidCriticalChunkCRC: false)
 
-        let footerDetectableSignatures: Set<FileSignature> = [.jpeg, .png, .gif, .bmp, .webp]
+        if signature == .png,
+           let pngEstimate = try? await fileFooterDetector.estimatePNGSize(
+               startOffset: offset,
+               reader: reader,
+               maxScanBytes: 32 * 1024 * 1024,
+               validateCriticalChunkCRCs: true
+           )
+        {
+            estimate.sizeInBytes = pngEstimate.sizeInBytes
+            estimate.hasInvalidCriticalChunkCRC = pngEstimate.hasInvalidCriticalChunkCRC
+        }
+
+        let footerDetectableSignatures: Set<FileSignature> = [.jpeg, .gif, .bmp, .webp]
         if footerDetectableSignatures.contains(signature),
            let estimatedSize = try? await fileFooterDetector.estimateSize(
                signature: signature,
@@ -583,19 +602,19 @@ struct DeepScanService: DeepScanServicing {
                maxScanBytes: 32 * 1024 * 1024
            )
         {
-            sizeInBytes = estimatedSize
+            estimate.sizeInBytes = estimatedSize
         }
 
         let mp4LikeSignatures: Set<FileSignature> = [.mp4, .mov, .m4v, .threeGP, .heic, .heif, .avif, .cr3]
         if mp4LikeSignatures.contains(signature) {
             let mp4Reconstructor = MP4Reconstructor()
             if let contiguousSize = mp4Reconstructor.calculateContiguousSize(startingAt: offset, reader: reader) {
-                sizeInBytes = Int64(contiguousSize)
+                estimate.sizeInBytes = Int64(contiguousSize)
             }
-            return sizeInBytes
+            return estimate
         }
 
-        if signature == .jpeg, sizeInBytes == 0 {
+        if signature == .jpeg, estimate.sizeInBytes == 0 {
             let imageReconstructor = ImageReconstructor()
             let availableBytes = context.buffer.count - index
             let checkLength = min(availableBytes, 65536)
@@ -605,11 +624,11 @@ struct DeepScanService: DeepScanServicing {
                 initialChunk: headerSlice,
                 reader: reader
             ) {
-                sizeInBytes = Int64(result.count)
+                estimate.sizeInBytes = Int64(result.count)
             }
         }
 
-        return sizeInBytes
+        return estimate
     }
 
     private func sampleEntropy(buffer: [UInt8], scanLength: Int, index: Int) -> Double {
@@ -757,7 +776,8 @@ struct DeepScanService: DeepScanServicing {
         signature: FileSignature,
         sizeInBytes: Int64,
         entropy: Double,
-        hasStructureSignal: Bool
+        hasStructureSignal: Bool,
+        hasInvalidPNGCriticalChunkCRC: Bool = false
     ) -> Double {
         let signatureStrength = signatureStrength(for: signature)
         let structureScore = hasStructureSignal ? 1.0 : 0.35
@@ -769,7 +789,8 @@ struct DeepScanService: DeepScanServicing {
             (structureScore * 0.30) +
             (sizeScore * 0.20) +
             (entropyScore * 0.20)
-        return min(max(weighted, 0), 1)
+        let pngCRCPenalty = signature == .png && hasInvalidPNGCriticalChunkCRC ? 0.25 : 0
+        return min(max(weighted - pngCRCPenalty, 0), 1)
     }
 
     private func signatureStrength(for signature: FileSignature) -> Double {

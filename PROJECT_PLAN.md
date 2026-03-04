@@ -946,7 +946,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-048 🔵 PNG Chunk CRC Validation
+### T-048 ✅ PNG Chunk CRC Validation
 
 **Description**: Improve confidence scoring for recovered PNG files by validating the CRC checksums of critical chunks (like IHDR, IDAT, IEND) during the footer detection phase. This allows the app to surface whether a PNG with a valid boundary might actually contain corrupted internal data.
 
@@ -962,6 +962,13 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `Vivacity/Services/Carvers/PNGChunkValidator.swift` [NEW]
 - `Vivacity/Services/DeepScanService.swift`
 - `VivacityTests/Carvers/PNGChunkValidatorTests.swift` [NEW]
+
+**Completion Notes**:
+- Added `PNGChunkValidator` with standards-compliant CRC-32 validation for critical PNG chunks and explicit validation summaries.
+- Extended `FileFooterDetector` PNG estimation to optionally return critical-chunk CRC validation metadata while preserving existing size-estimation fallbacks.
+- Integrated PNG CRC validation into `DeepScanService` confidence scoring with a PNG-specific penalty for invalid critical chunk CRCs (lower confidence only, no hard rejection).
+- Added new unit coverage for validator behavior (valid/corrupted/missing-IEND PNGs) and deep-scan confidence regression tests for invalid-vs-valid PNG CRC paths.
+- Verification on March 4, 2026: `xcodegen generate`, `swiftformat .`, `swiftlint` (0 violations), `xcodebuild build -scheme Vivacity -destination 'platform=macOS'`, and `xcodebuild test -scheme Vivacity -destination 'platform=macOS' -skip-testing:VivacityUITests` passed (known UI activation flake remains: app stays in Running Background).
 
 ---
 

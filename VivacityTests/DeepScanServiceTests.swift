@@ -443,6 +443,64 @@ final class DeepScanServiceTests: XCTestCase {
         XCTAssertTrue(found.isEmpty)
     }
 
+    func testDeepScanPenalizesPNGWithInvalidCriticalChunkCRC() async throws {
+        let validFile = try await firstFileFound(from: makePNGBuffer(corruptIHDR: false))
+        let corruptedFile = try await firstFileFound(from: makePNGBuffer(corruptIHDR: true))
+
+        XCTAssertEqual(validFile?.signatureMatch, .png)
+        XCTAssertEqual(corruptedFile?.signatureMatch, .png)
+        XCTAssertNotNil(corruptedFile)
+        XCTAssertTrue((corruptedFile?.confidenceScore ?? 0) >= 0.4)
+        XCTAssertLessThan(corruptedFile?.confidenceScore ?? 1, validFile?.confidenceScore ?? 0)
+        XCTAssertEqual(corruptedFile?.recoveryConfidence, .low)
+    }
+
+    private func firstFileFound(from bytes: [UInt8]) async throws -> RecoverableFile? {
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let stream = deepScanService.scan(
+            device: makeDevice(totalCapacity: Int64(bytes.count)),
+            existingOffsets: [],
+            startOffset: 0,
+            cameraProfile: .generic
+        )
+
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                return file
+            }
+        }
+
+        return nil
+    }
+
+    private func makePNGBuffer(corruptIHDR: Bool) -> [UInt8] {
+        var bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+
+        // IHDR chunk.
+        bytes.append(contentsOf: [0x00, 0x00, 0x00, 0x0D])
+        bytes.append(contentsOf: [0x49, 0x48, 0x44, 0x52])
+        bytes.append(contentsOf: [
+            0x00, 0x00, 0x00, 0x01,
+            0x00, 0x00, 0x00, 0x01,
+            0x08, 0x02, 0x00, 0x00, 0x00,
+        ])
+        if corruptIHDR {
+            bytes[16] ^= 0x01
+        }
+        bytes.append(contentsOf: [0x90, 0x77, 0x53, 0xDE])
+
+        // IEND chunk.
+        bytes.append(contentsOf: [0x00, 0x00, 0x00, 0x00])
+        bytes.append(contentsOf: [0x49, 0x45, 0x4E, 0x44])
+        bytes.append(contentsOf: [0xAE, 0x42, 0x60, 0x82])
+
+        if bytes.count < 1024 {
+            bytes.append(contentsOf: Array(repeating: 0x00, count: 1024 - bytes.count))
+        }
+        return bytes
+    }
+
     private func makeDevice(totalCapacity: Int64 = 1024) -> StorageDevice {
         StorageDevice(
             id: "test",
