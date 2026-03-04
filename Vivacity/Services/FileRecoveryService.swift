@@ -159,9 +159,10 @@ struct FileRecoveryService: FileRecoveryServicing {
             throw FileRecoveryError.invalidFileSize(file.fullFileName)
         }
 
+        let preferredName = inferPreferredOutputName(for: file, reader: reader)
         let destinationURL = uniqueFileURL(
             in: destinationDirectory,
-            preferredName: file.fileName,
+            preferredName: preferredName,
             fileExtension: file.fileExtension
         )
         _ = FileManager.default.createFile(atPath: destinationURL.path, contents: nil, attributes: nil)
@@ -215,6 +216,54 @@ struct FileRecoveryService: FileRecoveryServicing {
 
         logger.info("Recovered \(file.fullFileName) (\(fileRecoveredBytes) bytes)")
         return destinationURL
+    }
+
+    /// Attempts to build a richer output name using capture metadata from partial media bytes.
+    /// Falls back to the scanned file name when metadata cannot be extracted.
+    private func inferPreferredOutputName(for file: RecoverableFile, reader: PrivilegedDiskReading) -> String {
+        let sampleBytes = readHeadSample(
+            from: reader,
+            offset: file.offsetOnDisk,
+            fileSize: file.sizeInBytes
+        )
+        guard
+            let metadata = EXIFDateExtractor.extractMetadata(from: sampleBytes),
+            let richName = buildMetadataDrivenName(from: metadata)
+        else {
+            return file.fileName
+        }
+        return richName
+    }
+
+    private func buildMetadataDrivenName(from metadata: EXIFDateExtractor.CaptureMetadata) -> String? {
+        var parts: [String] = []
+        if let capture = metadata.captureTimeToken {
+            parts.append(capture)
+        }
+        if let device = metadata.deviceToken {
+            parts.append(device)
+        }
+
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: "_")
+    }
+
+    private func readHeadSample(from reader: PrivilegedDiskReading, offset: UInt64, fileSize: Int64) -> [UInt8] {
+        guard fileSize > 0 else { return [] }
+        let sampleLength = min(Int(fileSize), 128 * 1024)
+        guard sampleLength > 0 else { return [] }
+
+        var buffer = [UInt8](repeating: 0, count: sampleLength)
+        let readBytes = buffer.withUnsafeMutableBytes { rawBuffer in
+            reader.read(
+                into: rawBuffer.baseAddress!,
+                offset: offset,
+                length: sampleLength
+            )
+        }
+
+        guard readBytes > 0 else { return [] }
+        return Array(buffer.prefix(readBytes))
     }
 
     private func ensureDestinationDirectory(at url: URL) throws {

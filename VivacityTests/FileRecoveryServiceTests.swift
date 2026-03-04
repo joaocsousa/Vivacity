@@ -67,6 +67,31 @@ final class FileRecoveryServiceTests: XCTestCase {
         XCTAssertEqual(result.recoveredFiles.count, 1)
         XCTAssertEqual(result.recoveredFiles[0].lastPathComponent, "IMG_1001 (1).jpg")
     }
+
+    func testRecoverUsesMetadataDrivenNameWhenAvailable() async throws {
+        var sourceData = Data(repeating: 0, count: 512)
+        sourceData[0] = 0xFF
+        sourceData[1] = 0xD8
+        let metadataBytes = Array("2024:11:23 18:45:01+02:00 Canon EOS R5".utf8)
+        sourceData.replaceSubrange(64 ..< 64 + metadataBytes.count, with: metadataBytes)
+
+        let sourceURL = try makeSourceImage(data: sourceData)
+        let destinationURL = try makeTemporaryDirectory()
+        let device = makeDiskImageDevice(at: sourceURL)
+        let file = makeFile(name: "IMG_1001", ext: "jpg", offset: 0, size: 256)
+        let service = FileRecoveryService()
+
+        let result = try await service.recover(
+            files: [file],
+            from: device,
+            to: destinationURL,
+            progressHandler: { _ in }
+        )
+
+        XCTAssertEqual(result.failures.count, 0)
+        XCTAssertEqual(result.recoveredFiles.count, 1)
+        XCTAssertEqual(result.recoveredFiles[0].lastPathComponent, "20241123_184501+0200_Canon.jpg")
+    }
 }
 
 extension FileRecoveryServiceTests {
