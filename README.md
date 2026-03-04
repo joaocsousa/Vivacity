@@ -31,11 +31,33 @@ For the canonical roadmap, status, and handoff details, see [PROJECT_PLAN.md](PR
 ```bash
 git clone https://github.com/joaocsousa/Vivacity.git
 cd Vivacity
+xcodegen generate
 xcodebuild build -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"
 open build/Debug/Vivacity.app
 ```
 
-Or open `Vivacity.xcodeproj` in Xcode and press ⌘R.
+Or regenerate and open the project in Xcode:
+
+```bash
+xcodegen generate
+open Vivacity.xcodeproj
+```
+
+### Xcode Project Workflow (XcodeGen)
+
+- `project.yml` is the single source of truth for project structure and build settings.
+- `Vivacity.xcodeproj` is **not** committed; regenerate locally from `project.yml`.
+- Do not edit `Vivacity.xcodeproj/project.pbxproj` manually. Update `project.yml`, then run:
+
+```bash
+xcodegen generate
+```
+
+- To regenerate/verify before builds or PRs:
+
+```bash
+./scripts/check-xcodegen.sh   # regenerates and ensures the project remains untracked
+```
 
 ### Testing & Code Quality
 

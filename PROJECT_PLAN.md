@@ -25,6 +25,7 @@
 | M9 | Recovery Destination Screen | T-013 → T-015 | ✅ DONE |
 | M10 | Polish & Edge Cases | T-016 → T-018 | ✅ DONE |
 | M11 | Coverage & Quality Hardening | T-034 → T-036 | ✅ DONE |
+| M12 | XcodeGen Migration | T-037 → T-039 | ✅ DONE |
 
 ---
 
@@ -673,7 +674,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ## M12 — XcodeGen Migration
 
-### T-037 Define XcodeGen source-of-truth project spec
+### T-037 ✅ Define XcodeGen source-of-truth project spec
 
 **Description**: Introduce a `project.yml` that reproduces the current `Vivacity.xcodeproj` structure and build settings so the project can be generated deterministically.
 
@@ -687,9 +688,15 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `project.yml` [NEW]
 - `Vivacity.xcodeproj/project.pbxproj` [GENERATED]
 
+**Completion Notes**:
+- Added `project.yml` defining `Vivacity`, `VivacityTests`, and `VivacityUITests` targets with macOS 14.0 + Swift 5 settings.
+- Ported critical target settings (entitlements, bundle IDs, test host/bundle loader, app versioning) into XcodeGen config.
+- Added SwiftLint pre-build script in spec with an output file stamp to avoid unconditional reruns.
+- Regenerated `Vivacity.xcodeproj` via `xcodegen generate`.
+
 ---
 
-### T-038 Validate generated-project parity
+### T-038 ✅ Validate generated-project parity
 
 **Description**: Verify that the generated `.xcodeproj` is functionally equivalent to the current hand-maintained project.
 
@@ -703,9 +710,15 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `project.yml` [MODIFY]
 - `Vivacity.xcodeproj/project.pbxproj` [GENERATED]
 
+**Completion Notes**:
+- Verified generated project via `xcodebuild test -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"` (`** TEST SUCCEEDED **`).
+- Verified generated project via `xcodebuild build -scheme Vivacity -destination 'platform=macOS' SYMROOT="$(pwd)/build"` (`** BUILD SUCCEEDED **`).
+- Re-ran `swiftformat .` and `swiftlint` after migration changes; lint passes with 0 violations.
+- Confirmed source/test target membership by successful compilation/execution of all unit and UI test targets.
+
 ---
 
-### T-039 Document and enforce XcodeGen workflow
+### T-039 ✅ Document and enforce XcodeGen workflow
 
 **Description**: Finalize repository workflow so contributors use XcodeGen as the canonical project definition.
 
@@ -718,3 +731,9 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `README.md` [MODIFY]
 - `CONTRIBUTING.md` [NEW/MODIFY if present]
 - `scripts/` [NEW/MODIFY if guard script is added]
+
+**Completion Notes**:
+- Updated README onboarding to run `xcodegen generate` before build and documented XcodeGen as source of truth.
+- Added `CONTRIBUTING.md` with explicit contribution workflow for regenerate → verify → test/build.
+- Documented and enforced decision to commit both `project.yml` and generated `Vivacity.xcodeproj`.
+- Added lightweight guard script `scripts/check-xcodegen.sh` to detect project/spec drift.
