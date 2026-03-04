@@ -49,7 +49,8 @@ final class ExFATScannerTests: XCTestCase {
                 volumeInfo: VolumeInfo(
                     filesystemType: .exfat,
                     devicePath: "/dev/fake",
-                    mountPoint: URL(fileURLWithPath: "/")
+                    mountPoint: URL(fileURLWithPath: "/"),
+                    blockSize: 512
                 ),
                 reader: reader,
                 continuation: $0

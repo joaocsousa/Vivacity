@@ -840,7 +840,7 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 
 ---
 
-### T-044 Optimize scan performance and add resumability
+### T-044 ✅ Optimize scan performance and add resumability
 
 **Description**: Add bounded-parallel scanning (TaskGroup) with adaptive chunk/read-ahead tuned to device block size; checkpoint scan cursor to resume after interruption.
 
@@ -853,6 +853,14 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - `Vivacity/Services/DeepScanService.swift`
 - `Vivacity/ViewModels/FileScanViewModel.swift`
 - `VivacityTests/**` (benchmark/resume tests)
+
+**Completion Notes**:
+- Added bounded deep-scan parallelism (`TaskGroup`) with configurable worker limits via `PerformanceConfiguration`.
+- Added adaptive chunk sizing driven by device `blockSize`, hit density, and bytes read throughput, with dynamic buffer resizing during scan.
+- Added periodic deep-scan checkpoint events (`.checkpoint(offset)`) and final checkpoint emission before completion.
+- Added resumability in `FileScanViewModel` by tracking latest checkpoint offset and periodically autosaving active scan sessions.
+- Updated Fast Scan and scanner tests for new `ScanEvent`/`VolumeInfo` shape and kept event handling exhaustive.
+- Verification on March 4, 2026: `xcodebuild test -scheme Vivacity -destination 'platform=macOS'` passed (81 unit + 1 UI); `xcodebuild build -scheme Vivacity` passed; `swiftlint` passes with warnings only.
 
 ---
 

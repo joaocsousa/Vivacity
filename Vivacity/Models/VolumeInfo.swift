@@ -38,6 +38,9 @@ struct VolumeInfo: Sendable {
     /// The mount point URL (e.g. `/Volumes/USB_DRIVE`).
     let mountPoint: URL
 
+    /// Filesystem block size reported by statfs.
+    let blockSize: Int
+
     private static let logger = Logger(subsystem: "com.vivacity.app", category: "VolumeInfo")
 
     // MARK: - Detection
@@ -51,7 +54,8 @@ struct VolumeInfo: Sendable {
             return VolumeInfo(
                 filesystemType: .other,
                 devicePath: volumePath,
-                mountPoint: device.volumePath
+                mountPoint: device.volumePath,
+                blockSize: 4096
             )
         }
 
@@ -61,7 +65,8 @@ struct VolumeInfo: Sendable {
             return VolumeInfo(
                 filesystemType: .other,
                 devicePath: volumePath,
-                mountPoint: device.volumePath
+                mountPoint: device.volumePath,
+                blockSize: 4096
             )
         }
 
@@ -102,7 +107,8 @@ struct VolumeInfo: Sendable {
         return VolumeInfo(
             filesystemType: fsType,
             devicePath: resolvedDevicePath,
-            mountPoint: device.volumePath
+            mountPoint: device.volumePath,
+            blockSize: max(Int(stat.f_bsize), 512)
         )
     }
 }

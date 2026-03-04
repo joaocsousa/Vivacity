@@ -1,6 +1,7 @@
 import Foundation
 import os
 
+// swiftlint:disable file_length
 protocol DeepScanServicing: Sendable {
     func scan(
         device: StorageDevice,
@@ -12,21 +13,38 @@ protocol DeepScanServicing: Sendable {
 
 // swiftlint:disable:next type_body_length
 struct DeepScanService: DeepScanServicing {
+    struct PerformanceConfiguration: Sendable {
+        let maxParallelSignatureWorkers: Int
+        let minChunkSectors: Int
+        let maxChunkSectors: Int
+        let checkpointIntervalBytes: UInt64
+
+        static let `default` = PerformanceConfiguration(
+            maxParallelSignatureWorkers: max(2, ProcessInfo.processInfo.activeProcessorCount),
+            minChunkSectors: 128,
+            maxChunkSectors: 4096,
+            checkpointIntervalBytes: 8 * 1024 * 1024
+        )
+    }
+
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeepScan")
     private let diskReaderFactory: @Sendable (String) -> any PrivilegedDiskReading
     private let fileFooterDetector: FileFooterDetecting
+    private let performanceConfig: PerformanceConfiguration
 
     init(
         diskReaderFactory: @escaping @Sendable (String)
             -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading },
-        fileFooterDetector: FileFooterDetecting = FileFooterDetector()
+        fileFooterDetector: FileFooterDetecting = FileFooterDetector(),
+        performanceConfig: PerformanceConfiguration = .default
     ) {
         self.diskReaderFactory = diskReaderFactory
         self.fileFooterDetector = fileFooterDetector
+        self.performanceConfig = performanceConfig
     }
 
     private static let sectorSize = 512
-    private static let readChunkSectors = 256
+    private static let baseReadChunkSectors = 256
     private static let maxSignatureLength = 16
     private static let entropySampleBytes = 4096
     private static let entropyRejectThreshold = 2.2
@@ -178,11 +196,14 @@ struct DeepScanService: DeepScanServicing {
             return
         }
 
-        let chunkSize = Self.sectorSize * Self.readChunkSectors
+        let initialChunkSectors = initialChunkSectors(for: volumeInfo.blockSize)
+        var currentChunkSectors = initialChunkSectors
+        var chunkSize = Self.sectorSize * currentChunkSectors
         var buffer = [UInt8](repeating: 0, count: chunkSize + Self.maxSignatureLength)
         var bytesScanned: UInt64 = startOffset - (startOffset % UInt64(Self.sectorSize))
         var filesFound = 0
         var lastProgressReport: Double = -1
+        var lastCheckpointOffset = bytesScanned
         var carryOver = 0 // Bytes carried over from previous read for cross-boundary matching
         var allOffsets = existingOffsets
         var offsetBloom = RollingOffsetBloomFilter(capacityBits: Self.bloomCapacityBits)
@@ -195,6 +216,11 @@ struct DeepScanService: DeepScanServicing {
 
         while bytesScanned < totalBytes {
             try Task.checkCancellation()
+
+            if buffer.count < chunkSize + Self.maxSignatureLength {
+                buffer = [UInt8](repeating: 0, count: chunkSize + Self.maxSignatureLength)
+                carryOver = 0
+            }
 
             // Read a chunk
             let toRead = min(chunkSize, Int(totalBytes - bytesScanned))
@@ -292,7 +318,7 @@ struct DeepScanService: DeepScanServicing {
                 cameraProfile: cameraProfile,
                 totalBytes: totalBytes
             )
-            await scanChunk(
+            let detectedMatches = await scanChunk(
                 context: context,
                 reader: reader,
                 allOffsets: &allOffsets,
@@ -303,6 +329,13 @@ struct DeepScanService: DeepScanServicing {
             )
 
             bytesScanned += UInt64(bytesRead)
+
+            currentChunkSectors = adaptChunkSectors(
+                current: currentChunkSectors,
+                matches: detectedMatches,
+                bytesRead: bytesRead
+            )
+            chunkSize = Self.sectorSize * currentChunkSectors
 
             // Keep the last few bytes for cross-boundary matching
             if scanLength > Self.maxSignatureLength {
@@ -322,9 +355,15 @@ struct DeepScanService: DeepScanServicing {
                 // Yield to avoid starving the main thread
                 await Task.yield()
             }
+
+            if bytesScanned - lastCheckpointOffset >= performanceConfig.checkpointIntervalBytes {
+                continuation.yield(.checkpoint(bytesScanned))
+                lastCheckpointOffset = bytesScanned
+            }
         }
 
         logger.info("Deep scan complete: \(filesFound) file(s) found after scanning \(bytesScanned) bytes")
+        continuation.yield(.checkpoint(bytesScanned))
         continuation.yield(.completed)
         continuation.finish()
     }
@@ -401,130 +440,186 @@ struct DeepScanService: DeepScanServicing {
         claimedRanges: inout [ClaimedRange],
         filesFound: inout Int,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
-    ) async {
-        // Scan the chunk for magic bytes
-        var i = 0
-        while i < context.scanLength - Self.maxSignatureLength {
+    ) async -> Int {
+        let candidatePositions = stride(from: 0, to: context.scanLength - Self.maxSignatureLength, by: Self.sectorSize)
+            .map { $0 }
+        let matches = await detectMatchesInParallel(
+            buffer: context.buffer,
+            positions: candidatePositions,
+            cameraProfile: context.cameraProfile
+        )
+
+        for (i, match) in matches {
             let offset = context.bytesScanned + UInt64(i) - UInt64(context.readOffset)
 
-            // Skip if already found by fast scan
             if offsetBloom.probablyContains(offset), allOffsets.contains(offset) {
-                i += Self.sectorSize
                 continue
             }
 
-            if let match = matchSignatureAt(buffer: context.buffer, position: i, cameraProfile: context.cameraProfile) {
-                let candidateNumber = filesFound + 1
+            let candidateNumber = filesFound + 1
 
-                var fileName = "\(context.cameraProfile.defaultFilePrefix)\(String(format: "%04d", candidateNumber))"
+            var fileName = "\(context.cameraProfile.defaultFilePrefix)\(String(format: "%04d", candidateNumber))"
 
-                if match.category == .image {
-                    let availableBytes = context.buffer.count - i
-                    let checkLength = min(availableBytes, 65536)
-                    let headerSlice = Array(context.buffer[i ..< i + checkLength])
+            if match.category == .image {
+                let availableBytes = context.buffer.count - i
+                let checkLength = min(availableBytes, 65536)
+                let headerSlice = Array(context.buffer[i ..< i + checkLength])
 
-                    if let exifName = EXIFDateExtractor.extractFilenamePrefix(from: headerSlice) {
-                        fileName = "\(exifName)_\(String(format: "%04d", candidateNumber))"
-                    }
+                if let exifName = EXIFDateExtractor.extractFilenamePrefix(from: headerSlice) {
+                    fileName = "\(exifName)_\(String(format: "%04d", candidateNumber))"
                 }
-
-                var sizeInBytes: Int64 = 0
-
-                if match == .jpeg || match == .png,
-                   let estimatedSize = try? await fileFooterDetector.estimateSize(
-                       signature: match,
-                       startOffset: offset,
-                       reader: reader,
-                       maxScanBytes: 32 * 1024 * 1024
-                   )
-                {
-                    sizeInBytes = estimatedSize
-                }
-
-                if match == .mp4 || match == .mov || match == .m4v || match == .threeGP ||
-                    match == .heic || match == .heif || match == .avif || match == .cr3
-                {
-                    let mp4Reconstructor = MP4Reconstructor()
-                    if let contiguousSize = mp4Reconstructor.calculateContiguousSize(
-                        startingAt: offset,
-                        reader: reader
-                    ) {
-                        sizeInBytes = Int64(contiguousSize)
-                    }
-                } else if match == .jpeg, sizeInBytes == 0 {
-                    let imageReconstructor = ImageReconstructor()
-
-                    let availableBytes = context.buffer.count - i
-                    let checkLength = min(availableBytes, 65536)
-                    let headerSlice = Data(context.buffer[i ..< i + checkLength])
-
-                    if let result = await imageReconstructor.reconstruct(
-                        headerOffset: offset,
-                        initialChunk: headerSlice,
-                        reader: reader
-                    ) {
-                        sizeInBytes = Int64(result.count)
-                    }
-                }
-
-                let availableBytes = context.scanLength - i
-                let entropySampleLength = min(max(availableBytes, 0), Self.entropySampleBytes)
-                let entropyBytes: [UInt8] = if entropySampleLength > 0 {
-                    Array(context.buffer[i ..< i + entropySampleLength])
-                } else {
-                    []
-                }
-                let entropy = shannonEntropy(of: entropyBytes)
-                let structureSignal = true
-                let score = confidenceScore(
-                    signature: match,
-                    sizeInBytes: sizeInBytes,
-                    entropy: entropy,
-                    hasStructureSignal: structureSignal
-                )
-
-                let file = RecoverableFile(
-                    id: UUID(),
-                    fileName: fileName,
-                    fileExtension: match.fileExtension,
-                    fileType: match.category,
-                    sizeInBytes: sizeInBytes,
-                    offsetOnDisk: offset,
-                    signatureMatch: match,
-                    source: .deepScan,
-                    isLikelyContiguous: sizeInBytes > 0,
-                    confidenceScore: score
-                )
-
-                if shouldEmit(file, entropy: entropy),
-                   canAcceptCandidate(
-                       offset: offset,
-                       sizeInBytes: sizeInBytes,
-                       totalBytes: context.totalBytes,
-                       allOffsets: allOffsets,
-                       offsetBloom: offsetBloom,
-                       claimedRanges: claimedRanges
-                   )
-                {
-                    registerCandidate(
-                        offset: offset,
-                        sizeInBytes: sizeInBytes,
-                        allOffsets: &allOffsets,
-                        offsetBloom: &offsetBloom,
-                        claimedRanges: &claimedRanges
-                    )
-                    filesFound += 1
-                    continuation.yield(.fileFound(file))
-                }
-
-                // Skip ahead past this header to avoid re-matching
-                i += Self.sectorSize
-                continue
             }
 
-            // Move forward by sector alignment for efficiency
-            i += Self.sectorSize
+            var sizeInBytes: Int64 = 0
+
+            if match == .jpeg || match == .png,
+               let estimatedSize = try? await fileFooterDetector.estimateSize(
+                   signature: match,
+                   startOffset: offset,
+                   reader: reader,
+                   maxScanBytes: 32 * 1024 * 1024
+               )
+            {
+                sizeInBytes = estimatedSize
+            }
+
+            if match == .mp4 || match == .mov || match == .m4v || match == .threeGP ||
+                match == .heic || match == .heif || match == .avif || match == .cr3
+            {
+                let mp4Reconstructor = MP4Reconstructor()
+                if let contiguousSize = mp4Reconstructor.calculateContiguousSize(
+                    startingAt: offset,
+                    reader: reader
+                ) {
+                    sizeInBytes = Int64(contiguousSize)
+                }
+            } else if match == .jpeg, sizeInBytes == 0 {
+                let imageReconstructor = ImageReconstructor()
+
+                let availableBytes = context.buffer.count - i
+                let checkLength = min(availableBytes, 65536)
+                let headerSlice = Data(context.buffer[i ..< i + checkLength])
+
+                if let result = await imageReconstructor.reconstruct(
+                    headerOffset: offset,
+                    initialChunk: headerSlice,
+                    reader: reader
+                ) {
+                    sizeInBytes = Int64(result.count)
+                }
+            }
+
+            let availableBytes = context.scanLength - i
+            let entropySampleLength = min(max(availableBytes, 0), Self.entropySampleBytes)
+            let entropyBytes: [UInt8] = if entropySampleLength > 0 {
+                Array(context.buffer[i ..< i + entropySampleLength])
+            } else {
+                []
+            }
+            let entropy = shannonEntropy(of: entropyBytes)
+            let structureSignal = true
+            let score = confidenceScore(
+                signature: match,
+                sizeInBytes: sizeInBytes,
+                entropy: entropy,
+                hasStructureSignal: structureSignal
+            )
+
+            let file = RecoverableFile(
+                id: UUID(),
+                fileName: fileName,
+                fileExtension: match.fileExtension,
+                fileType: match.category,
+                sizeInBytes: sizeInBytes,
+                offsetOnDisk: offset,
+                signatureMatch: match,
+                source: .deepScan,
+                isLikelyContiguous: sizeInBytes > 0,
+                confidenceScore: score
+            )
+
+            if shouldEmit(file, entropy: entropy),
+               canAcceptCandidate(
+                   offset: offset,
+                   sizeInBytes: sizeInBytes,
+                   totalBytes: context.totalBytes,
+                   allOffsets: allOffsets,
+                   offsetBloom: offsetBloom,
+                   claimedRanges: claimedRanges
+               )
+            {
+                registerCandidate(
+                    offset: offset,
+                    sizeInBytes: sizeInBytes,
+                    allOffsets: &allOffsets,
+                    offsetBloom: &offsetBloom,
+                    claimedRanges: &claimedRanges
+                )
+                filesFound += 1
+                continuation.yield(.fileFound(file))
+            }
         }
+
+        return matches.count
+    }
+
+    private func detectMatchesInParallel(
+        buffer: [UInt8],
+        positions: [Int],
+        cameraProfile: CameraProfile
+    ) async -> [(Int, FileSignature)] {
+        guard !positions.isEmpty else { return [] }
+
+        let workers = max(1, performanceConfig.maxParallelSignatureWorkers)
+        let sliceSize = max(1, positions.count / workers)
+
+        return await withTaskGroup(of: [(Int, FileSignature)].self) { group in
+            for start in stride(from: 0, to: positions.count, by: sliceSize) {
+                let end = min(start + sliceSize, positions.count)
+                let slice = Array(positions[start ..< end])
+                group.addTask {
+                    var local: [(Int, FileSignature)] = []
+                    local.reserveCapacity(slice.count / 16 + 1)
+                    for pos in slice {
+                        if let signature = matchSignatureAt(
+                            buffer: buffer,
+                            position: pos,
+                            cameraProfile: cameraProfile
+                        ) {
+                            local.append((pos, signature))
+                        }
+                    }
+                    return local
+                }
+            }
+
+            var combined: [(Int, FileSignature)] = []
+            for await partial in group {
+                combined.append(contentsOf: partial)
+            }
+            return combined.sorted { $0.0 < $1.0 }
+        }
+    }
+
+    private func initialChunkSectors(for blockSize: Int) -> Int {
+        let blockMultiplier = max(1, blockSize / Self.sectorSize)
+        let desired = Self.baseReadChunkSectors * blockMultiplier
+        return min(max(desired, performanceConfig.minChunkSectors), performanceConfig.maxChunkSectors)
+    }
+
+    private func adaptChunkSectors(current: Int, matches: Int, bytesRead: Int) -> Int {
+        guard bytesRead > 0 else { return current }
+
+        let sectorsRead = max(1, bytesRead / Self.sectorSize)
+        let density = Double(matches) / Double(sectorsRead)
+
+        var next = current
+        if density > 0.03 {
+            next = max(performanceConfig.minChunkSectors, current / 2)
+        } else if density < 0.005 {
+            next = min(performanceConfig.maxChunkSectors, Int(Double(current) * 1.5))
+        }
+        return max(performanceConfig.minChunkSectors, min(next, performanceConfig.maxChunkSectors))
     }
 
     private func canAcceptCandidate(

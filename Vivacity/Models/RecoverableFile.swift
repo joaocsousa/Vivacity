@@ -16,6 +16,8 @@ enum ScanEvent: Sendable {
     case fileFound(RecoverableFile)
     /// Scan progress updated (0–1).
     case progress(Double)
+    /// Exact deep-scan cursor checkpoint (bytes scanned).
+    case checkpoint(UInt64)
     /// The scan phase completed.
     case completed
 }
