@@ -9,6 +9,8 @@ settings:
     SWIFT_VERSION: 5.0
     GENERATE_INFOPLIST_FILE: YES
     MACOSX_DEPLOYMENT_TARGET: 14.0
+    SYMROOT: $(SRCROOT)/build
+    OBJROOT: $(SRCROOT)/build
 configs:
   Debug: debug
   Release: release
@@ -16,6 +18,8 @@ targets:
   Vivacity:
     type: application
     platform: macOS
+    dependencies:
+      - target: VivacityPrivilegedHelper
     sources:
       - path: Vivacity
         excludes:
@@ -29,6 +33,12 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Vivacity/Vivacity.entitlements
         ENABLE_HARDENED_RUNTIME: NO
         SWIFT_EMIT_LOC_STRINGS: YES
+        PRIVILEGED_HELPER_REQUIREMENT: identifier "com.joao.Vivacity.PrivilegedHelper" and anchor apple generic and certificate leaf[subject.OU] = "4HR9NUUP6T"
+      configs:
+        Debug:
+          PRIVILEGED_HELPER_REQUIREMENT: identifier "com.joao.Vivacity.PrivilegedHelper" and anchor apple generic and certificate leaf[subject.OU] = "4HR9NUUP6T"
+        Release:
+          PRIVILEGED_HELPER_REQUIREMENT: identifier "com.joao.Vivacity.PrivilegedHelper" and anchor apple generic and certificate leaf[subject.OU] = "4HR9NUUP6T"
     preBuildScripts:
       - name: SwiftLint
         script: |
@@ -42,6 +52,28 @@ targets:
           touch "${DERIVED_FILE_DIR}/swiftlint.done"
         outputFiles:
           - $(DERIVED_FILE_DIR)/swiftlint.done
+    postBuildScripts:
+      - name: Embed Privileged Helper
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          APP_BUNDLE="${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}"
+          HELPER_SOURCE="${BUILT_PRODUCTS_DIR}/com.joao.Vivacity.PrivilegedHelper"
+          HELPER_DEST="${APP_BUNDLE}/Contents/Library/LaunchServices/com.joao.Vivacity.PrivilegedHelper"
+          APP_PLIST="${APP_BUNDLE}/Contents/Info.plist"
+
+          mkdir -p "$(dirname "$HELPER_DEST")"
+          if [[ -f "$HELPER_SOURCE" ]]; then
+            cp -f "$HELPER_SOURCE" "$HELPER_DEST"
+            chmod 755 "$HELPER_DEST"
+          else
+            echo "warning: Privileged helper binary not found at ${HELPER_SOURCE}"
+          fi
+
+          HELPER_REQ_ESCAPED="${PRIVILEGED_HELPER_REQUIREMENT//\"/\\\"}"
+          /usr/libexec/PlistBuddy -c "Delete :SMPrivilegedExecutables" "$APP_PLIST" >/dev/null 2>&1 || true
+          /usr/libexec/PlistBuddy -c "Add :SMPrivilegedExecutables dict" "$APP_PLIST"
+          /usr/libexec/PlistBuddy -c "Add :SMPrivilegedExecutables:com.joao.Vivacity.PrivilegedHelper string \"$HELPER_REQ_ESCAPED\"" "$APP_PLIST"
 
   VivacityTests:
     type: bundle.unit-test
@@ -69,6 +101,35 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.joao.VivacityUITests
         PRODUCT_NAME: VivacityUITests
 
+  VivacityPrivilegedHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - path: VivacityPrivilegedHelper
+        excludes:
+          - "**/*.md"
+      - path: Vivacity/Services/PrivilegedHelper/PrivilegedReaderXPCProtocol.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.joao.Vivacity.PrivilegedHelper
+        PRODUCT_NAME: VivacityPrivilegedHelper
+        EXECUTABLE_NAME: com.joao.Vivacity.PrivilegedHelper
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: VivacityPrivilegedHelper/Info.plist
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -sectcreate
+          - __TEXT
+          - __launchd_plist
+          - $(SRCROOT)/VivacityPrivilegedHelper/Launchd.plist
+        HELPER_AUTHORIZED_CLIENT_REQUIREMENT: identifier "com.joao.Vivacity" and anchor apple generic and certificate leaf[subject.OU] = "4HR9NUUP6T"
+      configs:
+        Debug:
+          HELPER_AUTHORIZED_CLIENT_REQUIREMENT: identifier "com.joao.Vivacity" and anchor apple generic and certificate leaf[subject.OU] = "4HR9NUUP6T"
+        Release:
+          HELPER_AUTHORIZED_CLIENT_REQUIREMENT: identifier "com.joao.Vivacity" and anchor apple generic and certificate leaf[subject.OU] = "4HR9NUUP6T"
+
 schemes:
   Vivacity:
     shared: true
@@ -91,3 +152,9 @@ schemes:
       gatherCoverageData: true
       targets:
         - name: VivacityUITests
+
+  VivacityHelper:
+    shared: true
+    build:
+      targets:
+        VivacityPrivilegedHelper: all

@@ -10,6 +10,42 @@ protocol DeepScanServicing: Sendable {
     ) -> AsyncThrowingStream<ScanEvent, Error>
 }
 
+struct RollingOffsetBloomFilter {
+    private var bits: [UInt64]
+    private let mask: UInt64
+
+    init(capacityBits: Int) {
+        let roundedBits = max(64, 1 << Int(log2(Double(max(capacityBits, 64)))))
+        bits = Array(repeating: 0, count: roundedBits / 64)
+        mask = UInt64(roundedBits - 1)
+    }
+
+    mutating func insert(_ value: UInt64) {
+        for hash in hashes(for: value) {
+            let idx = Int(hash >> 6)
+            let bit = UInt64(1) << (hash & 63)
+            bits[idx] |= bit
+        }
+    }
+
+    func probablyContains(_ value: UInt64) -> Bool {
+        for hash in hashes(for: value) {
+            let idx = Int(hash >> 6)
+            let bit = UInt64(1) << (hash & 63)
+            if bits[idx] & bit == 0 { return false }
+        }
+        return true
+    }
+
+    private func hashes(for value: UInt64) -> [UInt64] {
+        let h1 = (value &* 0x9E37_79B9_7F4A_7C15) & mask
+        let h2 = ((value ^ 0xC2B2_AE3D_27D4_EB4F) &* 0x1656_67B1_9E37_79F9) & mask
+        let rotated = (value << 13) | (value >> (64 - 13))
+        let h3 = (rotated &* 0x85EB_CA6B_27D4_EB2F) & mask
+        return [h1, h2, h3]
+    }
+}
+
 struct DeepScanService: DeepScanServicing {
     struct PerformanceConfiguration: Sendable {
         let maxParallelSignatureWorkers: Int
@@ -48,6 +84,14 @@ struct DeepScanService: DeepScanServicing {
     static let entropyRejectThreshold = 2.2
     static let confidenceRejectThreshold = 0.4
     static let bloomCapacityBits = 1 << 20
+
+    private func logInfo(_ message: String) {
+        logger.info("\(message, privacy: .public)")
+    }
+
+    private func logWarning(_ message: String) {
+        logger.warning("\(message, privacy: .public)")
+    }
 
     // MARK: - Public API
 
@@ -134,6 +178,8 @@ struct DeepScanService: DeepScanServicing {
         var lastProgressReport: Double
         var lastCheckpointOffset: UInt64
         var carryOver: Int
+        var chunkReadCount: Int
+        var lastLoggedProgressDecile: Int
     }
 
     private struct ChunkReadResult {
@@ -143,46 +189,11 @@ struct DeepScanService: DeepScanServicing {
     }
 
     private struct ScanRuntimeContext {
+        let devicePath: String
         let reader: any PrivilegedDiskReading
         let cameraProfile: CameraProfile
         let totalBytes: UInt64
         let continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
-    }
-
-    struct RollingOffsetBloomFilter {
-        private var bits: [UInt64]
-        private let mask: UInt64
-
-        init(capacityBits: Int) {
-            let roundedBits = max(64, 1 << Int(log2(Double(max(capacityBits, 64)))))
-            bits = Array(repeating: 0, count: roundedBits / 64)
-            mask = UInt64(roundedBits - 1)
-        }
-
-        mutating func insert(_ value: UInt64) {
-            for hash in hashes(for: value) {
-                let idx = Int(hash >> 6)
-                let bit = UInt64(1) << (hash & 63)
-                bits[idx] |= bit
-            }
-        }
-
-        func probablyContains(_ value: UInt64) -> Bool {
-            for hash in hashes(for: value) {
-                let idx = Int(hash >> 6)
-                let bit = UInt64(1) << (hash & 63)
-                if bits[idx] & bit == 0 { return false }
-            }
-            return true
-        }
-
-        private func hashes(for value: UInt64) -> [UInt64] {
-            let h1 = (value &* 0x9E37_79B9_7F4A_7C15) & mask
-            let h2 = ((value ^ 0xC2B2_AE3D_27D4_EB4F) &* 0x1656_67B1_9E37_79F9) & mask
-            let rotated = (value << 13) | (value >> (64 - 13))
-            let h3 = (rotated &* 0x85EB_CA6B_27D4_EB2F) & mask
-            return [h1, h2, h3]
-        }
     }
 
     private func performScan(
@@ -194,7 +205,14 @@ struct DeepScanService: DeepScanServicing {
     ) async throws {
         let volumeInfo = VolumeInfo.detect(for: device)
         let devicePath = volumeInfo.devicePath
-        logger.info("Starting deep scan on \(device.name) using device \(devicePath)")
+        logInfo(
+            "Starting deep scan on '\(device.name)' " +
+                "device=\(devicePath) " +
+                "fs=\(volumeInfo.filesystemType.displayName) " +
+                "blockSize=\(volumeInfo.blockSize) " +
+                "startOffset=\(startOffset) " +
+                "existingOffsets=\(existingOffsets.count)"
+        )
         let reader = try startReader(for: devicePath)
         defer { reader.stop() }
 
@@ -213,12 +231,17 @@ struct DeepScanService: DeepScanServicing {
             startOffset: startOffset
         )
         let runtime = ScanRuntimeContext(
+            devicePath: devicePath,
             reader: reader,
             cameraProfile: cameraProfile,
             totalBytes: totalBytes,
             continuation: continuation
         )
-        logger.info("Deep scanning \(totalBytes) bytes (\(totalBytes / (1024 * 1024)) MB)")
+        logInfo(
+            "Deep scanning totalBytes=\(totalBytes) " +
+                "(\(totalBytes / (1024 * 1024)) MB) " +
+                "initialChunkSize=\(state.chunkSize) bytes"
+        )
         try await runScanLoop(
             state: &state,
             carvers: &carvers,
@@ -228,27 +251,17 @@ struct DeepScanService: DeepScanServicing {
         let completionMessage =
             "Deep scan complete: \(state.scanAccumulator.filesFound) file(s) " +
             "found after scanning \(state.bytesScanned) bytes"
-        logger.info("\(completionMessage)")
+        logInfo(completionMessage)
         continuation.yield(.checkpoint(state.bytesScanned))
         continuation.yield(.completed)
         continuation.finish()
-    }
-
-    private func startReader(for devicePath: String) throws -> any PrivilegedDiskReading {
-        let reader = diskReaderFactory(devicePath)
-        do {
-            try reader.start()
-            return reader
-        } catch {
-            logger.error("Failed to start privileged reader: \(error.localizedDescription)")
-            throw DeepScanError.cannotOpenDevice(path: devicePath, reason: error.localizedDescription)
-        }
     }
 
     private func initializeCarvers(for volumeInfo: VolumeInfo, reader: PrivilegedDiskReading) -> ActiveCarvers {
         switch volumeInfo.filesystemType {
         case .fat32:
             let fat = createFATCarver(reader: reader)
+            logInfo("Deep scan filesystem-aware carver FAT enabled=\(fat != nil)")
             return ActiveCarvers(fat: fat, apfs: nil, hfsPlus: nil)
         case .apfs:
             logger.info("Initialized APFSCarver for APFS volume")
@@ -257,6 +270,7 @@ struct DeepScanService: DeepScanServicing {
             logger.info("Initialized HFSPlusCarver for HFS+ volume")
             return ActiveCarvers(fat: nil, apfs: nil, hfsPlus: HFSPlusCarver())
         default:
+            logInfo("No filesystem-aware carver available for fs=\(volumeInfo.filesystemType.displayName)")
             return ActiveCarvers(fat: nil, apfs: nil, hfsPlus: nil)
         }
     }
@@ -301,7 +315,9 @@ struct DeepScanService: DeepScanServicing {
             scanAccumulator: scanAccumulator,
             lastProgressReport: -1,
             lastCheckpointOffset: alignedStartOffset,
-            carryOver: 0
+            carryOver: 0,
+            chunkReadCount: 0,
+            lastLoggedProgressDecile: -1
         )
     }
 
@@ -315,6 +331,22 @@ struct DeepScanService: DeepScanServicing {
             ensureBufferCapacity(state: &state)
 
             guard let chunk = readNextChunk(state: &state, runtime: runtime) else {
+                if state.chunkReadCount == 0 {
+                    let diagnostic =
+                        runtime.reader.lastReadFailureDescription ?? "no reader diagnostic available"
+                    throw DeepScanError.cannotReadDevice(
+                        path: runtime.devicePath,
+                        offset: state.bytesScanned,
+                        reason:
+                        "No data could be read. seekable=\(runtime.reader.isSeekable). " +
+                            "diagnostic=\(diagnostic)"
+                    )
+                }
+                logWarning(
+                    "Stopping deep scan loop due to zero/negative read " +
+                        "offset=\(state.bytesScanned) " +
+                        "chunks=\(state.chunkReadCount)"
+                )
                 break
             }
 
@@ -447,6 +479,21 @@ struct DeepScanService: DeepScanServicing {
 }
 
 extension DeepScanService {
+    private func startReader(for devicePath: String) throws -> any PrivilegedDiskReading {
+        let reader = diskReaderFactory(devicePath)
+        do {
+            try reader.start()
+            logInfo("Deep reader started successfully for \(devicePath). seekable=\(reader.isSeekable)")
+            return reader
+        } catch {
+            logger
+                .error(
+                    "Reader failed \(devicePath, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+            throw DeepScanError.cannotOpenDevice(path: devicePath, reason: error.localizedDescription)
+        }
+    }
+
     private func ensureBufferCapacity(state: inout ScanLoopState) {
         if state.buffer.count < state.chunkSize + Self.maxSignatureLength {
             state.buffer = [UInt8](repeating: 0, count: state.chunkSize + Self.maxSignatureLength)
@@ -468,7 +515,25 @@ extension DeepScanService {
                 length: bytesToRead
             )
         }
-        guard bytesRead > 0 else { return nil }
+        guard bytesRead > 0 else {
+            logWarning(
+                "Deep read returned bytesRead=\(bytesRead) " +
+                    "offset=\(state.bytesScanned) " +
+                    "requested=\(bytesToRead) " +
+                    "readOffset=\(readOffset) " +
+                    "seekable=\(runtime.reader.isSeekable)"
+            )
+            return nil
+        }
+
+        if state.chunkReadCount == 0 {
+            logInfo(
+                "Deep first chunk read succeeded " +
+                    "bytesRead=\(bytesRead) " +
+                    "requested=\(bytesToRead) " +
+                    "offset=\(state.bytesScanned)"
+            )
+        }
 
         return ChunkReadResult(
             bytesRead: bytesRead,
@@ -489,6 +554,7 @@ extension DeepScanService {
             bytesRead: chunk.bytesRead
         )
         state.chunkSize = Self.sectorSize * state.currentChunkSectors
+        state.chunkReadCount += 1
 
         if chunk.scanLength > Self.maxSignatureLength {
             let keepFrom = chunk.scanLength - Self.maxSignatureLength
@@ -505,6 +571,15 @@ extension DeepScanService {
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async {
         let progress = Double(state.bytesScanned) / Double(totalBytes)
+        let decile = Int((progress * 10).rounded(.down))
+        if decile > state.lastLoggedProgressDecile {
+            state.lastLoggedProgressDecile = decile
+            logInfo(
+                "Deep scan progress \(Int(progress * 100))% " +
+                    "bytesScanned=\(state.bytesScanned) " +
+                    "filesFound=\(state.scanAccumulator.filesFound)"
+            )
+        }
         if progress - state.lastProgressReport >= 0.01 {
             continuation.yield(.progress(min(progress, 1.0)))
             state.lastProgressReport = progress
@@ -512,23 +587,9 @@ extension DeepScanService {
         }
 
         if state.bytesScanned - state.lastCheckpointOffset >= performanceConfig.checkpointIntervalBytes {
+            logInfo("Deep scan checkpoint emitted at offset=\(state.bytesScanned)")
             continuation.yield(.checkpoint(state.bytesScanned))
             state.lastCheckpointOffset = state.bytesScanned
-        }
-    }
-}
-
-// MARK: - Errors
-
-/// Errors specific to the deep scan process.
-enum DeepScanError: LocalizedError {
-    case cannotOpenDevice(path: String, reason: String)
-
-    var errorDescription: String? {
-        switch self {
-        case let .cannotOpenDevice(path, reason):
-            "Cannot open \(path) for scanning: \(reason). " +
-                "Try running with elevated privileges or granting Full Disk Access in System Settings."
         }
     }
 }

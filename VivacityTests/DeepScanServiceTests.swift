@@ -2,6 +2,27 @@ import XCTest
 @testable import Vivacity
 
 final class DeepScanServiceTests: XCTestCase {
+    func testDeepScanThrowsWhenFirstReadReturnsNoData() async {
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data())
+        let deepScanService = DeepScanService { _ in fakeReader }
+        let stream = deepScanService.scan(
+            device: makeDevice(totalCapacity: 4096),
+            existingOffsets: [],
+            startOffset: 0,
+            cameraProfile: .generic
+        )
+
+        do {
+            for try await _ in stream {}
+            XCTFail("Expected deep scan to throw when first read returns no data")
+        } catch {
+            XCTAssertTrue(
+                error.localizedDescription.contains("Cannot read")
+                    || error.localizedDescription.contains("No data could be read")
+            )
+        }
+    }
+
     func testDeepScanDetectsAVIFBrand() async throws {
         var bytes: [UInt8] = [
             0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66,
