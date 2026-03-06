@@ -1,8 +1,11 @@
 import Foundation
+import os
 
 /// Simple dependency container to allow tests to inject fake services/view models.
 @MainActor
 enum AppEnvironment {
+    private static let logger = Logger(subsystem: "com.vivacity.app", category: "AppEnvironment")
+
     static var makeDeviceSelectionViewModel: @MainActor () -> DeviceSelectionViewModel = {
         DeviceSelectionViewModel()
     }
@@ -15,7 +18,13 @@ enum AppEnvironment {
     static func configureForTestingIfNeeded() {
         #if DEBUG
         let env = ProcessInfo.processInfo.environment
-        guard env["VIVACITY_USE_FAKE_SERVICES"] == "1" else { return }
+        let fakeServicesEnabled = env["VIVACITY_USE_FAKE_SERVICES"] == "1"
+        if !fakeServicesEnabled {
+            logger.info("Using real services (VIVACITY_USE_FAKE_SERVICES != 1)")
+            return
+        }
+
+        logger.warning("Using FAKE services due to VIVACITY_USE_FAKE_SERVICES=1")
 
         makeDeviceSelectionViewModel = {
             DeviceSelectionViewModel(deviceService: FakeDeviceService())
