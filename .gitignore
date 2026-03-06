@@ -65,5 +65,6 @@ fastlane/test_output
 
 # Custom Derived Data / Build Output
 .DerivedData/
+*.profraw
 Build/
 build/
