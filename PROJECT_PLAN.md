@@ -91,6 +91,7 @@
 | M13 | Recovery Quality Improvements | T-040 → T-046 | ✅ DONE |
 | M14 | Test Reliability Hardening | T-050 | ✅ DONE |
 | M15 | Unified Scan Flow & ETA Progress | T-051 | ✅ DONE |
+| M16 | Thorough Scanning Enhancements | T-052 → T-057 | ⬜ TODO |
 
 ---
 
@@ -1061,5 +1062,92 @@ This requires extracting the raw bytes from `/dev/disk` using the discovered `of
 - Added parser unit coverage for valid VPS/SPS/PPS streams, incomplete parameter sets, non-Annex-B payloads, and NAL-unit limit behavior.
 - Added integration coverage in `ImageReconstructorTests` and `MP4ReconstructorTests` to verify optional HEVC validation metadata is populated in reconstruction results.
 - Verification on March 4, 2026: `xcodegen generate`, `swiftformat .`, `swiftlint` (0 violations), `xcodebuild build -scheme Vivacity -destination 'platform=macOS'`, and `xcodebuild test -scheme Vivacity -destination 'platform=macOS' -skip-testing:VivacityUITests` passed (full UI test run in this environment hit an authentication/system-state runner issue).
+
+---
+
+## M16 — Thorough Scanning Enhancements
+
+### T-052 ⬜ Free-Space Bitmap Utilization (Deep Scan Optimization)
+
+**Description**: Restrict the deep scan only to unallocated (free) space by reading the filesystem's allocation bitmap (e.g., APFS Space Manager, FAT table, NTFS $Bitmap).
+**Acceptance Criteria**:
+- Scanners can parse and utilize the filesystem's allocation bitmap.
+- Deep scan skips sectors currently allocated to live files.
+- Reduces scan time and false positives from live files.
+
+**Files**:
+- `Vivacity/Services/DeepScanService.swift`
+- `Vivacity/Services/PartitionSearchService.swift`
+- `VivacityTests/**`
+
+---
+
+### T-053 ⬜ Application Cache & Thumbnail Extraction
+
+**Description**: Target specific macOS caches and application folders to recover high-quality thumbnails when original files are overwritten.
+**Acceptance Criteria**:
+- Scans `com.apple.QuickLook.thumbnailcache` (`index.sqlite` and `thumbnails.data`).
+- Scans `Photos Library.photoslibrary/resources/derivatives/`.
+- Scans `~/Library/Messages/Attachments/`.
+- Recovers viewable versions of files even if original media is lost.
+
+**Files**:
+- `Vivacity/Services/FastScanService.swift`
+- `Vivacity/Models/RecoverableFile.swift`
+- `VivacityTests/**`
+
+---
+
+### T-054 ⬜ Advanced Fragmentation Assembly (Smart Carving)
+
+**Description**: Implement "Bifurcation Carving" to stitch a floating `moov` atom to an orphaned `mdat` atom for video files split into non-contiguous chunks.
+**Acceptance Criteria**:
+- `FragmentedVideoAssembler` stitches non-contiguous `moov` and `mdat` atoms.
+- Successfully recovers playable MP4/MOV files that are currently unplayable or corrupted.
+
+**Files**:
+- `Vivacity/Services/Carvers/FragmentedVideoAssembler.swift`
+- `Vivacity/Services/Carvers/MP4Reconstructor.swift`
+- `VivacityTests/**`
+
+---
+
+### T-055 ⬜ Virtual Memory & Swap Scanning
+
+**Description**: Scan virtual memory and swapfiles on the boot drive for residual file data from recently viewed media.
+**Acceptance Criteria**:
+- Scans `/private/var/vm/` (swapfiles/sleepimage) for image/video signatures.
+- Recovers residual file data paged to memory from external drives.
+
+**Files**:
+- `Vivacity/Services/DeepScanService.swift`
+- `VivacityTests/**`
+
+---
+
+### T-056 ⬜ Expanded File Signatures (Archives & Pro Formats)
+
+**Description**: Add support for document/archive formats (ZIP, RAR, PDF, DOCX) and Pro Video/Audio formats (.BRAW, .R3D, .MXF, MP3, WAV, AAC).
+**Acceptance Criteria**:
+- `FileSignature.swift` updated with new magic bytes for archives, documents, pro video, and audio.
+- Deep scan successfully recovers these new file types.
+
+**Files**:
+- `Vivacity/Models/FileSignature.swift`
+- `VivacityTests/FileSignatureTests.swift`
+
+---
+
+### T-057 ⬜ APFS .fseventsd Parsing
+
+**Description**: Parse the `.fseventsd` folder to track historical filesystem changes and locate exact sectors of deleted files, enabling targeted extraction instead of blind carving.
+**Acceptance Criteria**:
+- Parser decodes `.fseventsd` logs to find deleted file paths and their former sector locations.
+- Enables targeted extraction of recently deleted APFS files.
+
+**Files**:
+- `Vivacity/Services/FastScanService.swift`
+- `Vivacity/Services/APFSMetadataScanner.swift`
+- `VivacityTests/**`
 
 ---
