@@ -5,9 +5,22 @@ extension FileScanViewModel {
         let verifiedCount: Int
         let mismatchCount: Int
         let unreadableCount: Int
+        let unreadableReasonSummary: String?
 
         var hasWarnings: Bool {
             mismatchCount > 0 || unreadableCount > 0
+        }
+
+        var blockingMessage: String? {
+            guard unreadableCount > 0, verifiedCount == 0, mismatchCount == 0 else {
+                return nil
+            }
+
+            return
+                "\(unreadableCount) file(s) could not be read during sample verification." +
+                reasonSuffix +
+                " " +
+                "Preview and recovery are unavailable until the source bytes can be read again."
         }
 
         var warningMessage: String {
@@ -16,9 +29,16 @@ extension FileScanViewModel {
                 parts.append("\(mismatchCount) file(s) changed between reads")
             }
             if unreadableCount > 0 {
-                parts.append("\(unreadableCount) file(s) could not be read")
+                parts.append("\(unreadableCount) file(s) could not be read during sample verification")
             }
-            return parts.joined(separator: ", ")
+            return parts.joined(separator: ", ") + reasonSuffix
+        }
+
+        private var reasonSuffix: String {
+            guard let unreadableReasonSummary, !unreadableReasonSummary.isEmpty else {
+                return ""
+            }
+            return " Reason: \(unreadableReasonSummary)"
         }
     }
 

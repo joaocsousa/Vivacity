@@ -101,6 +101,91 @@ final class FastScanServiceTests: XCTestCase {
         XCTAssertEqual(foundNames, ["deleted_from_live.jpg"])
     }
 
+    func testScanDiskImageRunsAPFSMetadataPhase() async throws {
+        let imageURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fastscan-apfs-\(UUID().uuidString).img")
+        defer { try? FileManager.default.removeItem(at: imageURL) }
+
+        var disk = Data(repeating: 0, count: 8192)
+        writeASCII("BSXN", to: &disk, offset: 32)
+        writeUInt32(4096, to: &disk, offset: 36)
+        writeASCII("Users/demo/Pictures/deleted_photo.jpg", to: &disk, offset: 256)
+        let jpegOffset = 5000
+        let jpegBytes: [UInt8] = [
+            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46,
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0xFF, 0xD9,
+        ]
+        for (index, byte) in jpegBytes.enumerated() {
+            disk[jpegOffset + index] = byte
+        }
+        try disk.write(to: imageURL)
+
+        let service = FastScanService(runTMUtilClosure: { _, _ in nil })
+        let device = StorageDevice(
+            id: imageURL.absoluteString,
+            name: "APFS Image",
+            volumePath: imageURL,
+            volumeUUID: "APFS-IMAGE",
+            filesystemType: .apfs,
+            isExternal: true,
+            isDiskImage: true,
+            partitionOffset: nil,
+            partitionSize: nil,
+            totalCapacity: Int64(disk.count),
+            availableCapacity: 0
+        )
+
+        let events = try await collectEvents(from: service.scan(device: device))
+        let foundNames = events.compactMap { event -> String? in
+            if case let .fileFound(file) = event {
+                return file.fullFileName
+            }
+            return nil
+        }
+
+        XCTAssertEqual(foundNames, ["deleted_photo.jpg"])
+    }
+
+    func testScanDiskImageRunsStructuredAPFSMetadataPhase() async throws {
+        let imageURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fastscan-apfs-structured-\(UUID().uuidString).img")
+        defer { try? FileManager.default.removeItem(at: imageURL) }
+
+        let fixture = APFSTestImageFixture.makeStructuredJPEG(
+            pathComponents: ["Users", "Pictures", "deleted_photo.jpg"]
+        )
+        try fixture.disk.write(to: imageURL)
+
+        let service = FastScanService(runTMUtilClosure: { _, _ in nil })
+        let device = StorageDevice(
+            id: imageURL.absoluteString,
+            name: "APFS Image",
+            volumePath: imageURL,
+            volumeUUID: "APFS-STRUCTURED-IMAGE",
+            filesystemType: .apfs,
+            isExternal: true,
+            isDiskImage: true,
+            partitionOffset: nil,
+            partitionSize: nil,
+            totalCapacity: Int64(fixture.disk.count),
+            availableCapacity: 0
+        )
+
+        let events = try await collectEvents(from: service.scan(device: device))
+        let files = events.compactMap { event -> RecoverableFile? in
+            if case let .fileFound(file) = event {
+                return file
+            }
+            return nil
+        }
+
+        let file = try XCTUnwrap(files.first)
+        XCTAssertEqual(files.count, 1)
+        XCTAssertEqual(file.fullFileName, "deleted_photo.jpg")
+        XCTAssertEqual(file.filePath, fixture.filePath)
+        XCTAssertEqual(file.fragmentMap, fixture.fragmentMap)
+    }
+
     private func collectEvents(from stream: AsyncThrowingStream<ScanEvent, Error>) async throws -> [ScanEvent] {
         var events: [ScanEvent] = []
         for try await event in stream {
@@ -119,6 +204,19 @@ final class FastScanServiceTests: XCTestCase {
     private func makeJPEGFile(at url: URL) throws {
         let bytes: [UInt8] = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]
         try Data(bytes).write(to: url)
+    }
+
+    private func writeUInt32(_ value: UInt32, to data: inout Data, offset: Int) {
+        data[offset + 0] = UInt8(value & 0xFF)
+        data[offset + 1] = UInt8((value >> 8) & 0xFF)
+        data[offset + 2] = UInt8((value >> 16) & 0xFF)
+        data[offset + 3] = UInt8((value >> 24) & 0xFF)
+    }
+
+    private func writeASCII(_ string: String, to data: inout Data, offset: Int) {
+        for (index, byte) in string.utf8.enumerated() {
+            data[offset + index] = byte
+        }
     }
 
     private func makeDevice(volumeRoot: URL) -> StorageDevice {

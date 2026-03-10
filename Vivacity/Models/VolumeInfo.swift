@@ -41,6 +41,23 @@ struct VolumeInfo: Sendable {
     /// Filesystem block size reported by statfs.
     let blockSize: Int
 
+    /// Whether the underlying volume is reported as internal by `diskutil`.
+    let isInternal: Bool
+
+    /// Whether the underlying volume is bootable by `diskutil`.
+    let isBootable: Bool
+
+    /// Whether the underlying volume reports FileVault encryption.
+    let isFileVaultEnabled: Bool
+
+    var isProtectedBootAPFSVolume: Bool {
+        filesystemType == .apfs &&
+            isInternal &&
+            isBootable &&
+            isFileVaultEnabled &&
+            ["/", "/System/Volumes/Data"].contains(mountPoint.path)
+    }
+
     private static let logger = Logger(subsystem: "com.vivacity.app", category: "VolumeInfo")
 
     private static func logInfo(_ message: String) {
@@ -60,10 +77,13 @@ struct VolumeInfo: Sendable {
         if device.isDiskImage {
             logInfo("Skipping statfs for disk image file at \(volumePath)")
             return VolumeInfo(
-                filesystemType: .other,
+                filesystemType: device.filesystemType,
                 devicePath: volumePath,
                 mountPoint: device.volumePath,
-                blockSize: 4096
+                blockSize: 4096,
+                isInternal: false,
+                isBootable: false,
+                isFileVaultEnabled: false
             )
         }
 
@@ -74,7 +94,10 @@ struct VolumeInfo: Sendable {
                 filesystemType: .other,
                 devicePath: volumePath,
                 mountPoint: device.volumePath,
-                blockSize: 4096
+                blockSize: 4096,
+                isInternal: !device.isExternal,
+                isBootable: false,
+                isFileVaultEnabled: false
             )
         }
 
@@ -93,6 +116,7 @@ struct VolumeInfo: Sendable {
         }
 
         let fsType = FilesystemType(rawValue: fsTypeName) ?? .other
+        let diskInfo = diskutilInfoPlist(for: volumePath) ?? diskutilInfoPlist(for: devicePath)
         let remappedDevicePath = remapAPFSSnapshotDeviceIfNeeded(
             currentDevicePath: devicePath,
             fsType: fsType,
@@ -106,7 +130,10 @@ struct VolumeInfo: Sendable {
             filesystemType: fsType,
             devicePath: resolvedDevicePath,
             mountPoint: device.volumePath,
-            blockSize: max(Int(stat.f_bsize), 512)
+            blockSize: max(Int(stat.f_bsize), 512),
+            isInternal: diskInfo?["Internal"] as? Bool ?? !device.isExternal,
+            isBootable: diskInfo?["Bootable"] as? Bool ?? false,
+            isFileVaultEnabled: diskInfo?["FileVault"] as? Bool ?? false
         )
     }
 

@@ -50,7 +50,10 @@ final class ExFATScannerTests: XCTestCase {
                     filesystemType: .exfat,
                     devicePath: "/dev/fake",
                     mountPoint: URL(fileURLWithPath: "/"),
-                    blockSize: 512
+                    blockSize: 512,
+                    isInternal: false,
+                    isBootable: false,
+                    isFileVaultEnabled: false
                 ),
                 reader: reader,
                 continuation: $0

@@ -30,7 +30,7 @@ struct FastScanService: FastScanServicing {
 
     init(
         diskReaderFactory: @escaping @Sendable (String)
-            -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading },
+            -> any PrivilegedDiskReading = { DiskReaderFactoryProvider.makeReader(forPath: $0) },
         runTMUtilClosure: @escaping @Sendable (URL, Logger) -> String? = FastScanService.defaultRunTMUtil,
         mountSnapshotClosure: @escaping @Sendable (String, URL, Logger) throws -> URL = FastScanService
             .defaultMountSnapshot,
@@ -102,6 +102,7 @@ struct FastScanService: FastScanServicing {
 
         let phaseBStats = await runRawCatalogPhaseIfNeeded(
             volumeInfo: volumeInfo,
+            totalBytes: UInt64(device.totalCapacity),
             foundFilenames: &foundFilenames,
             continuation: continuation
         )
@@ -146,12 +147,14 @@ struct FastScanService: FastScanServicing {
 
     private func runRawCatalogPhaseIfNeeded(
         volumeInfo: VolumeInfo,
+        totalBytes: UInt64,
         foundFilenames: inout Set<String>,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async -> (files: Int, checkpoints: Int) {
         guard volumeInfo.filesystemType == .fat32
             || volumeInfo.filesystemType == .exfat
             || volumeInfo.filesystemType == .ntfs
+            || volumeInfo.filesystemType == .apfs
         else {
             logInfo("Fast scan Phase B skipped for filesystem \(volumeInfo.filesystemType.displayName)")
             continuation.yield(.progress(1.0))
@@ -172,7 +175,11 @@ struct FastScanService: FastScanServicing {
                 return (0, 0)
             }
 
-            for try await event in makeRawCatalogPhaseStream(volumeInfo: volumeInfo, reader: reader) {
+            for try await event in makeRawCatalogPhaseStream(
+                volumeInfo: volumeInfo,
+                reader: reader,
+                totalBytes: totalBytes
+            ) {
                 switch event {
                 case let .fileFound(file):
                     if !foundFilenames.contains(file.fileName) {
@@ -196,46 +203,6 @@ struct FastScanService: FastScanServicing {
         return (phaseBFiles, phaseBCheckpoints)
     }
 
-    private func makeRawCatalogPhaseStream(
-        volumeInfo: VolumeInfo,
-        reader: any PrivilegedDiskReading
-    ) -> AsyncThrowingStream<ScanEvent, Error> {
-        AsyncThrowingStream { phaseBContinuation in
-            Task.detached {
-                do {
-                    try await runFilesystemSpecificCatalogScan(
-                        volumeInfo: volumeInfo,
-                        reader: reader,
-                        continuation: phaseBContinuation
-                    )
-                    phaseBContinuation.finish()
-                } catch {
-                    phaseBContinuation.finish(throwing: error)
-                }
-            }
-        }
-    }
-
-    private func runFilesystemSpecificCatalogScan(
-        volumeInfo: VolumeInfo,
-        reader: any PrivilegedDiskReading,
-        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
-    ) async throws {
-        switch volumeInfo.filesystemType {
-        case .fat32:
-            let scanner = FATDirectoryScanner()
-            try await scanner.scan(volumeInfo: volumeInfo, reader: reader, continuation: continuation)
-        case .exfat:
-            let scanner = ExFATScanner()
-            try await scanner.scan(volumeInfo: volumeInfo, reader: reader, continuation: continuation)
-        case .ntfs:
-            let scanner = NTFSScanner()
-            try await scanner.scan(volumeInfo: volumeInfo, reader: reader, continuation: continuation)
-        default:
-            break
-        }
-    }
-
     // MARK: - Filesystem-Level Scan (all FS types)
 
     /// Scans a mounted volume for deleted media files using standard file APIs.
@@ -251,6 +218,14 @@ struct FastScanService: FastScanServicing {
         device: StorageDevice,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
+        if device.isDiskImage {
+            logInfo("Skipping filesystem API walk for disk image \(device.volumePath.path)")
+            continuation.yield(.progress(1.0))
+            continuation.yield(.completed)
+            continuation.finish()
+            return
+        }
+
         let volumeRoot = device.volumePath
         let volumeInfo = VolumeInfo.detect(for: device)
         logInfo("Starting filesystem scan on \(device.name) at \(volumeRoot.path)")

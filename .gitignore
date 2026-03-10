@@ -68,3 +68,7 @@ fastlane/test_output
 *.profraw
 Build/
 build/
+
+# AI and Design Artifacts
+.codex/
+design.pen

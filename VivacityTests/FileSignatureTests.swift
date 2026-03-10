@@ -15,4 +15,16 @@ final class FileSignatureTests: XCTestCase {
         XCTAssertEqual(FileSignature.rw2.category, .image)
         XCTAssertEqual(FileSignature.avif.category, .image)
     }
+
+    func testInlineVideoPreviewSupportIsLimitedToStableContainers() {
+        XCTAssertTrue(FileSignature.mp4.supportsInlineVideoPreview)
+        XCTAssertTrue(FileSignature.mov.supportsInlineVideoPreview)
+        XCTAssertTrue(FileSignature.m4v.supportsInlineVideoPreview)
+
+        XCTAssertFalse(FileSignature.avi.supportsInlineVideoPreview)
+        XCTAssertFalse(FileSignature.mkv.supportsInlineVideoPreview)
+        XCTAssertFalse(FileSignature.wmv.supportsInlineVideoPreview)
+        XCTAssertFalse(FileSignature.flv.supportsInlineVideoPreview)
+        XCTAssertFalse(FileSignature.threeGP.supportsInlineVideoPreview)
+    }
 }

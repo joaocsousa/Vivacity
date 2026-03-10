@@ -4,6 +4,7 @@ import SwiftUI
 struct DeviceSelectionView: View {
     @State private var viewModel = AppEnvironment.makeDeviceSelectionViewModel()
     @State private var navigationTarget: NavigationDestination?
+    @State private var showHelperUninstallDialog = false
 
     enum NavigationDestination: Hashable {
         case device(StorageDevice)
@@ -12,7 +13,7 @@ struct DeviceSelectionView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            topSection
             Divider()
             deviceList
             Divider()
@@ -29,10 +30,13 @@ struct DeviceSelectionView: View {
             }
         }
         .task {
-            await viewModel.loadDevices()
+            await viewModel.load()
         }
         .task {
             await viewModel.observeVolumeChanges()
+        }
+        .onChange(of: viewModel.pendingScanDevice) { _, _ in
+            navigateToPendingScanIfNeeded()
         }
         .alert(
             "Error",
@@ -49,12 +53,55 @@ struct DeviceSelectionView: View {
                 }
             }
         )
+        .alert(
+            item: Binding(
+                get: { viewModel.helperFeedbackAlert },
+                set: { if $0 == nil { viewModel.clearHelperFeedbackAlert() } }
+            )
+        ) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("OK")) {
+                    viewModel.clearHelperFeedbackAlert()
+                }
+            )
+        }
+        .confirmationDialog(
+            "Uninstall Recovery Helper?",
+            isPresented: $showHelperUninstallDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Uninstall Helper", role: .destructive) {
+                viewModel.uninstallHelper()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "This removes the privileged recovery helper from this Mac. " +
+                    "Disk images will still scan normally, but full raw-disk scans will need it reinstalled."
+            )
+        }
     }
 }
 
 // MARK: - Subviews
 
 extension DeviceSelectionView {
+    private func navigateToPendingScanIfNeeded() {
+        guard let device = viewModel.consumePendingScanDevice() else { return }
+        navigationTarget = .device(device)
+    }
+
+    private var topSection: some View {
+        VStack(spacing: 0) {
+            header
+            helperManagementCard
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+        }
+    }
+
     private var header: some View {
         VStack(spacing: 6) {
             // Icon in a rounded-square background
@@ -75,8 +122,114 @@ extension DeviceSelectionView {
             Text("Choose a storage device to scan for recoverable files.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
-                .padding(.bottom, 16)
         }
+        .padding(.top, 24)
+        .padding(.bottom, 16)
+    }
+
+    private var helperManagementCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(helperAccentColor.opacity(0.12))
+                        .frame(width: 44, height: 44)
+
+                    Image(systemName: helperSymbolName)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(helperAccentColor)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(viewModel.helperStatusTitle)
+                            .font(.system(size: 16, weight: .semibold))
+
+                        Spacer()
+
+                        helperStatusPill
+                    }
+
+                    Text(viewModel.helperStatusMessage)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(spacing: 10) {
+                if let primaryActionTitle = viewModel.helperPrimaryActionTitle {
+                    Button(primaryActionTitle) {
+                        viewModel.installOrUpdateHelper()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(helperAccentColor)
+                }
+
+                if viewModel.helperShowsDestructiveAction {
+                    Button("Uninstall Helper") {
+                        showHelperUninstallDialog = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .disabled(viewModel.isLoading || viewModel.isCreatingImage)
+                }
+
+                Spacer()
+
+                Text("Required for full physical-disk scans")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            if let callout = viewModel.helperAttentionCallout {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: callout.symbolName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(helperAccentColor)
+                        .frame(width: 18)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(callout.title)
+                            .font(.system(size: 12, weight: .semibold))
+
+                        Text(callout.message)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .background(helperAccentColor.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(
+                    viewModel.helperNeedsAttention
+                        ? helperAccentColor.opacity(0.06)
+                        : Color(nsColor: .controlBackgroundColor)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(
+                    helperAccentColor.opacity(viewModel.helperStatus == .updateRequired ? 0.38 : 0.18),
+                    lineWidth: viewModel.helperStatus == .updateRequired ? 1.4 : 1
+                )
+        )
+        .shadow(
+            color: helperAccentColor.opacity(viewModel.helperStatus == .updateRequired ? 0.16 : 0),
+            radius: 16,
+            y: 8
+        )
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.helperStatus)
     }
 
     private var deviceList: some View {
@@ -174,7 +327,7 @@ extension DeviceSelectionView {
     private var footer: some View {
         HStack {
             Button {
-                Task { await viewModel.loadDevices() }
+                Task { await viewModel.load() }
             } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
                     .font(.system(size: 13))
@@ -190,7 +343,7 @@ extension DeviceSelectionView {
                 panel.title = "Select Disk Image"
 
                 if panel.runModal() == .OK, let url = panel.url {
-                    viewModel.loadDiskImage(at: url)
+                    viewModel.loadDiskImageAndQueueScan(at: url)
                 }
             } label: {
                 Label("Load Image...", systemImage: "doc.badge.plus")
@@ -221,7 +374,15 @@ extension DeviceSelectionView {
                 .foregroundStyle(.blue)
                 .padding(.trailing, 8)
 
-                if let session = viewModel.savedSessions[selected.id] {
+                if let helperActionTitle = viewModel.selectedDeviceHelperActionTitle {
+                    Button(helperActionTitle) {
+                        viewModel.installOrUpdateHelper()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(helperAccentColor)
+                    .disabled(viewModel.isLoading || viewModel.isCreatingImage)
+                } else if let session = viewModel.savedSessions[selected.id] {
                     Button {
                         navigationTarget = .device(selected)
                     } label: {
@@ -274,6 +435,49 @@ extension DeviceSelectionView {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    private var helperStatusPill: some View {
+        Text(helperStatusLabel)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(helperAccentColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(helperAccentColor.opacity(0.12))
+            .clipShape(Capsule())
+    }
+
+    private var helperStatusLabel: String {
+        switch viewModel.helperStatus {
+        case .installed:
+            "Installed"
+        case .notInstalled:
+            "Not Installed"
+        case .updateRequired:
+            "Mismatch Detected"
+        }
+    }
+
+    private var helperSymbolName: String {
+        switch viewModel.helperStatus {
+        case .installed:
+            "checkmark.shield.fill"
+        case .notInstalled:
+            "lock.shield.fill"
+        case .updateRequired:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var helperAccentColor: Color {
+        switch viewModel.helperStatus {
+        case .installed:
+            .green
+        case .notInstalled:
+            .orange
+        case .updateRequired:
+            .orange
+        }
     }
 }
 

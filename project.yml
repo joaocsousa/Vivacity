@@ -9,6 +9,8 @@ settings:
     SWIFT_VERSION: 5.0
     GENERATE_INFOPLIST_FILE: YES
     MACOSX_DEPLOYMENT_TARGET: 14.0
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: 4HR9NUUP6T
     SYMROOT: $(SRCROOT)/build
     OBJROOT: $(SRCROOT)/build
 configs:
@@ -109,6 +111,7 @@ targets:
         excludes:
           - "**/*.md"
       - path: Vivacity/Services/PrivilegedHelper/PrivilegedReaderXPCProtocol.swift
+      - path: Vivacity/Services/PrivilegedHelper/RawDeviceReadPlan.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.joao.Vivacity.PrivilegedHelper

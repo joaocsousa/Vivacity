@@ -68,7 +68,7 @@ struct DeepScanService: DeepScanServicing {
 
     init(
         diskReaderFactory: @escaping @Sendable (String)
-            -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading },
+            -> any PrivilegedDiskReading = { DiskReaderFactoryProvider.makeReader(forPath: $0) },
         fileFooterDetector: FileFooterDetecting = FileFooterDetector(),
         performanceConfig: PerformanceConfiguration = .default
     ) {
@@ -483,13 +483,15 @@ extension DeepScanService {
         let reader = diskReaderFactory(devicePath)
         do {
             try reader.start()
-            logInfo("Deep reader started successfully for \(devicePath). seekable=\(reader.isSeekable)")
+            let successMessage = "Deep reader started successfully for \(devicePath). " +
+                "readerType=\(String(reflecting: type(of: reader))) seekable=\(reader.isSeekable)"
+            logInfo(successMessage)
             return reader
         } catch {
-            logger
-                .error(
-                    "Reader failed \(devicePath, privacy: .public): \(error.localizedDescription, privacy: .public)"
-                )
+            let failureDiagnostic = reader.lastReadFailureDescription ?? "nil"
+            let failureMessage = "Reader failed \(devicePath): \(error.localizedDescription) " +
+                "readerType=\(String(reflecting: type(of: reader))) diagnostic=\(failureDiagnostic)"
+            logger.error("\(failureMessage, privacy: .public)")
             throw DeepScanError.cannotOpenDevice(path: devicePath, reason: error.localizedDescription)
         }
     }
@@ -516,12 +518,14 @@ extension DeepScanService {
             )
         }
         guard bytesRead > 0 else {
+            let diagnostic = runtime.reader.lastReadFailureDescription ?? "no reader diagnostic available"
             logWarning(
                 "Deep read returned bytesRead=\(bytesRead) " +
                     "offset=\(state.bytesScanned) " +
                     "requested=\(bytesToRead) " +
                     "readOffset=\(readOffset) " +
-                    "seekable=\(runtime.reader.isSeekable)"
+                    "seekable=\(runtime.reader.isSeekable) " +
+                    "diagnostic=\(diagnostic)"
             )
             return nil
         }

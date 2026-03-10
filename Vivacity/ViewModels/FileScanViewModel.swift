@@ -10,6 +10,14 @@ enum ScanPhase: Sendable, Equatable {
     case complete
 }
 
+enum ScanAccessState: Sendable, Equatable {
+    case fullScan
+    case helperInstallRequired
+    case imageRecommended
+    case imageRequired
+    case limitedOnly
+}
+
 // MARK: - ViewModel
 
 /// ViewModel for the file scan screen.
@@ -52,15 +60,27 @@ final class FileScanViewModel {
     /// Whether disk access was denied and the user needs to grant permissions.
     var permissionDenied: Bool = false
 
+    /// Current scan-access classification for the selected device.
+    var scanAccessState: ScanAccessState = .fullScan
+
+    /// Optional user-facing details for the current access state.
+    var scanAccessMessage: String?
+
     /// Current privileged helper installation status.
     var helperStatus: PrivilegedHelperStatus = .notInstalled
     var helperInstallFeedbackState: HelperInstallFeedbackState?
 
+    /// Whether a byte-to-byte image is currently being created from the scan screen.
+    private(set) var isCreatingImage = false
+
+    /// Progress for the in-flight disk image creation.
+    private(set) var imageCreationProgress: Double = 0
+
     /// Last sample verification summary for selected files.
-    private(set) var lastSampleVerificationSummary: SampleVerificationSummary?
+    var lastSampleVerificationSummary: SampleVerificationSummary?
 
     /// Whether pre-recovery sample verification is currently running.
-    private(set) var isVerifyingSamples: Bool = false
+    var isVerifyingSamples: Bool = false
 
     /// Query string to filter by file name.
     var fileNameQuery: String = ""
@@ -79,6 +99,8 @@ final class FileScanViewModel {
     let cameraRecoveryService: CameraRecoveryServicing
     let fileSampleVerifier: FileSampleVerifying
     let helperManager: PrivilegedHelperManaging
+    let diskImageService: DiskImageServicing
+    let volumeInfoProvider: @Sendable (StorageDevice) -> VolumeInfo
     let logger = Logger(subsystem: "com.vivacity.app", category: "FileScan")
 
     /// Handle for the currently running unified scan task (for cancellation).
@@ -171,7 +193,9 @@ final class FileScanViewModel {
         fileSampleVerifier: FileSampleVerifying = FileRecoveryService(),
         helperManager: PrivilegedHelperManaging = PrivilegedHelperInstallService(
             helperLabel: PrivilegedHelperClient.defaultServiceName
-        )
+        ),
+        diskImageService: DiskImageServicing = DiskImageService(),
+        volumeInfoProvider: @escaping @Sendable (StorageDevice) -> VolumeInfo = { VolumeInfo.detect(for: $0) }
     ) {
         self.fastScanService = fastScanService
         self.deepScanService = deepScanService
@@ -179,6 +203,8 @@ final class FileScanViewModel {
         self.cameraRecoveryService = cameraRecoveryService
         self.fileSampleVerifier = fileSampleVerifier
         self.helperManager = helperManager
+        self.diskImageService = diskImageService
+        self.volumeInfoProvider = volumeInfoProvider
     }
 
     // MARK: - Actions
@@ -186,6 +212,9 @@ final class FileScanViewModel {
     /// Starts a single unified scan that runs all available scan methods.
     func startScan(device: StorageDevice, allowDeepScan: Bool = true) {
         guard scanPhase != .scanning else { return }
+        scanAccessState = allowDeepScan ? .fullScan : .limitedOnly
+        scanAccessMessage = nil
+        permissionDenied = false
         let scanRequestMessage =
             "Requested unified scan for device '\(device.name)' " +
             "path=\(device.volumePath.path) " +
@@ -199,9 +228,83 @@ final class FileScanViewModel {
             device: device,
             startOffset: 0,
             seedFiles: [],
-            includeFastWorker: !device.isDiskImage || !allowDeepScan,
+            includeFastWorker: true,
             includeDeepWorker: allowDeepScan
         )
+    }
+
+    @discardableResult
+    func beginScanFlow(for device: StorageDevice, allowDeepScan: Bool = true) -> ScanAccessState {
+        refreshHelperStatus()
+        let state = prepareInitialScanAccess(for: device, allowDeepScan: allowDeepScan)
+        switch state {
+        case .fullScan:
+            startScan(device: device, allowDeepScan: true)
+        case .limitedOnly:
+            startScan(device: device, allowDeepScan: false)
+        case .helperInstallRequired, .imageRecommended, .imageRequired:
+            break
+        }
+        return state
+    }
+
+    /// Builds a disk-image device after the file is created on disk.
+    func diskImageDevice(for url: URL) -> StorageDevice {
+        DiskImageDeviceLoader.makeStorageDevice(from: url)
+    }
+
+    func activateDiskImageScan(from url: URL) -> StorageDevice {
+        let imageDevice = diskImageDevice(for: url)
+        beginScanFlow(for: imageDevice)
+        return imageDevice
+    }
+
+    func createDiskImageAndActivateScan(from device: StorageDevice, to url: URL) async -> StorageDevice? {
+        guard let imageDevice = await createDiskImage(from: device, to: url) else {
+            return nil
+        }
+        beginScanFlow(for: imageDevice)
+        return imageDevice
+    }
+
+    /// Creates a byte-to-byte disk image from the current device for safer APFS scanning.
+    func createDiskImage(from device: StorageDevice, to url: URL) async -> StorageDevice? {
+        guard !isCreatingImage else { return nil }
+
+        isCreatingImage = true
+        imageCreationProgress = 0
+        errorMessage = nil
+
+        defer {
+            isCreatingImage = false
+            imageCreationProgress = 0
+        }
+
+        do {
+            logger.info("Starting scan-screen disk image creation for \(device.name) to \(url.path, privacy: .public)")
+            let stream = diskImageService.createImage(from: device, to: url)
+            for try await progress in stream {
+                imageCreationProgress = progress
+            }
+            let imageDevice = diskImageDevice(for: url)
+            logger.info("Disk image created successfully at \(url.path, privacy: .public)")
+            return imageDevice
+        } catch {
+            let message = error.localizedDescription
+            logger.error("Disk image creation failed: \(message, privacy: .public)")
+            if shouldRecommendImage(for: device) {
+                setScanAccessState(
+                    .imageRequired,
+                    message:
+                    "Vivacity could not create a byte-to-byte image of the running startup disk. " +
+                        "Create the image from Recovery Mode or another boot volume, then load it here.\n\n" +
+                        "Latest error: \(message)"
+                )
+            } else {
+                errorMessage = "Failed to create disk image: \(message)"
+            }
+            return nil
+        }
     }
 
     /// Stops the currently running scan phase early.
@@ -344,30 +447,111 @@ final class FileScanViewModel {
             includeDeepWorker: true
         )
     }
+}
 
-    /// Verifies selected files by hashing head/tail samples before recovery.
-    ///
-    /// Returns a summary with counts of verified, mismatched, and unreadable files.
-    func verifySelectedSamples(device: StorageDevice) async -> SampleVerificationSummary? {
-        let selectedFiles = foundFiles.filter { selectedFileIDs.contains($0.id) }
-        guard !selectedFiles.isEmpty else { return nil }
+extension FileScanViewModel {
+    func prepareInitialScanAccess(for device: StorageDevice, allowDeepScan: Bool = true) -> ScanAccessState {
+        let state = classifyScanAccess(for: device, allowDeepScan: allowDeepScan)
+        setScanAccessState(state, message: defaultScanAccessMessage(for: state, device: device))
+        return state
+    }
 
-        isVerifyingSamples = true
-        defer { isVerifyingSamples = false }
+    func classifyScanAccess(for device: StorageDevice, allowDeepScan: Bool = true) -> ScanAccessState {
+        guard allowDeepScan else { return .limitedOnly }
+        if device.isDiskImage {
+            return .fullScan
+        }
 
-        do {
-            let results = try await fileSampleVerifier.verifySamples(files: selectedFiles, from: device)
-            let summary = SampleVerificationSummary(
-                verifiedCount: results.filter { $0.status == .verified }.count,
-                mismatchCount: results.filter { $0.status == .mismatch }.count,
-                unreadableCount: results.filter { $0.status == .unreadable }.count
-            )
-            lastSampleVerificationSummary = summary
-            return summary
-        } catch {
-            logger.error("Sample verification failed: \(error.localizedDescription, privacy: .public)")
-            errorMessage = "Sample verification failed: \(error.localizedDescription)"
+        if shouldRecommendImage(for: device) {
+            return .imageRecommended
+        }
+
+        switch helperStatus {
+        case .installed:
+            return .fullScan
+        case .notInstalled, .updateRequired:
+            return .helperInstallRequired
+        }
+    }
+
+    func continueWithLimitedScan(device: StorageDevice) {
+        errorMessage = nil
+        permissionDenied = false
+        setScanAccessState(.limitedOnly)
+
+        if scanPhase == .idle, hasCompletedFastWorker {
+            markScanCompleted(forceProgressToFull: false)
+            return
+        }
+
+        startScan(device: device, allowDeepScan: false)
+    }
+
+    func canOfferInAppImageCreation(for device: StorageDevice) -> Bool {
+        guard !device.isDiskImage else { return false }
+        if scanAccessState == .helperInstallRequired {
+            return false
+        }
+        if scanAccessState == .imageRequired, shouldRecommendImage(for: device) {
+            return false
+        }
+        return true
+    }
+
+    func canRetryFullScan(for device: StorageDevice) -> Bool {
+        guard scanAccessState == .imageRecommended else { return false }
+        return !shouldRecommendImage(for: device)
+    }
+
+    func retryFullScanIfPossible(device: StorageDevice) {
+        refreshHelperStatus()
+        let state = prepareInitialScanAccess(for: device, allowDeepScan: true)
+        guard state == .fullScan else { return }
+        startScan(device: device, allowDeepScan: true)
+    }
+
+    func shouldRecommendImage(for device: StorageDevice) -> Bool {
+        guard !device.isDiskImage else { return false }
+        return volumeInfoProvider(device).isProtectedBootAPFSVolume
+    }
+
+    func shouldRouteToOfflineImage(for device: StorageDevice, reason: String) -> Bool {
+        guard shouldRecommendImage(for: device) else { return false }
+        let normalized = reason.lowercased()
+        return normalized.contains("operation not permitted")
+            || normalized.contains("permission denied")
+            || normalized.contains("access denied")
+            || normalized.contains("not authorized")
+    }
+
+    func setScanAccessState(_ state: ScanAccessState, message: String? = nil) {
+        scanAccessState = state
+        scanAccessMessage = message
+    }
+
+    private func defaultScanAccessMessage(for state: ScanAccessState, device: StorageDevice) -> String? {
+        switch state {
+        case .fullScan, .limitedOnly:
             return nil
+        case .helperInstallRequired:
+            if helperStatus == .updateRequired {
+                return
+                    "The installed recovery helper does not match this build of Vivacity. " +
+                    "Go back to the main screen and reinstall it before running a full physical-disk scan, " +
+                    "or continue with a limited metadata scan."
+            }
+            return
+                "Vivacity needs the recovery helper to read raw sectors on this device for a full scan. " +
+                "Install it from the main screen to continue with deep recovery, or switch to a limited metadata scan."
+        case .imageRecommended:
+            let volumeInfo = volumeInfoProvider(device)
+            let volumeDescription = volumeInfo.mountPoint.path == "/" ? "your startup volume" : device.name
+            return
+                "macOS often blocks live raw reads of \(volumeDescription) even when the helper is installed. " +
+                "For the best APFS recovery results, create or load a byte-to-byte image and scan that image instead."
+        case .imageRequired:
+            return
+                "Vivacity needs an offline byte-to-byte image to continue the full APFS recovery path for this device."
         }
     }
 }

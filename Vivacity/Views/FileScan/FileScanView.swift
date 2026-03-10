@@ -7,22 +7,16 @@ struct FileScanView: View {
         let selectedFiles: [RecoverableFile]
     }
 
-    let device: StorageDevice
     let sessionToResume: ScanSession?
+    @State private var activeDevice: StorageDevice
     @State private var viewModel = AppEnvironment.makeFileScanViewModel()
     @State private var recoveryNavigationState: RecoveryNavigationState?
     @State private var verificationWarningMessage: String?
     @State private var pendingRecoveryFiles: [RecoverableFile] = []
-    @State private var showHelperInstallDialog = false
-    @State private var showHelperUninstallDialog = false
-    @State private var showHelperInstallFeedback = false
-    @State private var helperInstallFeedbackTitle = ""
-    @State private var helperInstallFeedbackMessage = ""
-    @State private var shouldStartFullScanAfterHelperFeedback = false
 
     init(device: StorageDevice, sessionToResume: ScanSession? = nil) {
-        self.device = device
         self.sessionToResume = sessionToResume
+        _activeDevice = State(initialValue: device)
     }
 
     var body: some View {
@@ -36,13 +30,8 @@ struct FileScanView: View {
                 isEnabled: viewModel.hasFiles
             )
 
-            if viewModel.permissionDenied {
-                PermissionDeniedView(
-                    onTryAgain: { checkPermissionsAndScan() },
-                    onContinueLimited: {
-                        viewModel.permissionDenied = false
-                    }
-                )
+            if shouldShowScanAccessInterruption {
+                scanAccessInterruptionView
             } else if viewModel.foundFiles.isEmpty, viewModel.isScanning {
                 VStack(spacing: 16) {
                     Image(systemName: "magnifyingglass")
@@ -66,7 +55,7 @@ struct FileScanView: View {
 
                     FilePreviewView(
                         file: viewModel.previewFile,
-                        device: device
+                        device: activeDevice
                     )
                     .frame(minWidth: 350, idealWidth: 450, maxWidth: .infinity)
                 }
@@ -77,17 +66,38 @@ struct FileScanView: View {
         }
         .frame(minWidth: 620, minHeight: 580)
         .background(Color(.windowBackgroundColor))
-        .task {
-            viewModel.refreshHelperStatus()
-            if let session = sessionToResume {
-                viewModel.resumeSession(session, device: device)
-            } else {
-                checkPermissionsAndScan()
+        .overlay {
+            if viewModel.isCreatingImage {
+                ZStack {
+                    Color.primary.opacity(0.2)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ProgressView(value: viewModel.imageCreationProgress, total: 1.0)
+                            .progressViewStyle(.linear)
+                            .frame(width: 220)
+
+                        Text("Creating Byte-to-Byte Disk Image...")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+
+                        Text("\(Int(viewModel.imageCreationProgress * 100))%")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(32)
+                    .background(Color(.windowBackgroundColor))
+                    .cornerRadius(12)
+                    .shadow(radius: 10)
+                }
             }
         }
-        .onChange(of: viewModel.scanPhase) { _, newPhase in
-            if newPhase != .scanning {
+        .task {
+            if let session = sessionToResume {
                 viewModel.refreshHelperStatus()
+                viewModel.resumeSession(session, device: activeDevice)
+            } else {
+                viewModel.beginScanFlow(for: activeDevice)
             }
         }
         .onDisappear {
@@ -120,7 +130,7 @@ struct FileScanView: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Continue Recovery", role: .destructive) {
                     recoveryNavigationState = RecoveryNavigationState(
-                        device: device,
+                        device: activeDevice,
                         selectedFiles: pendingRecoveryFiles
                     )
                 }
@@ -131,114 +141,68 @@ struct FileScanView: View {
                 }
             }
         )
-        .alert(
-            helperInstallFeedbackTitle,
-            isPresented: $showHelperInstallFeedback,
-            actions: {
-                Button("OK") {
-                    if shouldStartFullScanAfterHelperFeedback {
-                        shouldStartFullScanAfterHelperFeedback = false
-                        viewModel.startScan(device: device, allowDeepScan: true)
-                    }
-                }
-            },
-            message: {
-                Text(helperInstallFeedbackMessage)
-            }
-        )
-        .alert(
-            "Install Recovery Helper?",
-            isPresented: $showHelperInstallDialog,
-            actions: {
-                Button("Install Helper & Full Scan") {
-                    installHelperAndPresentFeedback()
-                }
-                Button("Continue Limited Scan") {
-                    viewModel.startScan(device: device, allowDeepScan: false)
-                }
-                Button("Cancel", role: .cancel) {}
-            },
-            message: {
-                Text(
-                    "Vivacity needs a privileged helper to read raw disk sectors for deep recovery. " +
-                        "Install it to run a full scan, or continue with a limited metadata scan."
-                )
-            }
-        )
-        .alert(
-            "Uninstall Recovery Helper?",
-            isPresented: $showHelperUninstallDialog,
-            actions: {
-                Button("Uninstall Helper", role: .destructive) {
-                    uninstallHelperAndPresentFeedback()
-                }
-                Button("Cancel", role: .cancel) {}
-            },
-            message: {
-                Text(
-                    "This removes the privileged recovery helper from your Mac. " +
-                        "You can reinstall it later when starting a full scan."
-                )
-            }
-        )
         .navigationDestination(item: $recoveryNavigationState) { state in
             RecoveryDestinationView(scannedDevice: state.device, selectedFiles: state.selectedFiles)
         }
     }
 
-    private func checkPermissionsAndScan() {
-        if device.isDiskImage {
-            viewModel.startScan(device: device, allowDeepScan: true)
-            return
-        }
-        switch viewModel.helperStatus {
-        case .installed:
-            viewModel.startScan(device: device, allowDeepScan: true)
-        case .notInstalled, .updateRequired:
-            showHelperInstallDialog = true
+    private var shouldShowScanAccessInterruption: Bool {
+        viewModel.scanPhase == .idle
+            && viewModel.scanAccessState != .fullScan
+            && viewModel.scanAccessState != .limitedOnly
+    }
+
+    @ViewBuilder
+    private var scanAccessInterruptionView: some View {
+        let canCreateImage = viewModel.canOfferInAppImageCreation(for: activeDevice)
+        let canTryAgain = viewModel.canRetryFullScan(for: activeDevice)
+        ScanAccessInterruptionView(
+            state: viewModel.scanAccessState,
+            message: viewModel.scanAccessMessage,
+            onCreateImage: canCreateImage ? {
+                promptForDiskImageDestination()
+            } : nil,
+            onLoadImage: {
+                promptToLoadDiskImage()
+            },
+            onContinueLimited: {
+                viewModel.continueWithLimitedScan(device: activeDevice)
+            },
+            onTryAgain: canTryAgain ? {
+                viewModel.retryFullScanIfPossible(device: activeDevice)
+            } : nil
+        )
+    }
+
+    private func promptToLoadDiskImage() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canCreateDirectories = false
+        panel.allowedContentTypes = [.data, .diskImage, .rawImage]
+        panel.title = "Select Disk Image"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            loadDiskImage(from: url)
         }
     }
 
-    private func installHelperAndPresentFeedback() {
-        switch viewModel.installHelperForFullScan() {
-        case .installed:
-            helperInstallFeedbackTitle = "Helper Installed"
-            helperInstallFeedbackMessage = "Recovery helper installed successfully. Full scan will start now."
-            shouldStartFullScanAfterHelperFeedback = true
-            showHelperInstallFeedback = true
-        case .alreadyInstalled:
-            viewModel.startScan(device: device, allowDeepScan: true)
-        case let .failed(reason):
-            helperInstallFeedbackTitle = "Helper Installation Failed"
-            helperInstallFeedbackMessage =
-                "Vivacity could not install the recovery helper.\n\n\(reason)\n\n" +
-                "You can continue with a limited scan or try helper installation again."
-            shouldStartFullScanAfterHelperFeedback = false
-            showHelperInstallFeedback = true
-        }
+    private func loadDiskImage(from url: URL) {
+        activeDevice = viewModel.activateDiskImageScan(from: url)
     }
 
-    private func uninstallHelperAndPresentFeedback() {
-        switch viewModel.uninstallHelper() {
-        case .uninstalled:
-            helperInstallFeedbackTitle = "Helper Uninstalled"
-            helperInstallFeedbackMessage =
-                "Recovery helper removed successfully. " +
-                "Future full scans will require helper installation."
-            shouldStartFullScanAfterHelperFeedback = false
-            showHelperInstallFeedback = true
-        case .alreadyNotInstalled:
-            helperInstallFeedbackTitle = "Helper Not Installed"
-            helperInstallFeedbackMessage = "The recovery helper is already removed."
-            shouldStartFullScanAfterHelperFeedback = false
-            showHelperInstallFeedback = true
-        case let .failed(reason):
-            helperInstallFeedbackTitle = "Helper Uninstall Failed"
-            helperInstallFeedbackMessage =
-                "Vivacity could not remove the recovery helper.\n\n\(reason)\n\n" +
-                "You can continue using the app and try uninstalling again later."
-            shouldStartFullScanAfterHelperFeedback = false
-            showHelperInstallFeedback = true
+    private func promptForDiskImageDestination() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.data]
+        panel.nameFieldStringValue = "\(activeDevice.name)_Image.dd"
+        panel.title = "Save Disk Image"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            Task {
+                if let imageDevice = await viewModel.createDiskImageAndActivateScan(from: activeDevice, to: url) {
+                    activeDevice = imageDevice
+                }
+            }
         }
     }
 
@@ -251,22 +215,24 @@ struct FileScanView: View {
         guard !selectedFiles.isEmpty else { return }
         pendingRecoveryFiles = selectedFiles
 
-        guard let summary = await viewModel.verifySelectedSamples(device: device) else {
+        guard let summary = await viewModel.verifySelectedSamples(device: activeDevice) else {
             return
         }
 
-        if summary.hasWarnings {
+        if let blockingMessage = summary.blockingMessage {
+            viewModel.errorMessage = blockingMessage
+        } else if summary.hasWarnings {
             verificationWarningMessage = summary.warningMessage
         } else {
             recoveryNavigationState = RecoveryNavigationState(
-                device: device,
+                device: activeDevice,
                 selectedFiles: selectedFiles
             )
         }
     }
 
     private func verifySamplesOnly() async {
-        _ = await viewModel.verifySelectedSamples(device: device)
+        _ = await viewModel.verifySelectedSamples(device: activeDevice)
     }
 }
 
@@ -338,27 +304,12 @@ extension FileScanView {
         VStack(spacing: 12) {
             HStack {
                 HStack(spacing: 6) {
-                    Image(systemName: device.isExternal ? "externaldrive.fill" : "internaldrive.fill")
+                    Image(systemName: activeDevice.isExternal ? "externaldrive.fill" : "internaldrive.fill")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    Text(device.name)
+                    Text(activeDevice.name)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
-                }
-
-                if !device.isDiskImage {
-                    helperStatusBadge
-
-                    if viewModel.helperStatus != .notInstalled {
-                        Button("Uninstall Helper") {
-                            showHelperUninstallDialog = true
-                        }
-                        .buttonStyle(.borderless)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .disabled(viewModel.isScanning)
-                        .help("Remove the privileged recovery helper from this Mac")
-                    }
                 }
 
                 Spacer()
@@ -379,7 +330,7 @@ extension FileScanView {
                 } else if viewModel.scanPhase == .complete {
                     Button {
                         Task {
-                            await viewModel.saveSession(device: device)
+                            await viewModel.saveSession(device: activeDevice)
                         }
                     } label: {
                         HStack(spacing: 4) {
@@ -448,68 +399,24 @@ extension FileScanView {
             }
         }
     }
-
-    private var helperStatusBadge: some View {
-        HStack(spacing: 4) {
-            Image(systemName: helperStatusIcon)
-                .font(.system(size: 11, weight: .semibold))
-            Text(helperStatusLabel)
-                .font(.system(size: 11, weight: .semibold))
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .foregroundStyle(helperStatusColor)
-        .background(helperStatusColor.opacity(0.12))
-        .clipShape(Capsule())
-    }
-
-    private var helperStatusLabel: String {
-        let baseLabel = switch viewModel.helperStatus {
-        case .installed:
-            "Helper installed"
-        case .notInstalled:
-            "Helper not installed"
-        case .updateRequired:
-            "Helper update required"
-        }
-        if case .success = viewModel.helperInstallFeedbackState { return "\(baseLabel) • install verified" }
-        if case .failed = viewModel.helperInstallFeedbackState { return "\(baseLabel) • last install failed" }
-        return baseLabel
-    }
-
-    private var helperStatusIcon: String {
-        switch viewModel.helperStatus {
-        case .installed:
-            "checkmark.circle.fill"
-        case .notInstalled:
-            "exclamationmark.triangle.fill"
-        case .updateRequired:
-            "arrow.triangle.2.circlepath.circle.fill"
-        }
-    }
-
-    private var helperStatusColor: Color {
-        switch viewModel.helperStatus {
-        case .installed:
-            .green
-        case .notInstalled:
-            .orange
-        case .updateRequired:
-            .yellow
-        }
-    }
 }
 
 extension FileScanView {
     private var fileList: some View {
-        ZStack {
-            if viewModel.showFilteredEmptyState, !viewModel.isScanning {
+        let filteredFiles = viewModel.filteredFiles
+        let selectedFileIDs = viewModel.selectedFileIDs
+        let previewFileID = viewModel.previewFileID
+        let isScanning = viewModel.isScanning
+        let hasFiles = !viewModel.foundFiles.isEmpty
+
+        return ZStack {
+            if hasFiles, filteredFiles.isEmpty, !isScanning {
                 ContentUnavailableView(
                     "No Matches",
                     systemImage: "line.3.horizontal.decrease.circle",
                     description: Text("No files match the current filters.")
                 )
-            } else if viewModel.foundFiles.isEmpty, !viewModel.isScanning {
+            } else if !hasFiles, !isScanning {
                 ContentUnavailableView(
                     "No Files Found",
                     systemImage: "doc.questionmark.fill",
@@ -517,22 +424,25 @@ extension FileScanView {
                 )
             } else {
                 ScrollView {
-                    VStack(spacing: 0) {
-                        if !viewModel.filteredFiles.isEmpty {
-                            sectionHeader(
-                                title: "SCAN RESULTS",
-                                count: viewModel.filteredFiles.count
-                            )
-
-                            ForEach(viewModel.filteredFiles) { file in
-                                FileRow(
-                                    file: file,
-                                    isSelected: viewModel.selectedFileIDs.contains(file.id),
-                                    isPreviewSelected: viewModel.previewFileID == file.id,
-                                    onToggle: { viewModel.toggleSelection(file.id) },
-                                    onSelectForPreview: { viewModel.previewFileID = file.id }
+                    LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                        if !filteredFiles.isEmpty {
+                            Section {
+                                ForEach(filteredFiles) { file in
+                                    FileRow(
+                                        file: file,
+                                        isSelected: selectedFileIDs.contains(file.id),
+                                        isPreviewSelected: previewFileID == file.id,
+                                        onToggle: { viewModel.toggleSelection(file.id) },
+                                        onSelectForPreview: { viewModel.previewFileID = file.id }
+                                    )
+                                    .equatable()
+                                    Divider().opacity(0.2)
+                                }
+                            } header: {
+                                sectionHeader(
+                                    title: "SCAN RESULTS",
+                                    count: filteredFiles.count
                                 )
-                                Divider().opacity(0.2)
                             }
                         }
                     }

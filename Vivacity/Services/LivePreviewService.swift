@@ -57,58 +57,68 @@ actor LivePreviewService: LivePreviewServicing {
         }
 
         if let cachedURL = cache[file.id], FileManager.default.fileExists(atPath: cachedURL.path) {
-            logger.debug("Returning cached preview URL for file \(file.fileName)")
+            let cachedMessage =
+                "Returning cached preview URL file=\(file.fileName) path=\(cachedURL.path)"
+            logger.debug("\(cachedMessage, privacy: .public)")
             return cachedURL
         }
 
         let destinationURL = tempDirectoryURL.appendingPathComponent(file.fullFileName)
+        let expectedBytes = file.recoveryRanges.reduce(UInt64(0)) { $0 + $1.length }
+        let previewStartMessage =
+            "Starting preview extraction file=\(file.fullFileName) " +
+            "ranges=\(RecoveryByteRanges.rangeSummary(file.recoveryRanges)) " +
+            "expectedBytes=\(expectedBytes)"
+        logger.debug("\(previewStartMessage, privacy: .public)")
 
         var totalBytesWritten: UInt64 = 0
 
         do {
             FileManager.default.createFile(atPath: destinationURL.path, contents: nil, attributes: nil)
             let fileHandle = try FileHandle(forWritingTo: destinationURL)
+            let destinationMessage =
+                "Writing preview extraction file=\(file.fullFileName) outputPath=\(destinationURL.path)"
+            logger.debug("\(destinationMessage, privacy: .public)")
             defer {
                 try? fileHandle.close()
             }
 
-            let chunkSize = 1024 * 1024 // 1MB chunks
-            var currentOffset = file.offsetOnDisk
-            let totalSize = UInt64(file.sizeInBytes)
-            let endOffset = file.offsetOnDisk + totalSize
-
-            var buffer = [UInt8](repeating: 0, count: chunkSize)
-
-            while currentOffset < endOffset {
-                let bytesToRead = min(UInt64(chunkSize), endOffset - currentOffset)
-                let bytesRead = buffer.withUnsafeMutableBytes { buf in
-                    reader.read(into: buf.baseAddress!, offset: currentOffset, length: Int(bytesToRead))
+            totalBytesWritten = try UInt64(
+                RecoveryByteRanges.copy(
+                    ranges: file.recoveryRanges,
+                    from: reader,
+                    chunkSize: 1024 * 1024
+                ) { chunk in
+                    try fileHandle.write(contentsOf: chunk)
                 }
-
-                guard bytesRead > 0 else {
-                    break
-                }
-
-                let data = Data(bytes: buffer, count: bytesRead)
-                try fileHandle.write(contentsOf: data)
-
-                currentOffset += UInt64(bytesRead)
-                totalBytesWritten += UInt64(bytesRead)
-            }
+            )
 
             logger.debug("Successfully extracted \(totalBytesWritten) bytes for preview of \(file.fileName)")
 
-            if totalBytesWritten > 0 {
+            if totalBytesWritten == expectedBytes, totalBytesWritten > 0 {
                 cache[file.id] = destinationURL
                 return destinationURL
             } else {
+                let reason = reader.lastReadFailureDescription ?? "unknown"
+                let message =
+                    "Preview extraction incomplete for \(file.fileName): expected \(expectedBytes) bytes, " +
+                    "got \(totalBytesWritten). Last read failure: \(reason)"
+                logger.error("\(message, privacy: .public)")
+                try? FileManager.default.removeItem(at: destinationURL)
+                let cleanupMessage = "Removed incomplete preview output path=\(destinationURL.path)"
+                logger.info("\(cleanupMessage, privacy: .public)")
                 return nil
             }
 
         } catch {
-            logger.error("Error extracting preview for \(file.fileName): \(error.localizedDescription)")
+            let failureMessage =
+                "Error extracting preview for \(file.fileName): \(error.localizedDescription) " +
+                "outputPath=\(destinationURL.path)"
+            logger.error("\(failureMessage, privacy: .public)")
             try? FileManager.default.removeItem(at: destinationURL)
-            throw error
+            let cleanupMessage = "Removed failed preview output path=\(destinationURL.path)"
+            logger.info("\(cleanupMessage, privacy: .public)")
+            return nil
         }
     }
 

@@ -70,6 +70,39 @@ final class PrivilegedHelperInstallServiceTests: XCTestCase {
         XCTAssertEqual(blessCallCount, 1)
     }
 
+    func testInstallIfNeededCallsBlessWhenHelperVersionMatchesButBinaryDiffers() throws {
+        let installedRoot = try makeTemporaryDirectory()
+        let embeddedRoot = try makeTemporaryDirectory()
+        defer { try? fileManager.removeItem(at: installedRoot) }
+        defer { try? fileManager.removeItem(at: embeddedRoot) }
+
+        let label = "com.test.vivacity.helper"
+        try writeExecutable(
+            helperBinaryData(bundleVersion: "1", extraPayload: "installed"),
+            to: installedRoot.appendingPathComponent(label).path
+        )
+        try writeLaunchDaemonPlist(for: label, to: installedRoot)
+        try writeExecutable(
+            helperBinaryData(bundleVersion: "1", extraPayload: "embedded-with-new-logs"),
+            to: embeddedRoot.appendingPathComponent(label).path
+        )
+
+        var blessCallCount = 0
+        let service = PrivilegedHelperInstallService(
+            helperLabel: label,
+            fileManager: fileManager,
+            installedHelperRoot: installedRoot.path,
+            installedLaunchDaemonRoot: installedRoot.path,
+            embeddedHelperRoot: embeddedRoot.path,
+            helperReachabilityProbe: { true },
+            blessHelperAction: { blessCallCount += 1 }
+        )
+
+        try service.installIfNeeded()
+
+        XCTAssertEqual(blessCallCount, 1)
+    }
+
     func testInstallIfNeededSkipsBlessWhenInstalledHelperIsNotExecutableByCurrentUser() throws {
         let installedRoot = try makeTemporaryDirectory()
         defer { try? fileManager.removeItem(at: installedRoot) }
@@ -305,7 +338,7 @@ final class PrivilegedHelperInstallServiceTests: XCTestCase {
         try Data(contents.utf8).write(to: URL(fileURLWithPath: path))
     }
 
-    private func helperBinaryData(bundleVersion: String) -> Data {
+    private func helperBinaryData(bundleVersion: String, extraPayload: String = "") -> Data {
         Data(
             """
             \u{0}
@@ -320,7 +353,7 @@ final class PrivilegedHelperInstallServiceTests: XCTestCase {
                 <string>\(bundleVersion)</string>
             </dict>
             </plist>
-            tail
+            tail-\(extraPayload)
             """.utf8
         )
     }

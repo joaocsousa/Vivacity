@@ -176,12 +176,56 @@ final class RecoveryDestinationViewModelTests: XCTestCase {
 
         XCTAssertNil(sut.errorMessage)
         XCTAssertFalse(sut.isRecovering)
+        XCTAssertTrue(sut.didCompleteRecovery)
+        XCTAssertEqual(sut.recoveredFileCount, 1)
+        XCTAssertEqual(sut.failedFileCount, 0)
 
         let calls = await service.calls
         XCTAssertEqual(calls.count, 1)
         XCTAssertEqual(calls.first?.files, [file])
         XCTAssertEqual(calls.first?.destinationURL, destination)
         XCTAssertEqual(calls.first?.sourceDevice, device)
+    }
+
+    @MainActor
+    func testStartRecoverySurfacesPerFileFailuresWhenNothingWasRecovered() async {
+        let destination = URL(fileURLWithPath: "/Volumes/Recovery/Output")
+        let file = RecoverableFile.fixture(size: 500)
+        let service = RecordingRecoveryService(
+            result: FileRecoveryResult(
+                recoveredFiles: [],
+                failures: [FileRecoveryFailure(file: file, errorDescription: "Source data ended unexpectedly.")]
+            )
+        )
+        let sut = RecoveryDestinationViewModel(
+            scannedDevice: .fixture(),
+            selectedFiles: [file],
+            recoveryService: service,
+            directoryPicker: { destination },
+            volumeInfoLookup: { url in
+                if url.path.hasPrefix("/Volumes/Source") {
+                    return RecoveryDestinationViewModel.VolumeInfo(
+                        volumeRootURL: URL(fileURLWithPath: "/Volumes/Source"),
+                        volumeUUID: "SOURCE-UUID",
+                        availableCapacity: 8192
+                    )
+                }
+
+                return RecoveryDestinationViewModel.VolumeInfo(
+                    volumeRootURL: URL(fileURLWithPath: "/Volumes/Recovery"),
+                    volumeUUID: "RECOVERY-UUID",
+                    availableCapacity: 8192
+                )
+            }
+        )
+
+        sut.selectDestination()
+        await sut.startRecovery()
+
+        XCTAssertFalse(sut.didCompleteRecovery)
+        XCTAssertEqual(sut.recoveredFileCount, 0)
+        XCTAssertEqual(sut.failedFileCount, 1)
+        XCTAssertNotNil(sut.errorMessage)
     }
 }
 
@@ -192,10 +236,25 @@ private actor RecordingRecoveryService: FileRecoveryServicing {
         let destinationURL: URL
     }
 
+    private let result: FileRecoveryResult
     private(set) var calls: [Call] = []
 
-    func recover(files: [RecoverableFile], from sourceDevice: StorageDevice, to destinationURL: URL) async throws {
+    init(
+        result: FileRecoveryResult = FileRecoveryResult(
+            recoveredFiles: [URL(fileURLWithPath: "/tmp/recovered.jpg")],
+            failures: []
+        )
+    ) {
+        self.result = result
+    }
+
+    func recover(
+        files: [RecoverableFile],
+        from sourceDevice: StorageDevice,
+        to destinationURL: URL
+    ) async throws -> FileRecoveryResult {
         calls.append(Call(files: files, sourceDevice: sourceDevice, destinationURL: destinationURL))
+        return result
     }
 }
 

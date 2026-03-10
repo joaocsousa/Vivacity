@@ -22,6 +22,11 @@ extension FileScanViewModel {
         scanDuration = nil
         errorMessage = nil
         permissionDenied = false
+        if includeDeepWorker {
+            setScanAccessState(.fullScan)
+        } else {
+            setScanAccessState(.limitedOnly)
+        }
 
         foundFiles = seedFiles
         selectedFileIDs = Set(seedFiles.filter { $0.recoveryConfidence != .low }.map(\.id))
@@ -88,7 +93,7 @@ extension FileScanViewModel {
         shouldRun: Bool
     ) async -> WorkerOutcome {
         guard shouldRun else {
-            logInfo("Fast worker skipped (resume flow or disk image)")
+            logInfo("Fast worker skipped (resume flow)")
             return .success
         }
 
@@ -182,12 +187,37 @@ extension FileScanViewModel {
         } catch {
             hasCompletedDeepWorker = true
             let message = error.localizedDescription
-            if isPermissionDeniedError(message) {
+            let classifiedAsPermissionDenied = isPermissionDeniedError(message)
+            let errorType = String(reflecting: type(of: error))
+            logError(
+                "Deep worker failed classifiedPermissionDenied=\(classifiedAsPermissionDenied) " +
+                    "errorType=\(errorType) message=\(message)"
+            )
+            if classifiedAsPermissionDenied {
                 permissionDenied = true
-                logError("Deep scan permission denied: \(message)")
+                if shouldRouteToOfflineImage(for: device, reason: message) {
+                    let offlineImageMessage =
+                        "macOS denied live raw reads of this startup APFS volume, even through the helper. " +
+                        "Create the image from Recovery Mode or another boot volume, then load that image here.\n\n" +
+                        "Latest error: \(message)"
+                    setScanAccessState(
+                        .imageRequired,
+                        message: offlineImageMessage
+                    )
+                    return .failed("Deep scan image required: \(message)")
+                }
+
+                let imageRecommendedMessage =
+                    "Full raw-disk access is currently unavailable for this device. " +
+                    "Create or load a byte-to-byte image for the best recovery results, " +
+                    "or continue with a limited scan.\n\n" +
+                    "Latest error: \(message)"
+                setScanAccessState(
+                    .imageRecommended,
+                    message: imageRecommendedMessage
+                )
                 return .failed("Deep scan permission denied: \(message)")
             }
-            logError("Deep scan worker error: \(message)")
             return .failed("Deep scan error: \(message)")
         }
     }
@@ -532,8 +562,8 @@ extension FileScanViewModel {
         let normalized = message.lowercased()
         return normalized.contains("operation not permitted")
             || normalized.contains("permission denied")
-            || normalized.contains("cannot open")
-            || normalized.contains("cannot read")
+            || normalized.contains("access denied")
+            || normalized.contains("not authorized")
     }
 
     private func elapsedSeconds(since startedAt: Date?) -> Int {

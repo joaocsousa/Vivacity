@@ -33,10 +33,25 @@ enum DeepScanError: LocalizedError {
         switch self {
         case let .cannotOpenDevice(path, reason):
             "Cannot open \(path) for scanning: \(reason). " +
-                "Try running with elevated privileges or granting Full Disk Access in System Settings."
+                guidance(for: reason, isOpenFailure: true)
         case let .cannotReadDevice(path, offset, reason):
             "Cannot read \(path) at offset \(offset): \(reason). " +
-                "Check Full Disk Access and retry deep scan."
+                guidance(for: reason, isOpenFailure: false)
         }
+    }
+
+    private func guidance(for reason: String, isOpenFailure: Bool) -> String {
+        let normalizedReason = reason.lowercased()
+
+        if normalizedReason.contains("operation not permitted") {
+            return "macOS denied raw disk access to this device. " +
+                "If this is the startup volume, retry from another boot volume or create a disk image first."
+        }
+
+        if isOpenFailure {
+            return "Try running with elevated privileges or granting Full Disk Access in System Settings."
+        }
+
+        return "Check Full Disk Access and retry deep scan."
     }
 }
