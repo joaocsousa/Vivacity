@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+import os
 
 /// Errors raised while validating destination or starting recovery.
 enum RecoveryDestinationError: LocalizedError {
@@ -55,6 +56,15 @@ final class RecoveryDestinationViewModel {
     /// Whether recovery completed successfully.
     private(set) var didCompleteRecovery: Bool = false
 
+    /// Number of files recovered during the last recovery run.
+    private(set) var recoveredFileCount: Int = 0
+
+    /// Number of files that failed during the last recovery run.
+    private(set) var failedFileCount: Int = 0
+
+    /// User-facing summary for partial recovery results.
+    private(set) var recoverySummaryMessage: String?
+
     /// User-facing validation or recovery error.
     var errorMessage: String?
 
@@ -70,6 +80,7 @@ final class RecoveryDestinationViewModel {
     private let recoveryService: FileRecoveryServicing
     private let directoryPicker: DirectoryPicker
     private let volumeInfoLookup: VolumeInfoLookup
+    private let logger = Logger(subsystem: "com.vivacity.app", category: "RecoveryDestination")
 
     private let sourceVolumeRootPath: String
     private let sourceVolumeUUID: String?
@@ -92,11 +103,22 @@ final class RecoveryDestinationViewModel {
         let sourceVolumeInfo = volumeInfoLookup(scannedDevice.volumePath)
         sourceVolumeRootPath = sourceVolumeInfo.volumeRootURL.standardizedFileURL.path
         sourceVolumeUUID = sourceVolumeInfo.volumeUUID ?? scannedDevice.volumeUUID
+
+        let initMessage =
+            "Initialized recovery destination view model device=\(scannedDevice.name) " +
+            "selectedFiles=\(selectedFiles.count) requiredSpace=\(self.requiredSpace) " +
+            "sourceVolumeRoot=\(sourceVolumeRootPath) sourceVolumeUUID=\(sourceVolumeUUID ?? "nil")"
+        logger.debug("\(initMessage, privacy: .public)")
     }
 
     /// Opens a folder picker and validates the selected destination.
     func selectDestination() {
-        guard let pickedURL = directoryPicker() else { return }
+        guard let pickedURL = directoryPicker() else {
+            logger.debug("Recovery destination selection cancelled by user")
+            return
+        }
+        let selectMessage = "Selected recovery destination path=\(pickedURL.path)"
+        logger.info("\(selectMessage, privacy: .public)")
         destinationURL = pickedURL
         didCompleteRecovery = false
         updateAvailableSpace()
@@ -107,46 +129,99 @@ final class RecoveryDestinationViewModel {
         guard let destinationURL else {
             availableSpace = 0
             isDestinationOnScannedDevice = false
+            logger.debug("Cleared recovery destination availability because no destination is selected")
             return
         }
 
         let destinationInfo = volumeInfoLookup(destinationURL)
         availableSpace = max(0, destinationInfo.availableCapacity)
         isDestinationOnScannedDevice = isOnScannedDevice(destinationInfo: destinationInfo)
+        let capacityMessage =
+            "Updated recovery destination capacity path=\(destinationURL.path) " +
+            "volumeRoot=\(destinationInfo.volumeRootURL.path) volumeUUID=\(destinationInfo.volumeUUID ?? "nil") " +
+            "availableSpace=\(availableSpace) sameDevice=\(isDestinationOnScannedDevice)"
+        logger.info("\(capacityMessage, privacy: .public)")
 
         if isDestinationOnScannedDevice {
             errorMessage = RecoveryDestinationError.destinationOnScannedDevice.localizedDescription
+            let rejectionMessage =
+                "Rejected recovery destination because it is on the scanned device " +
+                "path=\(destinationURL.path)"
+            logger.error("\(rejectionMessage, privacy: .public)")
         }
     }
 
     /// Starts file recovery if destination checks pass.
     func startRecovery() async {
         do {
+            let startMessage =
+                "Recovery requested destination=\(destinationURL?.path ?? "nil") " +
+                "selectedFiles=\(selectedFiles.count) requiredSpace=\(requiredSpace) " +
+                "availableSpace=\(availableSpace) sameDevice=\(isDestinationOnScannedDevice)"
+            logger.info("\(startMessage, privacy: .public)")
             guard destinationURL != nil else {
+                logger.error("Recovery blocked because no destination is selected")
                 throw RecoveryDestinationError.destinationRequired
             }
             guard !isDestinationOnScannedDevice else {
+                logger.error("Recovery blocked because destination is on the scanned device")
                 throw RecoveryDestinationError.destinationOnScannedDevice
             }
             guard availableSpace >= requiredSpace else {
+                let insufficientSpaceMessage =
+                    "Recovery blocked because destination lacks space required=\(requiredSpace) " +
+                    "available=\(availableSpace)"
+                logger.error("\(insufficientSpaceMessage, privacy: .public)")
                 throw RecoveryDestinationError.insufficientSpace(required: requiredSpace, available: availableSpace)
             }
 
             errorMessage = nil
             didCompleteRecovery = false
+            recoveredFileCount = 0
+            failedFileCount = 0
+            recoverySummaryMessage = nil
             isRecovering = true
             defer { isRecovering = false }
 
             guard let destinationURL else { return }
-            try await recoveryService.recover(
+            let launchMessage =
+                "Launching recovery service destination=\(destinationURL.path) files=\(selectedFiles.count)"
+            logger.info("\(launchMessage, privacy: .public)")
+            let result = try await recoveryService.recover(
                 files: selectedFiles,
                 from: scannedDevice,
                 to: destinationURL
             )
+            recoveredFileCount = result.recoveredFiles.count
+            failedFileCount = result.failures.count
+            let resultMessage =
+                "Recovery service completed destination=\(destinationURL.path) " +
+                "recoveredFiles=\(recoveredFileCount) failedFiles=\(failedFileCount)"
+            logger.info("\(resultMessage, privacy: .public)")
+
+            guard !result.failures.isEmpty else {
+                didCompleteRecovery = true
+                logger.info("Recovery completed without per-file failures")
+                return
+            }
+
+            let failureMessage = Self.recoveryFailureMessage(from: result)
+            guard !result.recoveredFiles.isEmpty else {
+                errorMessage = failureMessage
+                logger.error("\(failureMessage, privacy: .public)")
+                return
+            }
+
+            recoverySummaryMessage = failureMessage
             didCompleteRecovery = true
+            logger.error("\(failureMessage, privacy: .public)")
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             didCompleteRecovery = false
+            let failureMessage =
+                "Recovery flow failed before completion " +
+                "reason=\(errorMessage ?? error.localizedDescription)"
+            logger.error("\(failureMessage, privacy: .public)")
         }
     }
 
@@ -200,5 +275,21 @@ final class RecoveryDestinationViewModel {
             volumeUUID: volumeUUID,
             availableCapacity: availableCapacity
         )
+    }
+
+    private static func recoveryFailureMessage(from result: FileRecoveryResult) -> String {
+        let failureSummary = if result.failures.count == 1 {
+            "1 file could not be recovered."
+        } else {
+            "\(result.failures.count) files could not be recovered."
+        }
+
+        let failureDetails = result.failures
+            .prefix(3)
+            .map { "\($0.file.fullFileName): \($0.errorDescription)" }
+            .joined(separator: " ")
+
+        guard !failureDetails.isEmpty else { return failureSummary }
+        return "\(failureSummary) \(failureDetails)"
     }
 }

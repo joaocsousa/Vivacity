@@ -122,6 +122,22 @@ enum FileSignature: String, Sendable, CaseIterable, Codable {
         }
     }
 
+    /// Whether Vivacity should attempt inline AVKit playback for this signature.
+    ///
+    /// AVFoundation playback is stable in-app for the QuickTime/MP4 family. Other
+    /// containers are still detected and recoverable, but fall back to the generic
+    /// preview placeholder to avoid runtime crashes in `VideoPlayer`.
+    var supportsInlineVideoPreview: Bool {
+        switch self {
+        case .mp4, .mov, .m4v:
+            true
+        case .jpeg, .png, .heic, .heif, .tiff, .tiffBigEndian,
+             .bmp, .gif, .webp, .cr2, .cr3, .nef, .arw, .dng, .raf, .rw2, .avif,
+             .avi, .mkv, .wmv, .flv, .threeGP:
+            false
+        }
+    }
+
     // MARK: - Lookup
 
     /// All known file extensions mapped to their signatures.

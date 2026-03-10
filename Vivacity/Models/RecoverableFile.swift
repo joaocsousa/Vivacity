@@ -43,6 +43,23 @@ enum RecoveryConfidence: String, Sendable, Codable {
     var accessibilityLabel: String {
         "Recovery confidence: \(displayName)"
     }
+
+    /// Explicit badge copy for scan result rows.
+    var badgeText: String {
+        "Recovery \(displayName)"
+    }
+
+    /// Short explanation shown on hover in the scan results list.
+    var helpText: String {
+        switch self {
+        case .high:
+            "High recovery confidence. The scan found strong signals that this file can be recovered cleanly."
+        case .medium:
+            "Medium recovery confidence. Recovery is plausible, but missing or damaged sections are still possible."
+        case .low:
+            "Low recovery confidence. The scan found weak or incomplete signals for this file."
+        }
+    }
 }
 
 /// Estimated likelihood that recovered output contains corruption artifacts.
@@ -56,6 +73,25 @@ enum CorruptionLikelihood: String, Sendable, Codable {
         case .low: "Low"
         case .medium: "Medium"
         case .high: "High"
+        }
+    }
+
+    var accessibilityLabel: String {
+        "Corruption risk: \(displayName)"
+    }
+
+    var badgeText: String {
+        "Corruption \(displayName)"
+    }
+
+    var helpText: String {
+        switch self {
+        case .low:
+            "Low corruption risk. This file looks likely to preview and recover without major issues."
+        case .medium:
+            "Medium corruption risk. The recovered file may contain missing frames, artifacts, or damaged sections."
+        case .high:
+            "High corruption risk. Expect a higher chance of visible damage, playback errors, or incomplete recovery."
         }
     }
 }

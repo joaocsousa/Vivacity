@@ -4,12 +4,18 @@ import SwiftUI
 ///
 /// Design matches the Stitch screens — blue checkboxes, file-type icons,
 /// "FAST"/"DEEP" pill badges, and right-aligned size text.
-struct FileRow: View {
+struct FileRow: View, Equatable {
     let file: RecoverableFile
     let isSelected: Bool
     let isPreviewSelected: Bool
     let onToggle: () -> Void
     let onSelectForPreview: () -> Void
+
+    static func == (lhs: FileRow, rhs: FileRow) -> Bool {
+        lhs.file == rhs.file
+            && lhs.isSelected == rhs.isSelected
+            && lhs.isPreviewSelected == rhs.isPreviewSelected
+    }
 
     var body: some View {
         // Container layout
@@ -65,7 +71,7 @@ struct FileRow: View {
                     .foregroundStyle(badgeColor)
                     .clipShape(Capsule())
 
-                Text(file.recoveryConfidence.displayName.uppercased())
+                Text(file.recoveryConfidence.badgeText.uppercased())
                     .font(.system(size: 9, weight: .bold))
                     .tracking(0.5)
                     .padding(.horizontal, 7)
@@ -74,8 +80,9 @@ struct FileRow: View {
                     .foregroundStyle(confidenceColor)
                     .clipShape(Capsule())
                     .accessibilityLabel(file.recoveryConfidence.accessibilityLabel)
+                    .help(file.recoveryConfidence.helpText)
 
-                Text("CORRUPTION \(file.corruptionLikelihood.displayName.uppercased())")
+                Text(file.corruptionLikelihood.badgeText.uppercased())
                     .font(.system(size: 9, weight: .bold))
                     .tracking(0.5)
                     .padding(.horizontal, 7)
@@ -83,6 +90,8 @@ struct FileRow: View {
                     .background(corruptionColor.opacity(0.18))
                     .foregroundStyle(corruptionColor)
                     .clipShape(Capsule())
+                    .accessibilityLabel(file.corruptionLikelihood.accessibilityLabel)
+                    .help(file.corruptionLikelihood.helpText)
 
                 Spacer()
 

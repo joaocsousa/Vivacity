@@ -63,16 +63,33 @@ extension RecoveryDestinationView {
         VStack(spacing: 14) {
             Spacer()
 
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: viewModel.failedFileCount > 0 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                 .font(.system(size: 52))
-                .foregroundStyle(.green)
+                .foregroundStyle(viewModel.failedFileCount > 0 ? .orange : .green)
 
-            Text("Recovery Complete")
+            Text(viewModel.failedFileCount > 0 ? "Recovery Finished" : "Recovery Complete")
                 .font(.system(size: 22, weight: .semibold))
 
-            Text("Recovered \(selectedFiles.count) file\(selectedFiles.count == 1 ? "" : "s").")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+            Text(
+                "Recovered \(viewModel.recoveredFileCount) " +
+                    "file\(viewModel.recoveredFileCount == 1 ? "" : "s")."
+            )
+            .font(.system(size: 13))
+            .foregroundStyle(.secondary)
+
+            if viewModel.failedFileCount > 0 {
+                Text("\(viewModel.failedFileCount) file(s) could not be recovered.")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.orange)
+
+                if let summary = viewModel.recoverySummaryMessage {
+                    Text(summary)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 360)
+                }
+            }
 
             Button("Done") {
                 dismiss()

@@ -50,7 +50,8 @@ struct DiskImageService: DiskImageServicing {
                 }
                 defer { try? fileHandle.close() }
 
-                let activeReader = injectedReader ?? PrivilegedDiskReader(devicePath: volumeInfo.devicePath)
+                let activeReader = injectedReader ?? DiskReaderFactoryProvider
+                    .makeReader(forPath: volumeInfo.devicePath)
 
                 do {
                     try activeReader.start()

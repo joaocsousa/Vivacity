@@ -91,4 +91,51 @@ final class LivePreviewServiceTests: XCTestCase {
         let extractedData = try Data(contentsOf: XCTUnwrap(secondURL))
         XCTAssertEqual(extractedData, fileData, "Data should match the first extraction due to caching")
     }
+
+    func testGeneratePreviewURL_assemblesFragmentMap() async throws {
+        mockReader.buffer = Data([0x01, 0x02, 0x03, 0xAA, 0xBB, 0x04, 0x05])
+
+        let file = RecoverableFile(
+            id: UUID(),
+            fileName: "fragmented",
+            fileExtension: "bin",
+            fileType: .image,
+            sizeInBytes: 5,
+            offsetOnDisk: 0,
+            signatureMatch: .jpeg,
+            source: .deepScan,
+            fragmentMap: [
+                FragmentRange(start: 0, length: 3),
+                FragmentRange(start: 5, length: 2),
+            ]
+        )
+
+        let url = try await sut.generatePreviewURL(for: file, reader: mockReader)
+        let extractedData = try Data(contentsOf: XCTUnwrap(url))
+
+        XCTAssertEqual(extractedData, Data([0x01, 0x02, 0x03, 0x04, 0x05]))
+    }
+
+    func testGeneratePreviewURL_withIncompleteRead_returnsNilAndRemovesPlaceholder() async throws {
+        mockReader.buffer = Data([0x01, 0x02])
+        let file = RecoverableFile(
+            id: UUID(),
+            fileName: UUID().uuidString,
+            fileExtension: "bin",
+            fileType: .image,
+            sizeInBytes: 5,
+            offsetOnDisk: 0,
+            signatureMatch: .jpeg,
+            source: .deepScan
+        )
+
+        let url = try await sut.generatePreviewURL(for: file, reader: mockReader)
+
+        XCTAssertNil(url)
+
+        let previewPath = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("VivacityLivePreviews", isDirectory: true)
+            .appendingPathComponent(file.fullFileName)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: previewPath.path))
+    }
 }

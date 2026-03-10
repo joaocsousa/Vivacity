@@ -8,6 +8,18 @@ import os
 @Observable
 @MainActor
 final class DeviceSelectionViewModel {
+    struct HelperFeedbackAlert: Identifiable, Equatable {
+        let id = UUID()
+        let title: String
+        let message: String
+    }
+
+    struct HelperAttentionCallout: Equatable {
+        let title: String
+        let message: String
+        let symbolName: String
+    }
+
     // MARK: - Published State
 
     /// All discovered storage devices.
@@ -31,12 +43,22 @@ final class DeviceSelectionViewModel {
     /// User-facing error message, shown via an alert.
     var errorMessage: String?
 
+    /// One-shot navigation request for a freshly created image-backed scan target.
+    private(set) var pendingScanDevice: StorageDevice?
+
+    /// Current privileged helper installation status for the main screen.
+    private(set) var helperStatus: PrivilegedHelperStatus = .notInstalled
+
+    /// Optional helper-management feedback presented to the user.
+    var helperFeedbackAlert: HelperFeedbackAlert?
+
     // MARK: - Dependencies
 
     private let deviceService: DeviceServicing
     private let partitionSearchService: PartitionSearchService
     private let sessionManager: SessionManaging
     private let diskImageService: DiskImageServicing
+    private let helperManager: PrivilegedHelperManaging
     private let logger = Logger(subsystem: "com.vivacity.app", category: "DeviceSelection")
 
     // MARK: - Init
@@ -45,15 +67,24 @@ final class DeviceSelectionViewModel {
         deviceService: DeviceServicing = DeviceService(),
         partitionSearchService: PartitionSearchService = PartitionSearchService(),
         sessionManager: SessionManaging = SessionManager(),
-        diskImageService: DiskImageServicing = DiskImageService()
+        diskImageService: DiskImageServicing = DiskImageService(),
+        helperManager: PrivilegedHelperManaging = PrivilegedHelperInstallService(
+            helperLabel: PrivilegedHelperClient.defaultServiceName
+        )
     ) {
         self.deviceService = deviceService
         self.partitionSearchService = partitionSearchService
         self.sessionManager = sessionManager
         self.diskImageService = diskImageService
+        self.helperManager = helperManager
     }
 
     // MARK: - Actions
+
+    func load() async {
+        refreshHelperStatus()
+        await loadDevices()
+    }
 
     /// Discovers available devices and updates the published state.
     func loadDevices() async {
@@ -95,6 +126,232 @@ final class DeviceSelectionViewModel {
         }
 
         isLoading = false
+    }
+
+    func refreshHelperStatus() {
+        helperStatus = helperManager.currentStatus()
+        let helperStatusRawValue = helperStatus.rawValue
+        logger.info("Main-screen helper status updated to \(helperStatusRawValue, privacy: .public)")
+    }
+
+    func clearHelperFeedbackAlert() {
+        helperFeedbackAlert = nil
+    }
+
+    func installOrUpdateHelper() {
+        let statusBefore = helperManager.currentStatus()
+        helperStatus = statusBefore
+
+        if statusBefore == .installed {
+            helperFeedbackAlert = HelperFeedbackAlert(
+                title: "Helper Already Installed",
+                message: "The recovery helper is already installed and matches this build."
+            )
+            logger.info("Main-screen helper install skipped because helper is already installed")
+            return
+        }
+
+        do {
+            try helperManager.installIfNeeded()
+        } catch {
+            helperStatus = helperManager.currentStatus()
+            let message = error.localizedDescription
+            helperFeedbackAlert = HelperFeedbackAlert(
+                title: statusBefore == .updateRequired ? "Helper Reinstall Failed" : "Helper Installation Failed",
+                message: message
+            )
+            logger.error("Main-screen helper install failed: \(message, privacy: .public)")
+            return
+        }
+
+        let statusAfter = helperManager.currentStatus()
+        helperStatus = statusAfter
+
+        switch statusAfter {
+        case .installed:
+            helperFeedbackAlert = HelperFeedbackAlert(
+                title: statusBefore == .updateRequired ? "Helper Reinstalled" : "Helper Installed",
+                message: "The recovery helper is ready for full raw-disk scans from the main screen."
+            )
+            logger.info("Main-screen helper install completed successfully")
+        case .updateRequired:
+            let message =
+                "Vivacity still sees a version mismatch. Reinstall the helper again from this " +
+                "screen before running a full physical-disk scan."
+            helperFeedbackAlert = HelperFeedbackAlert(
+                title: "Reinstall Still Required",
+                message: message
+            )
+            logger.error("Main-screen helper install left helper in updateRequired state")
+        case .notInstalled:
+            let message =
+                "Vivacity could not verify the helper installation. Try again before running " +
+                "a full physical-disk scan."
+            helperFeedbackAlert = HelperFeedbackAlert(
+                title: "Helper Was Not Installed",
+                message: message
+            )
+            logger.error("Main-screen helper install finished without an installed helper")
+        }
+    }
+
+    func uninstallHelper() {
+        let statusBefore = helperManager.currentStatus()
+        helperStatus = statusBefore
+
+        guard statusBefore != .notInstalled else {
+            helperFeedbackAlert = HelperFeedbackAlert(
+                title: "Helper Not Installed",
+                message: "There is no recovery helper installed on this Mac."
+            )
+            logger.info("Main-screen helper uninstall skipped because helper is not installed")
+            return
+        }
+
+        do {
+            try helperManager.uninstallIfInstalled()
+        } catch {
+            helperStatus = helperManager.currentStatus()
+            let message = error.localizedDescription
+            helperFeedbackAlert = HelperFeedbackAlert(
+                title: "Helper Uninstall Failed",
+                message: message
+            )
+            logger.error("Main-screen helper uninstall failed: \(message, privacy: .public)")
+            return
+        }
+
+        let statusAfter = helperManager.currentStatus()
+        helperStatus = statusAfter
+
+        if statusAfter == .notInstalled {
+            helperFeedbackAlert = HelperFeedbackAlert(
+                title: "Helper Uninstalled",
+                message: "The recovery helper was removed. Disk images still scan normally, " +
+                    "but physical-disk full scans will need it reinstalled."
+            )
+            logger.info("Main-screen helper uninstall completed successfully")
+        } else {
+            let message =
+                "Vivacity still detects the helper after the uninstall attempt. Remove it " +
+                "again before assuming the Mac is back to limited-scan mode."
+            helperFeedbackAlert = HelperFeedbackAlert(
+                title: "Helper Still Installed",
+                message: message
+            )
+            logger.error("Main-screen helper uninstall left helper in \(statusAfter.rawValue, privacy: .public)")
+        }
+    }
+
+    var helperStatusTitle: String {
+        switch helperStatus {
+        case .installed:
+            "Recovery Helper Ready"
+        case .notInstalled:
+            "Recovery Helper Not Installed"
+        case .updateRequired:
+            "Recovery Helper Reinstall Required"
+        }
+    }
+
+    var helperStatusMessage: String {
+        if let selectedDeviceHelperMessage {
+            return selectedDeviceHelperMessage
+        }
+
+        switch helperStatus {
+        case .installed:
+            return "Full raw-disk scans can start immediately from physical devices. " +
+                "Disk images never require the helper."
+        case .notInstalled:
+            return "Install the helper here before running a full physical-disk scan. " +
+                "You can still load and scan disk images without it."
+        case .updateRequired:
+            return "The installed helper does not match this build of Vivacity. Reinstall " +
+                "it now before scanning a physical device so the latest privileged code is used."
+        }
+    }
+
+    var helperPrimaryActionTitle: String? {
+        switch helperStatus {
+        case .installed:
+            nil
+        case .notInstalled:
+            "Install Helper"
+        case .updateRequired:
+            "Reinstall Helper"
+        }
+    }
+
+    var helperShowsDestructiveAction: Bool {
+        helperStatus != .notInstalled
+    }
+
+    var helperNeedsAttention: Bool {
+        helperStatus != .installed
+    }
+
+    var helperAttentionCallout: HelperAttentionCallout? {
+        if selectedDeviceRequiresHelper {
+            let deviceName = selectedDevice?.name ?? "this physical device"
+            switch helperStatus {
+            case .installed:
+                break
+            case .notInstalled:
+                return HelperAttentionCallout(
+                    title: "Install the Helper Before Scanning",
+                    message: "Install the recovery helper before scanning \(deviceName). " +
+                        "Disk images can still be scanned without it.",
+                    symbolName: "lock.shield.fill"
+                )
+            case .updateRequired:
+                return HelperAttentionCallout(
+                    title: "Version Mismatch Detected",
+                    message: "The installed helper does not match this build of Vivacity. " +
+                        "Reinstall it before scanning \(deviceName).",
+                    symbolName: "exclamationmark.triangle.fill"
+                )
+            }
+        }
+
+        if helperStatus == .updateRequired {
+            return HelperAttentionCallout(
+                title: "Version Mismatch Detected",
+                message: "Reinstall the recovery helper from this screen before starting any physical-disk scan.",
+                symbolName: "exclamationmark.triangle.fill"
+            )
+        }
+
+        return nil
+    }
+
+    var selectedDeviceRequiresHelper: Bool {
+        guard let selectedDevice else { return false }
+        return requiresHelperForPhysicalScan(selectedDevice)
+    }
+
+    var selectedDeviceHelperActionTitle: String? {
+        guard selectedDeviceRequiresHelper else { return nil }
+        return helperPrimaryActionTitle
+    }
+
+    private var selectedDeviceHelperMessage: String? {
+        guard selectedDeviceRequiresHelper, let selectedDevice else { return nil }
+
+        switch helperStatus {
+        case .installed:
+            return nil
+        case .notInstalled:
+            return "Install the helper from this screen before scanning \(selectedDevice.name). " +
+                "Disk images still work without it."
+        case .updateRequired:
+            return "The installed helper does not match this build of Vivacity. Reinstall it " +
+                "here before scanning \(selectedDevice.name)."
+        }
+    }
+
+    private func requiresHelperForPhysicalScan(_ device: StorageDevice) -> Bool {
+        !device.isDiskImage && helperStatus != .installed
     }
 
     /// Deletes the saved session for the given device ID.
@@ -163,33 +420,12 @@ final class DeviceSelectionViewModel {
     // MARK: - Disk Imaging
 
     /// Loads an existing disk image file (.dd, .dmg, etc.) as a StorageDevice.
-    func loadDiskImage(at url: URL) {
-        let path = url.path
-
-        // Attempt to get file size
-        var fileSize: Int64 = 0
-        if let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-           let size = attributes[.size] as? NSNumber
-        {
-            fileSize = size.int64Value
-        } else {
-            logger.warning("Could not determine size for disk image at \(path)")
+    @discardableResult
+    func loadDiskImage(at url: URL) -> StorageDevice {
+        let imageDevice = DiskImageDeviceLoader.makeStorageDevice(from: url)
+        if imageDevice.totalCapacity == 0 {
+            logger.warning("Could not determine size for disk image at \(url.path)")
         }
-
-        // Create an unmounted StorageDevice representing the file
-        let imageDevice = StorageDevice(
-            id: url.absoluteString,
-            name: url.lastPathComponent,
-            volumePath: url,
-            volumeUUID: UUID().uuidString,
-            filesystemType: .other,
-            isExternal: true, // Treat as external to allow raw access
-            isDiskImage: true,
-            partitionOffset: nil,
-            partitionSize: nil,
-            totalCapacity: fileSize,
-            availableCapacity: 0
-        )
 
         // Prevent duplicates
         devices.removeAll { $0.id == imageDevice.id }
@@ -199,15 +435,30 @@ final class DeviceSelectionViewModel {
         selectedDevice = imageDevice
 
         logger.info("Loaded disk image: \(imageDevice.name) (\(imageDevice.formattedTotal))")
+        return imageDevice
+    }
+
+    /// Loads an existing disk image and queues immediate navigation into scanning it.
+    @discardableResult
+    func loadDiskImageAndQueueScan(at url: URL) -> StorageDevice {
+        let imageDevice = loadDiskImage(at: url)
+        pendingScanDevice = imageDevice
+        return imageDevice
     }
 
     /// Initiates a byte-to-byte copy of the selected device to the destination URL.
-    func createImage(for device: StorageDevice, to url: URL) async {
-        guard !isCreatingImage else { return }
+    @discardableResult
+    func createImage(for device: StorageDevice, to url: URL) async -> StorageDevice? {
+        guard !isCreatingImage else { return nil }
 
         isCreatingImage = true
         imageCreationProgress = 0.0
         errorMessage = nil
+        pendingScanDevice = nil
+        defer {
+            isCreatingImage = false
+            imageCreationProgress = 0.0
+        }
 
         do {
             logger.info("Starting disk image creation for \(device.name) to \(url.path)")
@@ -218,12 +469,18 @@ final class DeviceSelectionViewModel {
             }
 
             logger.info("Successfully created disk image for \(device.name)")
+            let imageDevice = loadDiskImage(at: url)
+            pendingScanDevice = imageDevice
+            return imageDevice
         } catch {
             logger.error("Failed to create disk image: \(error.localizedDescription)")
             errorMessage = "Failed to create disk image: \(error.localizedDescription)"
         }
+        return nil
+    }
 
-        isCreatingImage = false
-        imageCreationProgress = 0.0
+    func consumePendingScanDevice() -> StorageDevice? {
+        defer { pendingScanDevice = nil }
+        return pendingScanDevice
     }
 }

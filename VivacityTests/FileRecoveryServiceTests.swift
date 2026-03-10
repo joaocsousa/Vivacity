@@ -3,6 +3,8 @@ import XCTest
 @testable import Vivacity
 
 final class FileRecoveryServiceTests: XCTestCase {
+    private struct MissingAPFSScannerHit: Error {}
+
     func testRecoverWritesBytesAtOffsetToDestination() async throws {
         let sourceData = Data((0 ..< 255).map(UInt8.init))
         let sourceURL = try makeSourceImage(data: sourceData)
@@ -44,6 +46,30 @@ final class FileRecoveryServiceTests: XCTestCase {
         XCTAssertEqual(result.recoveredFiles.count, 1)
         XCTAssertEqual(result.failures.count, 1)
         XCTAssertEqual(result.failures.first?.file.fullFileName, invalidFile.fullFileName)
+    }
+
+    func testRecoverRemovesPlaceholderFileWhenRecoveryFails() async throws {
+        let sourceData = Data((0 ..< 128).map(UInt8.init))
+        let sourceURL = try makeSourceImage(data: sourceData)
+        let destinationURL = try makeTemporaryDirectory()
+        let device = makeDiskImageDevice(at: sourceURL)
+        let invalidFile = makeFile(name: "broken", ext: "jpg", offset: 5000, size: 64)
+        let service = FileRecoveryService()
+
+        let result = try await service.recover(
+            files: [invalidFile],
+            from: device,
+            to: destinationURL,
+            progressHandler: { _ in }
+        )
+
+        XCTAssertEqual(result.recoveredFiles.count, 0)
+        XCTAssertEqual(result.failures.count, 1)
+        let directoryContents = try FileManager.default.contentsOfDirectory(
+            at: destinationURL,
+            includingPropertiesForKeys: nil
+        )
+        XCTAssertTrue(directoryContents.isEmpty)
     }
 
     func testRecoverUsesCollisionSafeFileNames() async throws {
@@ -93,6 +119,39 @@ final class FileRecoveryServiceTests: XCTestCase {
         XCTAssertEqual(result.recoveredFiles[0].lastPathComponent, "20241123_184501+0200_Canon.jpg")
     }
 
+    func testRecoverAssemblesFragmentMapRangesInOrder() async throws {
+        let sourceData = Data([0x01, 0x02, 0x03, 0xAA, 0xBB, 0x04, 0x05])
+        let sourceURL = try makeSourceImage(data: sourceData)
+        let destinationURL = try makeTemporaryDirectory()
+        let device = makeDiskImageDevice(at: sourceURL)
+        let file = RecoverableFile(
+            id: UUID(),
+            fileName: "fragmented",
+            fileExtension: "jpg",
+            fileType: .image,
+            sizeInBytes: 5,
+            offsetOnDisk: 0,
+            signatureMatch: .jpeg,
+            source: .fastScan,
+            isLikelyContiguous: false,
+            fragmentMap: [
+                FragmentRange(start: 0, length: 3),
+                FragmentRange(start: 5, length: 2),
+            ]
+        )
+        let service = FileRecoveryService()
+
+        let result = try await service.recover(
+            files: [file],
+            from: device,
+            to: destinationURL,
+            progressHandler: { _ in }
+        )
+
+        let recoveredData = try Data(contentsOf: XCTUnwrap(result.recoveredFiles.first))
+        XCTAssertEqual(recoveredData, Data([0x01, 0x02, 0x03, 0x04, 0x05]))
+    }
+
     func testVerifySamplesReturnsMismatchWhenHashesChangeBetweenReads() async throws {
         let device = try makeDiskImageDevice(at: makeSourceImage(data: Data(repeating: 0xAA, count: 512)))
         let file = makeFile(name: "clip", ext: "mov", offset: 0, size: 256)
@@ -115,6 +174,72 @@ final class FileRecoveryServiceTests: XCTestCase {
         let results = try await service.verifySamples(files: [file], from: device)
         XCTAssertEqual(results.count, 1)
         XCTAssertEqual(results.first?.status, .unreadable)
+        XCTAssertEqual(
+            results.first?.failureReason,
+            "head sample pass 1: Privileged helper returned EOF"
+        )
+    }
+
+    func testVerifySamplesReadsHeadAndTailAcrossFragments() async throws {
+        let sourceData = Data([0x10, 0x11, 0x12, 0xAA, 0xBB, 0x20, 0x21, 0x22])
+        let device = try makeDiskImageDevice(at: makeSourceImage(data: sourceData))
+        let file = RecoverableFile(
+            id: UUID(),
+            fileName: "fragmented",
+            fileExtension: "jpg",
+            fileType: .image,
+            sizeInBytes: 6,
+            offsetOnDisk: 0,
+            signatureMatch: .jpeg,
+            source: .fastScan,
+            isLikelyContiguous: false,
+            fragmentMap: [
+                FragmentRange(start: 0, length: 3),
+                FragmentRange(start: 5, length: 3),
+            ]
+        )
+        let service = FileRecoveryService()
+
+        let results = try await service.verifySamples(files: [file], from: device)
+
+        XCTAssertEqual(results.first?.status, .verified)
+    }
+
+    func testRecoverScannerEmittedAPFSStructuredFileAssemblesImageBackedFragments() async throws {
+        let fixture = APFSTestImageFixture.makeStructuredHEIC(
+            pathComponents: ["Users", "Pictures", "deleted_live.heic"]
+        )
+        let sourceURL = try makeSourceImage(data: fixture.disk)
+        let destinationURL = try makeTemporaryDirectory()
+        let device = makeDiskImageDevice(at: sourceURL, filesystemType: .apfs)
+        let file = try await makeAPFSScannerHit(from: fixture)
+        let service = FileRecoveryService()
+
+        let result = try await service.recover(
+            files: [file],
+            from: device,
+            to: destinationURL,
+            progressHandler: { _ in }
+        )
+
+        XCTAssertEqual(result.failures.count, 0)
+        let recoveredData = try Data(contentsOf: XCTUnwrap(result.recoveredFiles.first))
+        XCTAssertEqual(recoveredData, fixture.fileData)
+    }
+
+    func testVerifySamplesScannerEmittedAPFSStructuredFileReadsImageBackedFragments() async throws {
+        let fixture = APFSTestImageFixture.makeStructuredHEIC(
+            pathComponents: ["Users", "Pictures", "deleted_live.heic"]
+        )
+        let sourceURL = try makeSourceImage(data: fixture.disk)
+        let device = makeDiskImageDevice(at: sourceURL, filesystemType: .apfs)
+        let file = try await makeAPFSScannerHit(from: fixture)
+        let service = FileRecoveryService()
+
+        let results = try await service.verifySamples(files: [file], from: device)
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.status, .verified)
     }
 }
 
@@ -137,13 +262,13 @@ extension FileRecoveryServiceTests {
         return sourceURL
     }
 
-    private func makeDiskImageDevice(at url: URL) -> StorageDevice {
+    private func makeDiskImageDevice(at url: URL, filesystemType: FilesystemType = .other) -> StorageDevice {
         StorageDevice(
             id: UUID().uuidString,
             name: "Disk Image",
             volumePath: url,
             volumeUUID: "DISK-IMAGE-UUID",
-            filesystemType: .other,
+            filesystemType: filesystemType,
             isExternal: true,
             isDiskImage: true,
             partitionOffset: nil,
@@ -165,6 +290,35 @@ extension FileRecoveryServiceTests {
             source: .deepScan,
             isLikelyContiguous: true
         )
+    }
+
+    private func makeAPFSScannerHit(from fixture: APFSTestImageFixture.Output) async throws -> RecoverableFile {
+        let scanner = APFSMetadataScanner()
+        let reader = FakePrivilegedDiskReader(buffer: fixture.disk)
+        let stream = AsyncThrowingStream<ScanEvent, Error> { continuation in
+            Task {
+                do {
+                    try await scanner.scan(
+                        volumeInfo: fixture.volumeInfo,
+                        reader: reader,
+                        totalBytes: UInt64(fixture.disk.count),
+                        continuation: continuation
+                    )
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+
+        for try await event in stream {
+            if case let .fileFound(file) = event {
+                return file
+            }
+        }
+
+        XCTFail("Expected APFS structured scanner hit was not emitted.")
+        throw MissingAPFSScannerHit()
     }
 }
 
@@ -189,6 +343,10 @@ private final class FlakySampleReader: PrivilegedDiskReading, @unchecked Sendabl
 private final class UnreadableSampleReader: PrivilegedDiskReading, @unchecked Sendable {
     var isSeekable: Bool {
         true
+    }
+
+    var lastReadFailureDescription: String? {
+        "Privileged helper returned EOF"
     }
 
     func start() throws {}

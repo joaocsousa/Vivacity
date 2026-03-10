@@ -64,5 +64,11 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 
 # Custom Derived Data / Build Output
+.DerivedData/
+*.profraw
 Build/
 build/
+
+# AI and Design Artifacts
+.codex/
+design.pen

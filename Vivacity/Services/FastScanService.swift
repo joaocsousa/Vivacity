@@ -24,9 +24,13 @@ struct FastScanService: FastScanServicing {
     private let mountSnapshotClosure: @Sendable (String, URL, Logger) throws -> URL
     private let unmountSnapshotClosure: @Sendable (URL, Logger) -> Void
 
+    private func logInfo(_ message: String) {
+        logger.info("\(message, privacy: .public)")
+    }
+
     init(
         diskReaderFactory: @escaping @Sendable (String)
-            -> any PrivilegedDiskReading = { PrivilegedDiskReader(devicePath: $0) as any PrivilegedDiskReading },
+            -> any PrivilegedDiskReading = { DiskReaderFactoryProvider.makeReader(forPath: $0) },
         runTMUtilClosure: @escaping @Sendable (URL, Logger) -> String? = FastScanService.defaultRunTMUtil,
         mountSnapshotClosure: @escaping @Sendable (String, URL, Logger) throws -> URL = FastScanService
             .defaultMountSnapshot,
@@ -72,20 +76,45 @@ struct FastScanService: FastScanServicing {
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
         let volumeInfo = VolumeInfo.detect(for: device)
-        logger.info("Fast scan Phase A (Filesystem) on \(volumeInfo.filesystemType.displayName)")
+        logInfo(
+            "Fast scan started for device '\(device.name)' " +
+                "path=\(device.volumePath.path) " +
+                "fs=\(volumeInfo.filesystemType.displayName) " +
+                "total=\(device.totalCapacity)"
+        )
+        logInfo("Fast scan Phase A (Filesystem) on \(volumeInfo.filesystemType.displayName)")
         var foundFilenames = Set<String>()
+        var phaseAFiles = 0
+        var phaseACheckpoints = 0
         for try await event in makeFilesystemPhaseStream(device: device) {
             handleFilesystemPhaseEvent(event, foundFilenames: &foundFilenames, continuation: continuation)
+            if case .fileFound = event {
+                phaseAFiles += 1
+            } else if case .checkpoint = event {
+                phaseACheckpoints += 1
+            }
         }
+        logInfo(
+            "Fast scan Phase A finished files=\(phaseAFiles) " +
+                "checkpoints=\(phaseACheckpoints) " +
+                "uniqueNames=\(foundFilenames.count)"
+        )
 
-        await runRawCatalogPhaseIfNeeded(
+        let phaseBStats = await runRawCatalogPhaseIfNeeded(
             volumeInfo: volumeInfo,
+            totalBytes: UInt64(device.totalCapacity),
             foundFilenames: &foundFilenames,
             continuation: continuation
+        )
+        logInfo(
+            "Fast scan Phase B finished files=\(phaseBStats.files) " +
+                "checkpoints=\(phaseBStats.checkpoints) " +
+                "uniqueNames=\(foundFilenames.count)"
         )
 
         continuation.yield(.completed)
         continuation.finish()
+        logInfo("Fast scan completed for device '\(device.name)'")
     }
 
     private func makeFilesystemPhaseStream(device: StorageDevice) -> AsyncThrowingStream<ScanEvent, Error> {
@@ -118,18 +147,23 @@ struct FastScanService: FastScanServicing {
 
     private func runRawCatalogPhaseIfNeeded(
         volumeInfo: VolumeInfo,
+        totalBytes: UInt64,
         foundFilenames: inout Set<String>,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
-    ) async {
+    ) async -> (files: Int, checkpoints: Int) {
         guard volumeInfo.filesystemType == .fat32
             || volumeInfo.filesystemType == .exfat
             || volumeInfo.filesystemType == .ntfs
+            || volumeInfo.filesystemType == .apfs
         else {
+            logInfo("Fast scan Phase B skipped for filesystem \(volumeInfo.filesystemType.displayName)")
             continuation.yield(.progress(1.0))
-            return
+            return (0, 0)
         }
 
-        logger.info("Fast scan Phase B (Raw Catalog) on \(volumeInfo.filesystemType.displayName)")
+        logInfo("Fast scan Phase B (Raw Catalog) on \(volumeInfo.filesystemType.displayName)")
+        var phaseBFiles = 0
+        var phaseBCheckpoints = 0
         do {
             let reader = diskReaderFactory(volumeInfo.devicePath)
             try reader.start()
@@ -138,66 +172,35 @@ struct FastScanService: FastScanServicing {
             guard reader.isSeekable else {
                 logger.warning("Device is not seekable (using FIFO), skipping catalog scan Phase B")
                 continuation.yield(.progress(1.0))
-                return
+                return (0, 0)
             }
 
-            for try await event in makeRawCatalogPhaseStream(volumeInfo: volumeInfo, reader: reader) {
+            for try await event in makeRawCatalogPhaseStream(
+                volumeInfo: volumeInfo,
+                reader: reader,
+                totalBytes: totalBytes
+            ) {
                 switch event {
                 case let .fileFound(file):
                     if !foundFilenames.contains(file.fileName) {
                         foundFilenames.insert(file.fileName)
                         continuation.yield(event)
+                        phaseBFiles += 1
                     }
                 case let .progress(progress):
                     continuation.yield(.progress(0.5 + progress * 0.5))
-                case .checkpoint, .completed:
+                case .checkpoint:
+                    phaseBCheckpoints += 1
+                case .completed:
                     break
                 }
             }
         } catch {
-            logger.error("Phase B scan failed or access denied: \(error.localizedDescription)")
+            logger.error("Phase B scan failed or access denied: \(error.localizedDescription, privacy: .public)")
             continuation.yield(.progress(1.0))
+            return (phaseBFiles, phaseBCheckpoints)
         }
-    }
-
-    private func makeRawCatalogPhaseStream(
-        volumeInfo: VolumeInfo,
-        reader: any PrivilegedDiskReading
-    ) -> AsyncThrowingStream<ScanEvent, Error> {
-        AsyncThrowingStream { phaseBContinuation in
-            Task.detached {
-                do {
-                    try await runFilesystemSpecificCatalogScan(
-                        volumeInfo: volumeInfo,
-                        reader: reader,
-                        continuation: phaseBContinuation
-                    )
-                    phaseBContinuation.finish()
-                } catch {
-                    phaseBContinuation.finish(throwing: error)
-                }
-            }
-        }
-    }
-
-    private func runFilesystemSpecificCatalogScan(
-        volumeInfo: VolumeInfo,
-        reader: any PrivilegedDiskReading,
-        continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
-    ) async throws {
-        switch volumeInfo.filesystemType {
-        case .fat32:
-            let scanner = FATDirectoryScanner()
-            try await scanner.scan(volumeInfo: volumeInfo, reader: reader, continuation: continuation)
-        case .exfat:
-            let scanner = ExFATScanner()
-            try await scanner.scan(volumeInfo: volumeInfo, reader: reader, continuation: continuation)
-        case .ntfs:
-            let scanner = NTFSScanner()
-            try await scanner.scan(volumeInfo: volumeInfo, reader: reader, continuation: continuation)
-        default:
-            break
-        }
+        return (phaseBFiles, phaseBCheckpoints)
     }
 
     // MARK: - Filesystem-Level Scan (all FS types)
@@ -215,9 +218,17 @@ struct FastScanService: FastScanServicing {
         device: StorageDevice,
         continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
     ) async throws {
+        if device.isDiskImage {
+            logInfo("Skipping filesystem API walk for disk image \(device.volumePath.path)")
+            continuation.yield(.progress(1.0))
+            continuation.yield(.completed)
+            continuation.finish()
+            return
+        }
+
         let volumeRoot = device.volumePath
         let volumeInfo = VolumeInfo.detect(for: device)
-        logger.info("Starting filesystem scan on \(device.name) at \(volumeRoot.path)")
+        logInfo("Starting filesystem scan on \(device.name) at \(volumeRoot.path)")
 
         var filesFound = 0
         var filesExamined = 0
@@ -245,7 +256,7 @@ struct FastScanService: FastScanServicing {
         }
 
         for trashDir in trashDirs {
-            logger.info("Scanning trash directory: \(trashDir.path)")
+            logInfo("Scanning trash directory: \(trashDir.path)")
 
             guard let enumerator = fm.enumerator(
                 at: trashDir,
@@ -281,7 +292,7 @@ struct FastScanService: FastScanServicing {
             }
         }
 
-        logger.info("Trash scan found \(filesFound) file(s) from \(filesExamined) examined")
+        logInfo("Trash scan found \(filesFound) file(s) from \(filesExamined) examined")
 
         // ── Strategy 2: Scan APFS local snapshots (APFS only) ──
         if volumeInfo.filesystemType == .apfs {
@@ -293,7 +304,7 @@ struct FastScanService: FastScanServicing {
             )
         }
 
-        logger.info("Filesystem scan complete: \(filesFound) total deleted file(s) found")
+        logInfo("Filesystem scan complete: \(filesFound) total deleted file(s) found")
         continuation.yield(.progress(1.0))
         continuation.yield(.completed)
         continuation.finish()
@@ -315,11 +326,11 @@ struct FastScanService: FastScanServicing {
             .filter { $0.contains("com.apple.TimeMachine") }
 
         guard !snapshotNames.isEmpty else {
-            logger.info("No APFS local snapshots found")
+            logInfo("No APFS local snapshots found")
             return
         }
 
-        logger.info("Found \(snapshotNames.count) APFS snapshot(s) to scan")
+        logInfo("Found \(snapshotNames.count) APFS snapshot(s) to scan")
         continuation.yield(.progress(0.50))
 
         // We scan at most the 3 most recent snapshots to keep things fast
@@ -354,7 +365,7 @@ extension FastScanService {
             let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
             return String(data: outputData, encoding: .utf8)
         } catch {
-            logger.info("tmutil not available or failed: \(error.localizedDescription)")
+            logger.info("tmutil not available or failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
@@ -375,7 +386,7 @@ extension FastScanService {
             return
         }
 
-        logger.info("Mounted snapshot \(snapshotName) at \(mountPoint.path)")
+        logInfo("Mounted snapshot \(snapshotName) at \(mountPoint.path)")
         await enumerateSnapshot(
             mountPoint: mountPoint,
             volumeRoot: volumeRoot,
@@ -403,12 +414,16 @@ extension FastScanService {
             try mountProcess.run()
             mountProcess.waitUntilExit()
             guard mountProcess.terminationStatus == 0 else {
-                logger.info("mount_apfs returned non-zero for snapshot \(snapshotName)")
+                logger.info("mount_apfs returned non-zero for snapshot \(snapshotName, privacy: .public)")
                 try? fm.removeItem(at: mountPoint)
                 throw NSError(domain: "FastScan", code: Int(mountProcess.terminationStatus))
             }
         } catch {
-            logger.info("Failed to mount snapshot \(snapshotName): \(error.localizedDescription)")
+            let errorDescription = error.localizedDescription
+            logger
+                .info(
+                    "Failed mounting snapshot \(snapshotName, privacy: .public): \(errorDescription, privacy: .public)"
+                )
             try? fm.removeItem(at: mountPoint)
             throw error
         }

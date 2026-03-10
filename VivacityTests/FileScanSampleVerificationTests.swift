@@ -25,6 +25,37 @@ final class FileScanSampleVerificationTests: XCTestCase {
         XCTAssertEqual(summary?.hasWarnings, true)
     }
 
+    func testVerifySelectedSamplesBlockingMessageIncludesUnreadableReason() async {
+        let file = makeFile(id: 3, source: .deepScan)
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: [.fileFound(file), .completed]),
+            deepScanService: FakeDeepScanService(events: []),
+            fileSampleVerifier: FakeSampleVerifier(
+                results: [
+                    FileSampleVerification(
+                        file: file,
+                        status: .unreadable,
+                        headHash: nil,
+                        tailHash: nil,
+                        failureReason: "head sample pass 1: Privileged helper returned EOF"
+                    ),
+                ]
+            )
+        )
+
+        let device = makeDevice()
+        sut.startFastScan(device: device)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        let summary = await sut.verifySelectedSamples(device: device)
+        XCTAssertEqual(
+            summary?.blockingMessage,
+            "1 file(s) could not be read during sample verification. " +
+                "Reason: head sample pass 1: Privileged helper returned EOF (1) " +
+                "Preview and recovery are unavailable until the source bytes can be read again."
+        )
+    }
+
     func testVerifySelectedSamplesReturnsNilWhenNothingSelected() async {
         let file = makeFile(id: 2, source: .deepScan)
         let sut = FileScanViewModel(

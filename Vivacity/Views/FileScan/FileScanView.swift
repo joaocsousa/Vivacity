@@ -1,11 +1,5 @@
 import SwiftUI
 
-/// Main scan screen showing progressive file discovery with a single unified scan.
-///
-/// Layout matches the Stitch designs:
-/// 1. Header with status/progress bar and stop button
-/// 2. Scrolling file list with checkboxes
-/// 3. Footer with select all/deselect, file count, and recover button
 struct FileScanView: View {
     struct RecoveryNavigationState: Identifiable, Hashable {
         let id = UUID()
@@ -13,17 +7,16 @@ struct FileScanView: View {
         let selectedFiles: [RecoverableFile]
     }
 
-    let device: StorageDevice
     let sessionToResume: ScanSession?
-
+    @State private var activeDevice: StorageDevice
     @State private var viewModel = AppEnvironment.makeFileScanViewModel()
     @State private var recoveryNavigationState: RecoveryNavigationState?
     @State private var verificationWarningMessage: String?
     @State private var pendingRecoveryFiles: [RecoverableFile] = []
 
     init(device: StorageDevice, sessionToResume: ScanSession? = nil) {
-        self.device = device
         self.sessionToResume = sessionToResume
+        _activeDevice = State(initialValue: device)
     }
 
     var body: some View {
@@ -37,13 +30,8 @@ struct FileScanView: View {
                 isEnabled: viewModel.hasFiles
             )
 
-            if viewModel.permissionDenied {
-                PermissionDeniedView(
-                    onTryAgain: { checkPermissionsAndScan() },
-                    onContinueLimited: {
-                        viewModel.permissionDenied = false
-                    }
-                )
+            if shouldShowScanAccessInterruption {
+                scanAccessInterruptionView
             } else if viewModel.foundFiles.isEmpty, viewModel.isScanning {
                 VStack(spacing: 16) {
                     Image(systemName: "magnifyingglass")
@@ -67,7 +55,7 @@ struct FileScanView: View {
 
                     FilePreviewView(
                         file: viewModel.previewFile,
-                        device: device
+                        device: activeDevice
                     )
                     .frame(minWidth: 350, idealWidth: 450, maxWidth: .infinity)
                 }
@@ -78,11 +66,38 @@ struct FileScanView: View {
         }
         .frame(minWidth: 620, minHeight: 580)
         .background(Color(.windowBackgroundColor))
+        .overlay {
+            if viewModel.isCreatingImage {
+                ZStack {
+                    Color.primary.opacity(0.2)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ProgressView(value: viewModel.imageCreationProgress, total: 1.0)
+                            .progressViewStyle(.linear)
+                            .frame(width: 220)
+
+                        Text("Creating Byte-to-Byte Disk Image...")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+
+                        Text("\(Int(viewModel.imageCreationProgress * 100))%")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(32)
+                    .background(Color(.windowBackgroundColor))
+                    .cornerRadius(12)
+                    .shadow(radius: 10)
+                }
+            }
+        }
         .task {
             if let session = sessionToResume {
-                viewModel.resumeSession(session, device: device)
+                viewModel.refreshHelperStatus()
+                viewModel.resumeSession(session, device: activeDevice)
             } else {
-                checkPermissionsAndScan()
+                viewModel.beginScanFlow(for: activeDevice)
             }
         }
         .onDisappear {
@@ -115,7 +130,7 @@ struct FileScanView: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Continue Recovery", role: .destructive) {
                     recoveryNavigationState = RecoveryNavigationState(
-                        device: device,
+                        device: activeDevice,
                         selectedFiles: pendingRecoveryFiles
                     )
                 }
@@ -131,11 +146,64 @@ struct FileScanView: View {
         }
     }
 
-    // MARK: - Scan Helpers
+    private var shouldShowScanAccessInterruption: Bool {
+        viewModel.scanPhase == .idle
+            && viewModel.scanAccessState != .fullScan
+            && viewModel.scanAccessState != .limitedOnly
+    }
 
-    /// Starts the unified scan immediately, combining all available methods.
-    private func checkPermissionsAndScan() {
-        viewModel.startScan(device: device)
+    @ViewBuilder
+    private var scanAccessInterruptionView: some View {
+        let canCreateImage = viewModel.canOfferInAppImageCreation(for: activeDevice)
+        let canTryAgain = viewModel.canRetryFullScan(for: activeDevice)
+        ScanAccessInterruptionView(
+            state: viewModel.scanAccessState,
+            message: viewModel.scanAccessMessage,
+            onCreateImage: canCreateImage ? {
+                promptForDiskImageDestination()
+            } : nil,
+            onLoadImage: {
+                promptToLoadDiskImage()
+            },
+            onContinueLimited: {
+                viewModel.continueWithLimitedScan(device: activeDevice)
+            },
+            onTryAgain: canTryAgain ? {
+                viewModel.retryFullScanIfPossible(device: activeDevice)
+            } : nil
+        )
+    }
+
+    private func promptToLoadDiskImage() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canCreateDirectories = false
+        panel.allowedContentTypes = [.data, .diskImage, .rawImage]
+        panel.title = "Select Disk Image"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            loadDiskImage(from: url)
+        }
+    }
+
+    private func loadDiskImage(from url: URL) {
+        activeDevice = viewModel.activateDiskImageScan(from: url)
+    }
+
+    private func promptForDiskImageDestination() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.data]
+        panel.nameFieldStringValue = "\(activeDevice.name)_Image.dd"
+        panel.title = "Save Disk Image"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            Task {
+                if let imageDevice = await viewModel.createDiskImageAndActivateScan(from: activeDevice, to: url) {
+                    activeDevice = imageDevice
+                }
+            }
+        }
     }
 
     private var selectedFilesForRecovery: [RecoverableFile] {
@@ -147,26 +215,27 @@ struct FileScanView: View {
         guard !selectedFiles.isEmpty else { return }
         pendingRecoveryFiles = selectedFiles
 
-        guard let summary = await viewModel.verifySelectedSamples(device: device) else {
+        guard let summary = await viewModel.verifySelectedSamples(device: activeDevice) else {
             return
         }
 
-        if summary.hasWarnings {
+        if let blockingMessage = summary.blockingMessage {
+            viewModel.errorMessage = blockingMessage
+        } else if summary.hasWarnings {
             verificationWarningMessage = summary.warningMessage
         } else {
             recoveryNavigationState = RecoveryNavigationState(
-                device: device,
+                device: activeDevice,
                 selectedFiles: selectedFiles
             )
         }
     }
 
     private func verifySamplesOnly() async {
-        _ = await viewModel.verifySelectedSamples(device: device)
+        _ = await viewModel.verifySelectedSamples(device: activeDevice)
     }
 }
 
-/// Toolbar for filtering scan results by type, size, and name.
 private struct FilterToolbar: View {
     @Binding var fileNameQuery: String
     @Binding var fileTypeFilter: FileScanViewModel.FileTypeFilter
@@ -230,25 +299,21 @@ private struct FilterToolbar: View {
     }
 }
 
-// MARK: - Header
-
 extension FileScanView {
     private var header: some View {
         VStack(spacing: 12) {
             HStack {
-                // Device name
                 HStack(spacing: 6) {
-                    Image(systemName: device.isExternal ? "externaldrive.fill" : "internaldrive.fill")
+                    Image(systemName: activeDevice.isExternal ? "externaldrive.fill" : "internaldrive.fill")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    Text(device.name)
+                    Text(activeDevice.name)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                // Stop button (only visible during scanning)
                 if viewModel.isScanning {
                     Button(role: .destructive) {
                         viewModel.stopScanning()
@@ -265,7 +330,7 @@ extension FileScanView {
                 } else if viewModel.scanPhase == .complete {
                     Button {
                         Task {
-                            await viewModel.saveSession(device: device)
+                            await viewModel.saveSession(device: activeDevice)
                         }
                     } label: {
                         HStack(spacing: 4) {
@@ -279,7 +344,6 @@ extension FileScanView {
                 }
             }
 
-            // Phase label + progress
             scanStatusView
         }
         .padding(.horizontal, 16)
@@ -337,18 +401,22 @@ extension FileScanView {
     }
 }
 
-// MARK: - File List
-
 extension FileScanView {
     private var fileList: some View {
-        ZStack {
-            if viewModel.showFilteredEmptyState, !viewModel.isScanning {
+        let filteredFiles = viewModel.filteredFiles
+        let selectedFileIDs = viewModel.selectedFileIDs
+        let previewFileID = viewModel.previewFileID
+        let isScanning = viewModel.isScanning
+        let hasFiles = !viewModel.foundFiles.isEmpty
+
+        return ZStack {
+            if hasFiles, filteredFiles.isEmpty, !isScanning {
                 ContentUnavailableView(
                     "No Matches",
                     systemImage: "line.3.horizontal.decrease.circle",
                     description: Text("No files match the current filters.")
                 )
-            } else if viewModel.foundFiles.isEmpty, !viewModel.isScanning {
+            } else if !hasFiles, !isScanning {
                 ContentUnavailableView(
                     "No Files Found",
                     systemImage: "doc.questionmark.fill",
@@ -356,22 +424,25 @@ extension FileScanView {
                 )
             } else {
                 ScrollView {
-                    VStack(spacing: 0) {
-                        if !viewModel.filteredFiles.isEmpty {
-                            sectionHeader(
-                                title: "SCAN RESULTS",
-                                count: viewModel.filteredFiles.count
-                            )
-
-                            ForEach(viewModel.filteredFiles) { file in
-                                FileRow(
-                                    file: file,
-                                    isSelected: viewModel.selectedFileIDs.contains(file.id),
-                                    isPreviewSelected: viewModel.previewFileID == file.id,
-                                    onToggle: { viewModel.toggleSelection(file.id) },
-                                    onSelectForPreview: { viewModel.previewFileID = file.id }
+                    LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                        if !filteredFiles.isEmpty {
+                            Section {
+                                ForEach(filteredFiles) { file in
+                                    FileRow(
+                                        file: file,
+                                        isSelected: selectedFileIDs.contains(file.id),
+                                        isPreviewSelected: previewFileID == file.id,
+                                        onToggle: { viewModel.toggleSelection(file.id) },
+                                        onSelectForPreview: { viewModel.previewFileID = file.id }
+                                    )
+                                    .equatable()
+                                    Divider().opacity(0.2)
+                                }
+                            } header: {
+                                sectionHeader(
+                                    title: "SCAN RESULTS",
+                                    count: filteredFiles.count
                                 )
-                                Divider().opacity(0.2)
                             }
                         }
                     }
@@ -400,12 +471,9 @@ extension FileScanView {
     }
 }
 
-// MARK: - Footer
-
 extension FileScanView {
     private var footer: some View {
         HStack {
-            // Select All / Deselect All
             HStack(spacing: 12) {
                 Button("Select All") { viewModel.selectAllFiltered() }
                     .buttonStyle(.borderless)
@@ -420,7 +488,6 @@ extension FileScanView {
 
             Spacer()
 
-            // File count
             HStack(spacing: 8) {
                 Text(viewModel.filteredCountLabel)
                     .font(.system(size: 12))
@@ -450,7 +517,6 @@ extension FileScanView {
             .controlSize(.large)
             .disabled(!viewModel.canRecover || viewModel.isVerifyingSamples)
 
-            // Recover button
             Button {
                 Task {
                     await verifyThenRecover()
@@ -474,8 +540,6 @@ extension FileScanView {
         .padding(.vertical, 12)
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     FileScanView(

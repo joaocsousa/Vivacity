@@ -21,10 +21,7 @@ struct FilePreviewView: View {
         file: RecoverableFile?,
         device: StorageDevice,
         previewService: LivePreviewServicing = LivePreviewService(),
-        diskReaderFactory: @escaping DiskReaderFactory = { device in
-            let volumeInfo = VolumeInfo.detect(for: device)
-            return PrivilegedDiskReader(devicePath: volumeInfo.devicePath)
-        }
+        diskReaderFactory: @escaping DiskReaderFactory = { DiskReaderFactoryProvider.makeReader(for: $0) }
     ) {
         self.file = file
         self.device = device
@@ -49,6 +46,12 @@ struct FilePreviewView: View {
 
     private func loadPreviewURL() async {
         guard let file else {
+            previewURL = nil
+            isExtracting = false
+            return
+        }
+
+        guard supportsInlinePreview(for: file) else {
             previewURL = nil
             isExtracting = false
             return
@@ -114,7 +117,11 @@ extension FilePreviewView {
                 AsyncImagePreview(url: url)
 
             case .video:
-                VideoPlayerPreview(url: url)
+                if file.signatureMatch.supportsInlineVideoPreview {
+                    VideoPlayerPreview(url: url)
+                } else {
+                    unavailablePreview(for: file)
+                }
             }
         } else {
             // File not directly accessible or extraction failed
@@ -132,7 +139,7 @@ extension FilePreviewView {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
 
-            Text("Preview unavailable — file might be severely fragmented")
+            Text(previewUnavailableMessage(for: file))
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -225,6 +232,23 @@ extension FilePreviewView {
         formatter.allowedUnits = [.useMB, .useGB]
         formatter.countStyle = .file
         return formatter.string(fromByteCount: Int64(offset))
+    }
+
+    private func supportsInlinePreview(for file: RecoverableFile) -> Bool {
+        switch file.fileType {
+        case .image:
+            true
+        case .video:
+            file.signatureMatch.supportsInlineVideoPreview
+        }
+    }
+
+    private func previewUnavailableMessage(for file: RecoverableFile) -> String {
+        if file.fileType == .video, !file.signatureMatch.supportsInlineVideoPreview {
+            return "Inline preview unavailable for \(file.signatureMatch.fileExtension.uppercased()) videos on this Mac"
+        }
+
+        return "Preview unavailable — file might be severely fragmented"
     }
 }
 

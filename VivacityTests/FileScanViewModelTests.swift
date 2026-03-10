@@ -124,6 +124,11 @@ final class FileScanViewModelTests: XCTestCase {
         XCTAssertEqual(deepUnknownWithNoSize.recoveryConfidence, .low)
         XCTAssertEqual(deepUnknownWithNoSize.corruptionLikelihood, .high)
     }
+
+    func testConfidenceBadgeCopyIsExplicit() {
+        XCTAssertEqual(RecoveryConfidence.high.badgeText, "Recovery High")
+        XCTAssertEqual(CorruptionLikelihood.high.badgeText, "Corruption High")
+    }
 }
 
 // MARK: - Fakes
@@ -168,6 +173,54 @@ struct FakeDeepScanService: DeepScanServicing {
     }
 }
 
+final class FakeHelperManager: PrivilegedHelperManaging {
+    var currentStatusValue: PrivilegedHelperStatus
+    var statusAfterInstall: PrivilegedHelperStatus?
+    var statusAfterUninstall: PrivilegedHelperStatus?
+    var installError: Error?
+    var uninstallError: Error?
+    private(set) var installCallCount = 0
+    private(set) var uninstallCallCount = 0
+
+    init(
+        currentStatusValue: PrivilegedHelperStatus,
+        statusAfterInstall: PrivilegedHelperStatus? = nil,
+        statusAfterUninstall: PrivilegedHelperStatus? = nil,
+        installError: Error? = nil,
+        uninstallError: Error? = nil
+    ) {
+        self.currentStatusValue = currentStatusValue
+        self.statusAfterInstall = statusAfterInstall
+        self.statusAfterUninstall = statusAfterUninstall
+        self.installError = installError
+        self.uninstallError = uninstallError
+    }
+
+    func currentStatus() -> PrivilegedHelperStatus {
+        currentStatusValue
+    }
+
+    func installIfNeeded() throws {
+        installCallCount += 1
+        if let installError {
+            throw installError
+        }
+        if let statusAfterInstall {
+            currentStatusValue = statusAfterInstall
+        }
+    }
+
+    func uninstallIfInstalled() throws {
+        uninstallCallCount += 1
+        if let uninstallError {
+            throw uninstallError
+        }
+        if let statusAfterUninstall {
+            currentStatusValue = statusAfterUninstall
+        }
+    }
+}
+
 // MARK: - Fixtures
 
 extension RecoverableFile {
@@ -197,14 +250,21 @@ extension RecoverableFile {
 }
 
 extension StorageDevice {
-    fileprivate static func fakeDevice() -> StorageDevice {
+    fileprivate static func fakeDevice(
+        name: String = "FakeDisk",
+        volumePath: URL = URL(fileURLWithPath: "/Volumes/Fake"),
+        filesystemType: FilesystemType = .fat32,
+        isExternal: Bool = true,
+        isDiskImage: Bool = false
+    ) -> StorageDevice {
         StorageDevice(
-            id: "fake",
-            name: "FakeDisk",
-            volumePath: URL(fileURLWithPath: "/Volumes/Fake"),
+            id: volumePath.absoluteString,
+            name: name,
+            volumePath: volumePath,
             volumeUUID: "FAKE-UUID",
-            filesystemType: .fat32,
-            isExternal: true,
+            filesystemType: filesystemType,
+            isExternal: isExternal,
+            isDiskImage: isDiskImage,
             partitionOffset: nil,
             partitionSize: nil,
             totalCapacity: 10000,
@@ -213,15 +273,39 @@ extension StorageDevice {
     }
 }
 
+private func makeVolumeInfo(
+    filesystemType: FilesystemType,
+    devicePath: String,
+    mountPoint: URL,
+    isInternal: Bool,
+    isBootable: Bool,
+    isFileVaultEnabled: Bool
+) -> VolumeInfo {
+    VolumeInfo(
+        filesystemType: filesystemType,
+        devicePath: devicePath,
+        mountPoint: mountPoint,
+        blockSize: 4096,
+        isInternal: isInternal,
+        isBootable: isBootable,
+        isFileVaultEnabled: isFileVaultEnabled
+    )
+}
+
 @MainActor
 final class FileScanViewModelAdditionalTests: XCTestCase {
-    func testDiskImageSkipsFastScanImmediately() async {
+    func testDiskImageFullScanCompletes() async {
         let sut = FileScanViewModel(
             fastScanService: FakeFastScanService(events: []),
             deepScanService: FakeDeepScanService(events: [])
         )
-        var image = StorageDevice.fakeDevice()
-        image.isDiskImage = true
+        let image = StorageDevice.fakeDevice(
+            name: "Disk Image",
+            volumePath: URL(fileURLWithPath: "/tmp/test.img"),
+            filesystemType: .apfs,
+            isExternal: true,
+            isDiskImage: true
+        )
 
         sut.startFastScan(device: image)
         try? await Task.sleep(nanoseconds: 30_000_000)
@@ -324,6 +408,586 @@ final class FileScanViewModelAdditionalTests: XCTestCase {
         sut2.stopScanning()
         XCTAssertEqual(sut2.scanPhase, .complete)
     }
+
+    func testProtectedBootAPFSInitialAccessRecommendsImage() {
+        let protectedDevice = StorageDevice.fakeDevice(
+            name: "Macintosh HD",
+            volumePath: URL(fileURLWithPath: "/"),
+            filesystemType: .apfs,
+            isExternal: false
+        )
+        let protectedVolumeInfo = makeVolumeInfo(
+            filesystemType: .apfs,
+            devicePath: "/dev/disk3s5",
+            mountPoint: URL(fileURLWithPath: "/"),
+            isInternal: true,
+            isBootable: true,
+            isFileVaultEnabled: true
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: FakeHelperManager(currentStatusValue: .installed),
+            volumeInfoProvider: { _ in protectedVolumeInfo }
+        )
+
+        sut.refreshHelperStatus()
+        let state = sut.prepareInitialScanAccess(for: protectedDevice)
+
+        XCTAssertEqual(state, .imageRecommended)
+        XCTAssertEqual(sut.scanAccessState, .imageRecommended)
+        XCTAssertNotNil(sut.scanAccessMessage)
+    }
+
+    func testExternalDeviceRequiresHelperWhenMissing() {
+        let externalDevice = StorageDevice.fakeDevice()
+        let volumeInfo = makeVolumeInfo(
+            filesystemType: .exfat,
+            devicePath: "/dev/disk4s1",
+            mountPoint: externalDevice.volumePath,
+            isInternal: false,
+            isBootable: false,
+            isFileVaultEnabled: false
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: FakeHelperManager(currentStatusValue: .notInstalled),
+            volumeInfoProvider: { _ in volumeInfo }
+        )
+
+        sut.refreshHelperStatus()
+        let state = sut.prepareInitialScanAccess(for: externalDevice)
+
+        XCTAssertEqual(state, .helperInstallRequired)
+        XCTAssertEqual(sut.scanAccessState, .helperInstallRequired)
+    }
+
+    func testDiskImageInitialAccessAllowsFullScanWithoutHelperPrompt() {
+        let image = StorageDevice.fakeDevice(
+            name: "Recovered Image",
+            volumePath: URL(fileURLWithPath: "/tmp/recovered.img"),
+            filesystemType: .apfs,
+            isExternal: true,
+            isDiskImage: true
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: FakeHelperManager(currentStatusValue: .notInstalled)
+        )
+
+        sut.refreshHelperStatus()
+        let state = sut.prepareInitialScanAccess(for: image)
+
+        XCTAssertEqual(state, .fullScan)
+        XCTAssertEqual(sut.scanAccessState, .fullScan)
+    }
+
+    @MainActor
+    func testActivateDiskImageScanStartsFullScanWithoutHelperPrompt() async throws {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vivacity-scan-image-\(UUID().uuidString).img")
+        var bytes = Data(repeating: 0x00, count: 8192)
+        bytes.replaceSubrange(32 ..< 36, with: Data("BSXN".utf8))
+        try bytes.write(to: tempURL)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: [
+                .fileFound(.fixture(id: 77, source: .fastScan)),
+                .completed,
+            ]),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: FakeHelperManager(currentStatusValue: .notInstalled)
+        )
+        sut.scanAccessState = .imageRequired
+        sut.scanAccessMessage = "Load an image first."
+        sut.permissionDenied = true
+
+        let imageDevice = sut.activateDiskImageScan(from: tempURL)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(imageDevice.isDiskImage)
+        XCTAssertEqual(imageDevice.id, tempURL.absoluteString)
+        XCTAssertEqual(sut.helperStatus, .notInstalled)
+        XCTAssertEqual(sut.scanAccessState, .fullScan)
+        XCTAssertNil(sut.scanAccessMessage)
+        XCTAssertFalse(sut.permissionDenied)
+        XCTAssertEqual(sut.scanPhase, .complete)
+        XCTAssertEqual(sut.foundFiles.count, 1)
+    }
+
+    func testProtectedBootAPFSRuntimeEPERMRoutesToImageRequired() async {
+        let fast = FakeFastScanService(events: [.completed])
+        let deep = ThrowingDeepScanService(
+            error: DeepScanError.cannotReadDevice(
+                path: "/dev/disk3s5",
+                offset: 0,
+                reason: "Operation not permitted"
+            )
+        )
+        let protectedDevice = StorageDevice.fakeDevice(
+            name: "Macintosh HD",
+            volumePath: URL(fileURLWithPath: "/"),
+            filesystemType: .apfs,
+            isExternal: false
+        )
+        let protectedVolumeInfo = makeVolumeInfo(
+            filesystemType: .apfs,
+            devicePath: "/dev/disk3s5",
+            mountPoint: URL(fileURLWithPath: "/"),
+            isInternal: true,
+            isBootable: true,
+            isFileVaultEnabled: true
+        )
+        let sut = FileScanViewModel(
+            fastScanService: fast,
+            deepScanService: deep,
+            helperManager: FakeHelperManager(currentStatusValue: .installed),
+            volumeInfoProvider: { _ in protectedVolumeInfo }
+        )
+
+        sut.startScan(device: protectedDevice)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertTrue(sut.permissionDenied)
+        XCTAssertEqual(sut.scanPhase, .idle)
+        XCTAssertEqual(sut.scanAccessState, .imageRequired)
+        XCTAssertNil(sut.errorMessage)
+    }
+
+    func testNonPermissionDeepFailureShowsErrorInsteadOfPermissionScreen() async {
+        let fast = FakeFastScanService(events: [.completed])
+        let deep = ThrowingDeepScanService(
+            error: DeepScanError.cannotReadDevice(
+                path: "/dev/disk3s5",
+                offset: 0,
+                reason: "No data could be read. seekable=true. diagnostic=Privileged helper returned EOF"
+            )
+        )
+        let sut = FileScanViewModel(fastScanService: fast, deepScanService: deep)
+
+        sut.startScan(device: .fakeDevice())
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertFalse(sut.permissionDenied)
+        XCTAssertEqual(sut.scanPhase, .complete)
+        XCTAssertEqual(
+            sut.errorMessage,
+            "Deep scan error: Cannot read /dev/disk3s5 at offset 0: No data could be read. " +
+                "seekable=true. diagnostic=Privileged helper returned EOF. " +
+                "Check Full Disk Access and retry deep scan."
+        )
+    }
+
+    func testCreateDiskImageFailureRoutesProtectedBootAPFSToOfflineImage() async {
+        let protectedDevice = StorageDevice.fakeDevice(
+            name: "Macintosh HD",
+            volumePath: URL(fileURLWithPath: "/"),
+            filesystemType: .apfs,
+            isExternal: false
+        )
+        let protectedVolumeInfo = makeVolumeInfo(
+            filesystemType: .apfs,
+            devicePath: "/dev/disk3s5",
+            mountPoint: URL(fileURLWithPath: "/"),
+            isInternal: true,
+            isBootable: true,
+            isFileVaultEnabled: true
+        )
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vivacity-protected-\(UUID().uuidString).dd")
+        defer { try? FileManager.default.removeItem(at: destination) }
+
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            diskImageService: TestDiskImageService(progressValues: [], shouldThrow: true),
+            volumeInfoProvider: { _ in protectedVolumeInfo }
+        )
+
+        let image = await sut.createDiskImage(from: protectedDevice, to: destination)
+
+        XCTAssertNil(image)
+        XCTAssertEqual(sut.scanAccessState, .imageRequired)
+        XCTAssertNotNil(sut.scanAccessMessage)
+    }
+
+    @MainActor
+    func testCreateDiskImageSuccessActivatesImageBackedScanFlow() async {
+        let sourceDevice = StorageDevice.fakeDevice(
+            name: "External Recovery",
+            volumePath: URL(fileURLWithPath: "/Volumes/External"),
+            filesystemType: .exfat,
+            isExternal: true
+        )
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vivacity-created-\(UUID().uuidString).img")
+        defer { try? FileManager.default.removeItem(at: destination) }
+
+        var imageBytes = Data(repeating: 0x00, count: 8192)
+        imageBytes.replaceSubrange(32 ..< 36, with: Data("BSXN".utf8))
+
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: [
+                .fileFound(.fixture(id: 88, source: .fastScan)),
+                .completed,
+            ]),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: FakeHelperManager(currentStatusValue: .notInstalled),
+            diskImageService: TestDiskImageService(
+                progressValues: [0.3, 1.0],
+                outputData: imageBytes
+            )
+        )
+        sut.scanAccessState = .imageRecommended
+        sut.scanAccessMessage = "Create or load an image."
+        sut.permissionDenied = true
+
+        let imageDevice = await sut.createDiskImageAndActivateScan(from: sourceDevice, to: destination)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(imageDevice?.id, destination.absoluteString)
+        XCTAssertTrue(imageDevice?.isDiskImage == true)
+        XCTAssertFalse(sut.isCreatingImage)
+        XCTAssertEqual(sut.imageCreationProgress, 0.0)
+        XCTAssertEqual(sut.helperStatus, .notInstalled)
+        XCTAssertEqual(sut.scanAccessState, .fullScan)
+        XCTAssertNil(sut.scanAccessMessage)
+        XCTAssertFalse(sut.permissionDenied)
+        XCTAssertEqual(sut.scanPhase, .complete)
+        XCTAssertEqual(sut.foundFiles.count, 1)
+    }
+
+    func testContinueWithLimitedScanCompletesExistingFastResultsAfterImageRequired() async {
+        let protectedDevice = StorageDevice.fakeDevice(
+            name: "Macintosh HD",
+            volumePath: URL(fileURLWithPath: "/"),
+            filesystemType: .apfs,
+            isExternal: false
+        )
+        let protectedVolumeInfo = makeVolumeInfo(
+            filesystemType: .apfs,
+            devicePath: "/dev/disk3s5",
+            mountPoint: URL(fileURLWithPath: "/"),
+            isInternal: true,
+            isBootable: true,
+            isFileVaultEnabled: true
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: [
+                .fileFound(.fixture(id: 31, source: .fastScan)),
+                .completed,
+            ]),
+            deepScanService: ThrowingDeepScanService(
+                error: DeepScanError.cannotReadDevice(
+                    path: "/dev/disk3s5",
+                    offset: 0,
+                    reason: "Operation not permitted"
+                )
+            ),
+            helperManager: FakeHelperManager(currentStatusValue: .installed),
+            volumeInfoProvider: { _ in protectedVolumeInfo }
+        )
+
+        sut.startScan(device: protectedDevice)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        sut.continueWithLimitedScan(device: protectedDevice)
+
+        XCTAssertEqual(sut.scanAccessState, .limitedOnly)
+        XCTAssertEqual(sut.scanPhase, .complete)
+        XCTAssertEqual(sut.foundFiles.count, 1)
+    }
+
+    func testProtectedBootAPFSRecommendationDoesNotOfferRetryAction() {
+        let protectedDevice = StorageDevice.fakeDevice(
+            name: "Macintosh HD",
+            volumePath: URL(fileURLWithPath: "/"),
+            filesystemType: .apfs,
+            isExternal: false
+        )
+        let protectedVolumeInfo = makeVolumeInfo(
+            filesystemType: .apfs,
+            devicePath: "/dev/disk3s5",
+            mountPoint: URL(fileURLWithPath: "/"),
+            isInternal: true,
+            isBootable: true,
+            isFileVaultEnabled: true
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: FakeHelperManager(currentStatusValue: .installed),
+            volumeInfoProvider: { _ in protectedVolumeInfo }
+        )
+
+        sut.refreshHelperStatus()
+        _ = sut.prepareInitialScanAccess(for: protectedDevice)
+
+        XCTAssertFalse(sut.canRetryFullScan(for: protectedDevice))
+        XCTAssertTrue(sut.canOfferInAppImageCreation(for: protectedDevice))
+    }
+
+    func testProtectedBootAPFSImageRequiredDisablesInAppImageCreationAndRetry() async {
+        let protectedDevice = StorageDevice.fakeDevice(
+            name: "Macintosh HD",
+            volumePath: URL(fileURLWithPath: "/"),
+            filesystemType: .apfs,
+            isExternal: false
+        )
+        let protectedVolumeInfo = makeVolumeInfo(
+            filesystemType: .apfs,
+            devicePath: "/dev/disk3s5",
+            mountPoint: URL(fileURLWithPath: "/"),
+            isInternal: true,
+            isBootable: true,
+            isFileVaultEnabled: true
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: [.completed]),
+            deepScanService: ThrowingDeepScanService(
+                error: DeepScanError.cannotReadDevice(
+                    path: "/dev/disk3s5",
+                    offset: 0,
+                    reason: "Operation not permitted"
+                )
+            ),
+            helperManager: FakeHelperManager(currentStatusValue: .installed),
+            volumeInfoProvider: { _ in protectedVolumeInfo }
+        )
+
+        sut.startScan(device: protectedDevice)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(sut.scanAccessState, .imageRequired)
+        XCTAssertFalse(sut.canOfferInAppImageCreation(for: protectedDevice))
+        XCTAssertFalse(sut.canRetryFullScan(for: protectedDevice))
+    }
+
+    func testRetryAndImageCreationStayAvailableForNonProtectedImageRecommendation() async {
+        let externalDevice = StorageDevice.fakeDevice(
+            name: "External Recovery",
+            volumePath: URL(fileURLWithPath: "/Volumes/External"),
+            filesystemType: .exfat,
+            isExternal: true
+        )
+        let volumeInfo = makeVolumeInfo(
+            filesystemType: .exfat,
+            devicePath: "/dev/disk4s1",
+            mountPoint: externalDevice.volumePath,
+            isInternal: false,
+            isBootable: false,
+            isFileVaultEnabled: false
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: [.completed]),
+            deepScanService: ThrowingDeepScanService(
+                error: DeepScanError.cannotReadDevice(
+                    path: "/dev/disk4s1",
+                    offset: 0,
+                    reason: "Operation not permitted"
+                )
+            ),
+            helperManager: FakeHelperManager(currentStatusValue: .installed),
+            volumeInfoProvider: { _ in volumeInfo }
+        )
+
+        sut.startScan(device: externalDevice)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(sut.scanAccessState, .imageRecommended)
+        XCTAssertTrue(sut.canOfferInAppImageCreation(for: externalDevice))
+        XCTAssertTrue(sut.canRetryFullScan(for: externalDevice))
+    }
+
+    func testRefreshHelperStatusSetsInstalled() {
+        let helperManager = FakeHelperManager(currentStatusValue: .installed)
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        sut.refreshHelperStatus()
+
+        XCTAssertEqual(sut.helperStatus, .installed)
+    }
+
+    func testRefreshHelperStatusSetsNotInstalled() {
+        let helperManager = FakeHelperManager(currentStatusValue: .notInstalled)
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        sut.refreshHelperStatus()
+
+        XCTAssertEqual(sut.helperStatus, .notInstalled)
+    }
+
+    func testInstallHelperForFullScanReturnsAlreadyInstalledWithoutReinstalling() {
+        let helperManager = FakeHelperManager(currentStatusValue: .installed)
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        let result = sut.installHelperForFullScan()
+
+        XCTAssertEqual(result, .alreadyInstalled)
+        XCTAssertEqual(helperManager.installCallCount, 0)
+        XCTAssertEqual(sut.helperStatus, .installed)
+        XCTAssertEqual(sut.helperInstallFeedbackState, .success)
+    }
+
+    func testInstallHelperForFullScanReturnsInstalledOnSuccessfulInstall() {
+        let helperManager = FakeHelperManager(
+            currentStatusValue: .notInstalled,
+            statusAfterInstall: .installed
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        let result = sut.installHelperForFullScan()
+
+        XCTAssertEqual(result, .installed)
+        XCTAssertEqual(helperManager.installCallCount, 1)
+        XCTAssertEqual(sut.helperStatus, .installed)
+        XCTAssertEqual(sut.helperInstallFeedbackState, .success)
+    }
+
+    func testInstallHelperForFullScanReturnsFailureWhenInstallerThrows() {
+        let helperManager = FakeHelperManager(
+            currentStatusValue: .notInstalled,
+            installError: HelperManagerError.syntheticFailure
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        let result = sut.installHelperForFullScan()
+
+        guard case let .failed(message) = result else {
+            XCTFail("Expected failed helper install result")
+            return
+        }
+        XCTAssertFalse(message.isEmpty)
+        XCTAssertEqual(helperManager.installCallCount, 1)
+        XCTAssertEqual(sut.helperInstallFeedbackState, .failed(message))
+    }
+
+    func testInstallHelperForFullScanReturnsFailureWhenStatusStaysOutdated() {
+        let helperManager = FakeHelperManager(
+            currentStatusValue: .updateRequired,
+            statusAfterInstall: .updateRequired
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        let result = sut.installHelperForFullScan()
+
+        guard case let .failed(message) = result else {
+            XCTFail("Expected failed helper install result")
+            return
+        }
+        XCTAssertTrue(message.contains("update"))
+        XCTAssertEqual(helperManager.installCallCount, 1)
+        XCTAssertEqual(sut.helperStatus, .updateRequired)
+        XCTAssertEqual(sut.helperInstallFeedbackState, .failed(message))
+    }
+
+    func testUninstallHelperReturnsAlreadyNotInstalledWithoutCallingUninstall() {
+        let helperManager = FakeHelperManager(currentStatusValue: .notInstalled)
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        let result = sut.uninstallHelper()
+
+        XCTAssertEqual(result, .alreadyNotInstalled)
+        XCTAssertEqual(helperManager.uninstallCallCount, 0)
+        XCTAssertEqual(sut.helperStatus, .notInstalled)
+    }
+
+    func testUninstallHelperReturnsUninstalledOnSuccessfulRemoval() {
+        let helperManager = FakeHelperManager(
+            currentStatusValue: .installed,
+            statusAfterUninstall: .notInstalled
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        let result = sut.uninstallHelper()
+
+        XCTAssertEqual(result, .uninstalled)
+        XCTAssertEqual(helperManager.uninstallCallCount, 1)
+        XCTAssertEqual(sut.helperStatus, .notInstalled)
+        XCTAssertNil(sut.helperInstallFeedbackState)
+    }
+
+    func testUninstallHelperReturnsFailureWhenUninstallThrows() {
+        let helperManager = FakeHelperManager(
+            currentStatusValue: .installed,
+            uninstallError: HelperManagerError.syntheticFailure
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        let result = sut.uninstallHelper()
+
+        guard case let .failed(message) = result else {
+            XCTFail("Expected failed helper uninstall result")
+            return
+        }
+        XCTAssertFalse(message.isEmpty)
+        XCTAssertEqual(helperManager.uninstallCallCount, 1)
+        XCTAssertEqual(sut.helperStatus, .installed)
+    }
+
+    func testUninstallHelperReturnsFailureWhenStatusRemainsInstalled() {
+        let helperManager = FakeHelperManager(
+            currentStatusValue: .installed,
+            statusAfterUninstall: .installed
+        )
+        let sut = FileScanViewModel(
+            fastScanService: FakeFastScanService(events: []),
+            deepScanService: FakeDeepScanService(events: []),
+            helperManager: helperManager
+        )
+
+        let result = sut.uninstallHelper()
+
+        guard case let .failed(message) = result else {
+            XCTFail("Expected failed helper uninstall result")
+            return
+        }
+        XCTAssertTrue(message.contains("still appears installed"))
+        XCTAssertEqual(helperManager.uninstallCallCount, 1)
+        XCTAssertEqual(sut.helperStatus, .installed)
+    }
+}
+
+private enum HelperManagerError: Error {
+    case syntheticFailure
 }
 
 @MainActor
@@ -390,6 +1054,157 @@ final class DeviceSelectionViewModelTests: XCTestCase {
         XCTAssertFalse(sut.isLoading)
     }
 
+    func testRefreshHelperStatusSetsUpdateRequiredHeadlineAndAction() {
+        let sut = DeviceSelectionViewModel(
+            deviceService: TestDeviceService(devices: []),
+            partitionSearchService: PartitionSearchService(),
+            sessionManager: TestSessionManager(),
+            diskImageService: TestDiskImageService(progressValues: []),
+            helperManager: FakeHelperManager(currentStatusValue: .updateRequired)
+        )
+
+        sut.refreshHelperStatus()
+
+        XCTAssertEqual(sut.helperStatus, .updateRequired)
+        XCTAssertEqual(sut.helperStatusTitle, "Recovery Helper Reinstall Required")
+        XCTAssertEqual(sut.helperPrimaryActionTitle, "Reinstall Helper")
+    }
+
+    func testSelectedPhysicalDeviceRequiresHelperInstallFromMainScreen() {
+        let physicalDevice = StorageDevice.fakeDevice(
+            name: "Macintosh HD",
+            volumePath: URL(fileURLWithPath: "/"),
+            filesystemType: .apfs,
+            isExternal: false
+        )
+        let sut = DeviceSelectionViewModel(
+            deviceService: TestDeviceService(devices: [physicalDevice]),
+            partitionSearchService: PartitionSearchService(),
+            sessionManager: TestSessionManager(),
+            diskImageService: TestDiskImageService(progressValues: []),
+            helperManager: FakeHelperManager(currentStatusValue: .notInstalled)
+        )
+        sut.selectedDevice = physicalDevice
+
+        sut.refreshHelperStatus()
+
+        XCTAssertTrue(sut.selectedDeviceRequiresHelper)
+        XCTAssertEqual(sut.selectedDeviceHelperActionTitle, "Install Helper")
+        XCTAssertEqual(
+            sut.helperAttentionCallout?.title,
+            "Install the Helper Before Scanning"
+        )
+    }
+
+    func testSelectedPhysicalDeviceHighlightsVersionMismatchAndReinstallAction() {
+        let physicalDevice = StorageDevice.fakeDevice(
+            name: "Macintosh HD",
+            volumePath: URL(fileURLWithPath: "/"),
+            filesystemType: .apfs,
+            isExternal: false
+        )
+        let sut = DeviceSelectionViewModel(
+            deviceService: TestDeviceService(devices: [physicalDevice]),
+            partitionSearchService: PartitionSearchService(),
+            sessionManager: TestSessionManager(),
+            diskImageService: TestDiskImageService(progressValues: []),
+            helperManager: FakeHelperManager(currentStatusValue: .updateRequired)
+        )
+        sut.selectedDevice = physicalDevice
+
+        sut.refreshHelperStatus()
+
+        XCTAssertTrue(sut.selectedDeviceRequiresHelper)
+        XCTAssertEqual(sut.selectedDeviceHelperActionTitle, "Reinstall Helper")
+        XCTAssertEqual(
+            sut.helperAttentionCallout?.title,
+            "Version Mismatch Detected"
+        )
+    }
+
+    func testSelectedDiskImageBypassesHelperRequirementOnMainScreen() throws {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vivacity-main-screen-\(UUID().uuidString).img")
+        var bytes = Data(repeating: 0x00, count: 4096)
+        bytes.replaceSubrange(32 ..< 36, with: Data("BSXN".utf8))
+        try bytes.write(to: tempURL)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let sut = DeviceSelectionViewModel(
+            deviceService: TestDeviceService(devices: []),
+            partitionSearchService: PartitionSearchService(),
+            sessionManager: TestSessionManager(),
+            diskImageService: TestDiskImageService(progressValues: []),
+            helperManager: FakeHelperManager(currentStatusValue: .updateRequired)
+        )
+        sut.selectedDevice = sut.loadDiskImage(at: tempURL)
+
+        sut.refreshHelperStatus()
+
+        XCTAssertFalse(sut.selectedDeviceRequiresHelper)
+        XCTAssertNil(sut.selectedDeviceHelperActionTitle)
+    }
+
+    func testInstallOrUpdateHelperSuccessProducesInstalledFeedback() {
+        let helperManager = FakeHelperManager(
+            currentStatusValue: .notInstalled,
+            statusAfterInstall: .installed
+        )
+        let sut = DeviceSelectionViewModel(
+            deviceService: TestDeviceService(devices: []),
+            partitionSearchService: PartitionSearchService(),
+            sessionManager: TestSessionManager(),
+            diskImageService: TestDiskImageService(progressValues: []),
+            helperManager: helperManager
+        )
+
+        sut.installOrUpdateHelper()
+
+        XCTAssertEqual(helperManager.installCallCount, 1)
+        XCTAssertEqual(sut.helperStatus, .installed)
+        XCTAssertEqual(sut.helperFeedbackAlert?.title, "Helper Installed")
+    }
+
+    func testInstallOrUpdateHelperLeavesMismatchHighlightedWhenVersionStillOutdated() {
+        let helperManager = FakeHelperManager(
+            currentStatusValue: .updateRequired,
+            statusAfterInstall: .updateRequired
+        )
+        let sut = DeviceSelectionViewModel(
+            deviceService: TestDeviceService(devices: []),
+            partitionSearchService: PartitionSearchService(),
+            sessionManager: TestSessionManager(),
+            diskImageService: TestDiskImageService(progressValues: []),
+            helperManager: helperManager
+        )
+
+        sut.installOrUpdateHelper()
+
+        XCTAssertEqual(helperManager.installCallCount, 1)
+        XCTAssertEqual(sut.helperStatus, .updateRequired)
+        XCTAssertEqual(sut.helperFeedbackAlert?.title, "Reinstall Still Required")
+    }
+
+    func testUninstallHelperSuccessProducesFeedback() {
+        let helperManager = FakeHelperManager(
+            currentStatusValue: .installed,
+            statusAfterUninstall: .notInstalled
+        )
+        let sut = DeviceSelectionViewModel(
+            deviceService: TestDeviceService(devices: []),
+            partitionSearchService: PartitionSearchService(),
+            sessionManager: TestSessionManager(),
+            diskImageService: TestDiskImageService(progressValues: []),
+            helperManager: helperManager
+        )
+
+        sut.uninstallHelper()
+
+        XCTAssertEqual(helperManager.uninstallCallCount, 1)
+        XCTAssertEqual(sut.helperStatus, .notInstalled)
+        XCTAssertEqual(sut.helperFeedbackAlert?.title, "Helper Uninstalled")
+    }
+
     func testLoadDiskImageInsertsAndDeduplicates() throws {
         let sut = DeviceSelectionViewModel(
             deviceService: TestDeviceService(devices: []),
@@ -399,7 +1214,8 @@ final class DeviceSelectionViewModelTests: XCTestCase {
         )
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("vivacity-image-\(UUID().uuidString).img")
-        let bytes = Data(repeating: 0xAB, count: 16)
+        var bytes = Data(repeating: 0x00, count: 4096)
+        bytes.replaceSubrange(32 ..< 36, with: Data("BSXN".utf8))
         try bytes.write(to: tempURL)
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
@@ -408,26 +1224,75 @@ final class DeviceSelectionViewModelTests: XCTestCase {
 
         XCTAssertEqual(sut.devices.count, 1)
         XCTAssertEqual(sut.selectedDevice?.id, tempURL.absoluteString)
-        XCTAssertEqual(sut.devices.first?.totalCapacity, 16)
+        XCTAssertEqual(sut.devices.first?.totalCapacity, 4096)
+        XCTAssertEqual(sut.devices.first?.filesystemType, .apfs)
     }
 
-    func testCreateImageSuccessAndFailureResetState() async {
+    func testLoadDiskImageAndQueueScanSetsPendingNavigation() throws {
+        let sut = DeviceSelectionViewModel(
+            deviceService: TestDeviceService(devices: []),
+            partitionSearchService: PartitionSearchService(),
+            sessionManager: TestSessionManager(),
+            diskImageService: TestDiskImageService(progressValues: [])
+        )
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vivacity-load-scan-\(UUID().uuidString).img")
+        var bytes = Data(repeating: 0x00, count: 4096)
+        bytes.replaceSubrange(32 ..< 36, with: Data("BSXN".utf8))
+        try bytes.write(to: tempURL)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let imageDevice = sut.loadDiskImageAndQueueScan(at: tempURL)
+
+        XCTAssertEqual(imageDevice.id, tempURL.absoluteString)
+        XCTAssertEqual(sut.selectedDevice?.id, tempURL.absoluteString)
+        XCTAssertEqual(sut.pendingScanDevice?.id, tempURL.absoluteString)
+
+        let pendingScanDevice = sut.consumePendingScanDevice()
+        XCTAssertEqual(pendingScanDevice?.id, tempURL.absoluteString)
+        XCTAssertNil(sut.pendingScanDevice)
+    }
+
+    func testCreateImageSuccessLoadsAndSelectsCreatedImage() async {
         let device = StorageDevice.fakeDevice()
         let destination = FileManager.default.temporaryDirectory
             .appendingPathComponent("out-\(UUID().uuidString).dd")
         defer { try? FileManager.default.removeItem(at: destination) }
+        var bytes = Data(repeating: 0x00, count: 4096)
+        bytes.replaceSubrange(32 ..< 36, with: Data("BSXN".utf8))
 
-        let successSUT = DeviceSelectionViewModel(
+        let sut = DeviceSelectionViewModel(
             deviceService: TestDeviceService(devices: []),
             partitionSearchService: PartitionSearchService(),
             sessionManager: TestSessionManager(),
-            diskImageService: TestDiskImageService(progressValues: [0.25, 0.9, 1.0])
+            diskImageService: TestDiskImageService(
+                progressValues: [0.25, 0.9, 1.0],
+                outputData: bytes
+            )
         )
 
-        await successSUT.createImage(for: device, to: destination)
-        XCTAssertFalse(successSUT.isCreatingImage)
-        XCTAssertEqual(successSUT.imageCreationProgress, 0.0)
-        XCTAssertNil(successSUT.errorMessage)
+        let createdImage = await sut.createImage(for: device, to: destination)
+
+        XCTAssertFalse(sut.isCreatingImage)
+        XCTAssertEqual(sut.imageCreationProgress, 0.0)
+        XCTAssertNil(sut.errorMessage)
+        XCTAssertEqual(sut.devices.count, 1)
+        XCTAssertEqual(createdImage?.id, destination.absoluteString)
+        XCTAssertEqual(sut.selectedDevice?.id, destination.absoluteString)
+        XCTAssertTrue(sut.selectedDevice?.isDiskImage == true)
+        XCTAssertEqual(sut.selectedDevice?.filesystemType, .apfs)
+        XCTAssertEqual(sut.pendingScanDevice?.id, destination.absoluteString)
+
+        let pendingScanDevice = sut.consumePendingScanDevice()
+        XCTAssertEqual(pendingScanDevice?.id, destination.absoluteString)
+        XCTAssertNil(sut.pendingScanDevice)
+    }
+
+    func testCreateImageFailureResetsStateAndLeavesImageUnloaded() async {
+        let device = StorageDevice.fakeDevice()
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("out-\(UUID().uuidString).dd")
+        defer { try? FileManager.default.removeItem(at: destination) }
 
         let failingSUT = DeviceSelectionViewModel(
             deviceService: TestDeviceService(devices: []),
@@ -440,6 +1305,9 @@ final class DeviceSelectionViewModelTests: XCTestCase {
         XCTAssertFalse(failingSUT.isCreatingImage)
         XCTAssertEqual(failingSUT.imageCreationProgress, 0.0)
         XCTAssertNotNil(failingSUT.errorMessage)
+        XCTAssertTrue(failingSUT.devices.isEmpty)
+        XCTAssertNil(failingSUT.selectedDevice)
+        XCTAssertNil(failingSUT.pendingScanDevice)
     }
 }
 
@@ -497,12 +1365,13 @@ final class ViewRenderingCoverageTests: XCTestCase {
         AppEnvironment.makeFileScanViewModel = { fastComplete }
         render(FileScanView(device: .fakeDevice()))
 
-        let permissionDenied = FileScanViewModel(
+        let interrupted = FileScanViewModel(
             fastScanService: FakeFastScanService(events: []),
             deepScanService: FakeDeepScanService(events: [])
         )
-        permissionDenied.permissionDenied = true
-        AppEnvironment.makeFileScanViewModel = { permissionDenied }
+        interrupted.scanAccessState = .imageRequired
+        interrupted.scanAccessMessage = "Load an image first."
+        AppEnvironment.makeFileScanViewModel = { interrupted }
         render(FileScanView(device: .fakeDevice()))
     }
 
@@ -578,6 +1447,21 @@ private struct HangingDeepScanService: DeepScanServicing {
     }
 }
 
+private struct ThrowingDeepScanService: DeepScanServicing {
+    let error: Error
+
+    func scan(
+        device: StorageDevice,
+        existingOffsets: Set<UInt64>,
+        startOffset: UInt64,
+        cameraProfile: CameraProfile
+    ) -> AsyncThrowingStream<ScanEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.finish(throwing: error)
+        }
+    }
+}
+
 private actor TestSessionManager: SessionManaging {
     private let shouldThrowOnSave: Bool
     private let shouldThrowOnDelete: Bool
@@ -635,10 +1519,12 @@ private struct TestDeviceService: DeviceServicing {
 private struct TestDiskImageService: DiskImageServicing {
     let progressValues: [Double]
     let shouldThrow: Bool
+    let outputData: Data?
 
-    init(progressValues: [Double], shouldThrow: Bool = false) {
+    init(progressValues: [Double], shouldThrow: Bool = false, outputData: Data? = nil) {
         self.progressValues = progressValues
         self.shouldThrow = shouldThrow
+        self.outputData = outputData
     }
 
     func createImage(from device: StorageDevice, to destinationURL: URL) -> AsyncThrowingStream<Double, Error> {
@@ -647,6 +1533,9 @@ private struct TestDiskImageService: DiskImageServicing {
                 if shouldThrow {
                     continuation.finish(throwing: TestFailure.expected)
                     return
+                }
+                if let outputData {
+                    try? outputData.write(to: destinationURL)
                 }
                 for progress in progressValues {
                     continuation.yield(progress)
@@ -686,9 +1575,13 @@ final class AdditionalCoverageTests: XCTestCase {
             )
         )
         render(
-            PermissionDeniedView(
-                onTryAgain: {},
-                onContinueLimited: {}
+            ScanAccessInterruptionView(
+                state: .imageRecommended,
+                message: "Create or load an image to continue.",
+                onCreateImage: {},
+                onLoadImage: {},
+                onContinueLimited: {},
+                onTryAgain: nil
             )
         )
     }
