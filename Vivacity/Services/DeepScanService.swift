@@ -133,6 +133,7 @@ struct DeepScanService: DeepScanServicing {
         let bytesScanned: UInt64
         let cameraProfile: CameraProfile
         let totalBytes: UInt64
+        let maxContiguousEndOffset: UInt64
     }
 
     struct ClaimedRange: Sendable {
@@ -504,13 +505,21 @@ struct DeepScanService: DeepScanServicing {
         state: inout ScanLoopState,
         runtime: ScanRuntimeContext
     ) async -> Int {
+        let maxContiguousEndOffset: UInt64
+        if let ranges = state.freeSpaceRanges, let index = state.currentRangeIndex, index < ranges.count {
+            maxContiguousEndOffset = ranges[index].endOffset
+        } else {
+            maxContiguousEndOffset = runtime.totalBytes
+        }
+        
         let context = ScanContext(
             buffer: state.buffer,
             scanLength: chunk.scanLength,
             readOffset: chunk.readOffset,
             bytesScanned: state.bytesScanned,
             cameraProfile: runtime.cameraProfile,
-            totalBytes: runtime.totalBytes
+            totalBytes: runtime.totalBytes,
+            maxContiguousEndOffset: maxContiguousEndOffset
         )
 
         return await scanChunk(

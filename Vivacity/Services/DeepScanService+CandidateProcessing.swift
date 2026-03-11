@@ -37,7 +37,7 @@ extension DeepScanService {
                    canAcceptCandidate(
                        offset: candidate.offsetOnDisk,
                        sizeInBytes: candidate.sizeInBytes,
-                       totalBytes: totalBytes,
+                       maxContiguousEndOffset: totalBytes,
                        tracker: scanAccumulator.tracker
                    )
                 {
@@ -151,7 +151,7 @@ extension DeepScanService {
            canAcceptCandidate(
                offset: offset,
                sizeInBytes: sizeInBytes,
-               totalBytes: context.totalBytes,
+               maxContiguousEndOffset: context.maxContiguousEndOffset,
                tracker: scanAccumulator.tracker
            )
         {
@@ -187,12 +187,15 @@ extension DeepScanService {
         reader: PrivilegedDiskReading
     ) async -> CandidateEstimation {
         var estimate = CandidateEstimation(sizeInBytes: 0, hasInvalidCriticalChunkCRC: false)
+        
+        let availableContiguousBytesUInt = context.maxContiguousEndOffset > offset ? context.maxContiguousEndOffset - offset : 0
+        let maxAllowedBytes = min(Int(32 * 1024 * 1024), Int(min(availableContiguousBytesUInt, UInt64(Int.max))))
 
         if signature == .png,
            let pngEstimate = try? await fileFooterDetector.estimatePNGSize(
                startOffset: offset,
                reader: reader,
-               maxScanBytes: 32 * 1024 * 1024,
+               maxScanBytes: maxAllowedBytes,
                validateCriticalChunkCRCs: true
            )
         {
@@ -206,7 +209,7 @@ extension DeepScanService {
                signature: signature,
                startOffset: offset,
                reader: reader,
-               maxScanBytes: 32 * 1024 * 1024
+               maxScanBytes: maxAllowedBytes
            )
         {
             estimate.sizeInBytes = estimatedSize
@@ -308,15 +311,15 @@ extension DeepScanService {
     func canAcceptCandidate(
         offset: UInt64,
         sizeInBytes: Int64,
-        totalBytes: UInt64,
+        maxContiguousEndOffset: UInt64,
         tracker: CandidateTracker
     ) -> Bool {
         if tracker.offsetBloom.probablyContains(offset), tracker.allOffsets.contains(offset) {
             return false
         }
 
-        if let candidateRange = buildCandidateRange(offset: offset, sizeInBytes: sizeInBytes, totalBytes: totalBytes) {
-            if candidateRange.endExclusive > totalBytes {
+        if let candidateRange = buildCandidateRange(offset: offset, sizeInBytes: sizeInBytes, totalBytes: maxContiguousEndOffset) {
+            if candidateRange.endExclusive > maxContiguousEndOffset {
                 return false
             }
 

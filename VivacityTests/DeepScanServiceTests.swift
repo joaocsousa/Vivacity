@@ -426,24 +426,17 @@ final class DeepScanServiceTests: XCTestCase {
 
     func testDeepScanRejectsCandidateThatOverrunsDeviceBounds() async throws {
         var bytes = [UInt8](repeating: 0, count: 4096)
-        bytes[512] = 0x89
-        bytes[513] = 0x50
-        bytes[514] = 0x4E
-        bytes[515] = 0x47
-        bytes[516] = 0x0D
-        bytes[517] = 0x0A
-        bytes[518] = 0x1A
-        bytes[519] = 0x0A
-
-        // Place IEND well beyond the declared device capacity.
-        bytes[1700] = 0x49
-        bytes[1701] = 0x45
-        bytes[1702] = 0x4E
-        bytes[1703] = 0x44
-        bytes[1704] = 0xAE
-        bytes[1705] = 0x42
-        bytes[1706] = 0x60
-        bytes[1707] = 0x82
+        
+        let startOffset = 512
+        bytes[startOffset] = 0x42 // 'B'
+        bytes[startOffset + 1] = 0x4D // 'M'
+        
+        // Encode a massive size (e.g., 2000 bytes)
+        let declaredSize: UInt32 = 2000
+        bytes[startOffset + 2] = UInt8(declaredSize & 0xFF)
+        bytes[startOffset + 3] = UInt8((declaredSize >> 8) & 0xFF)
+        bytes[startOffset + 4] = UInt8((declaredSize >> 16) & 0xFF)
+        bytes[startOffset + 5] = UInt8((declaredSize >> 24) & 0xFF)
 
         let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
         let deepScanService = DeepScanService { _ in fakeReader }
@@ -461,7 +454,7 @@ final class DeepScanServiceTests: XCTestCase {
             }
         }
 
-        XCTAssertTrue(found.isEmpty)
+        XCTAssertTrue(found.isEmpty, "BMP with size 2000 should be rejected on a 1024 byte device")
     }
 
     func testDeepScanPenalizesPNGWithInvalidCriticalChunkCRC() async throws {
