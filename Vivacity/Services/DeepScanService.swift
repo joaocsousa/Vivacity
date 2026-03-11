@@ -180,6 +180,8 @@ struct DeepScanService: DeepScanServicing {
         var carryOver: Int
         var chunkReadCount: Int
         var lastLoggedProgressDecile: Int
+        var freeSpaceRanges: [FreeSpaceRange]?
+        var currentRangeIndex: Int?
     }
 
     private struct ChunkReadResult {
@@ -225,10 +227,13 @@ struct DeepScanService: DeepScanServicing {
         }
 
         var carvers = initializeCarvers(for: volumeInfo, reader: reader)
+        let freeSpaceRanges = await initializeFreeSpaceMap(for: volumeInfo, reader: reader)
+        
         var state = makeInitialScanLoopState(
             volumeInfo: volumeInfo,
             existingOffsets: existingOffsets,
-            startOffset: startOffset
+            startOffset: startOffset,
+            freeSpaceRanges: freeSpaceRanges
         )
         let runtime = ScanRuntimeContext(
             devicePath: devicePath,
@@ -286,10 +291,42 @@ struct DeepScanService: DeepScanServicing {
         return FATCarver(bpb: bpb)
     }
 
+    private func initializeFreeSpaceMap(for volumeInfo: VolumeInfo, reader: PrivilegedDiskReading) async -> [FreeSpaceRange]? {
+        let mapper: FreeSpaceMapping?
+        
+        switch volumeInfo.filesystemType {
+        case .fat32:
+            mapper = FATAllocationTable(reader: reader)
+        case .apfs:
+            mapper = APFSSpaceManager(reader: reader)
+        default:
+            mapper = nil
+        }
+        
+        guard let mapper else { return nil }
+        
+        do {
+            var ranges: [FreeSpaceRange] = []
+            for try await range in mapper.freeSpaceRanges() {
+                ranges.append(range)
+            }
+            // Sort to ensure monotonic progression
+            ranges.sort { $0.startOffset < $1.startOffset }
+            
+            let totalFree = ranges.reduce(0) { $0 + $1.length }
+            logInfo("Successfully loaded free-space map: \(ranges.count) contiguous ranges, total unallocated \(totalFree / (1024 * 1024)) MB")
+            return ranges.isEmpty ? nil : ranges
+        } catch {
+            logWarning("Failed to build free-space map for \(volumeInfo.filesystemType.displayName): \(error.localizedDescription). Proceeding with standard contiguous scan.")
+            return nil
+        }
+    }
+
     private func makeInitialScanLoopState(
         volumeInfo: VolumeInfo,
         existingOffsets: Set<UInt64>,
-        startOffset: UInt64
+        startOffset: UInt64,
+        freeSpaceRanges: [FreeSpaceRange]?
     ) -> ScanLoopState {
         let chunkSectors = initialChunkSectors(for: volumeInfo.blockSize)
         let chunkSize = Self.sectorSize * chunkSectors
@@ -317,7 +354,9 @@ struct DeepScanService: DeepScanServicing {
             lastCheckpointOffset: alignedStartOffset,
             carryOver: 0,
             chunkReadCount: 0,
-            lastLoggedProgressDecile: -1
+            lastLoggedProgressDecile: -1,
+            freeSpaceRanges: freeSpaceRanges,
+            currentRangeIndex: freeSpaceRanges != nil ? 0 : nil
         )
     }
 
@@ -328,6 +367,11 @@ struct DeepScanService: DeepScanServicing {
     ) async throws {
         while state.bytesScanned < runtime.totalBytes {
             try Task.checkCancellation()
+            
+            guard advanceToNextFreeSpaceIfNeeded(state: &state, totalBytes: runtime.totalBytes) else {
+                break
+            }
+            
             ensureBufferCapacity(state: &state)
 
             guard let chunk = readNextChunk(state: &state, runtime: runtime) else {
@@ -507,7 +551,14 @@ extension DeepScanService {
         state: inout ScanLoopState,
         runtime: ScanRuntimeContext
     ) -> ChunkReadResult? {
-        let bytesToRead = min(state.chunkSize, Int(runtime.totalBytes - state.bytesScanned))
+        let maxAvailableBytes: UInt64
+        if let ranges = state.freeSpaceRanges, let index = state.currentRangeIndex, index < ranges.count {
+            maxAvailableBytes = ranges[index].endOffset - state.bytesScanned
+        } else {
+            maxAvailableBytes = runtime.totalBytes - state.bytesScanned
+        }
+        
+        let bytesToRead = min(state.chunkSize, Int(maxAvailableBytes))
         let readOffset = state.carryOver
 
         let bytesRead = state.buffer.withUnsafeMutableBytes { rawBuffer in
@@ -595,5 +646,33 @@ extension DeepScanService {
             continuation.yield(.checkpoint(state.bytesScanned))
             state.lastCheckpointOffset = state.bytesScanned
         }
+    }
+
+    private func advanceToNextFreeSpaceIfNeeded(state: inout ScanLoopState, totalBytes: UInt64) -> Bool {
+        guard let ranges = state.freeSpaceRanges, let index = state.currentRangeIndex else { return true }
+        
+        guard index < ranges.count else {
+            state.bytesScanned = totalBytes
+            return false
+        }
+        
+        let currentRange = ranges[index]
+        if state.bytesScanned < currentRange.startOffset {
+            let skipAmount = currentRange.startOffset - state.bytesScanned
+            if skipAmount > 1024 * 1024 { // Only log significant skips
+                logInfo("Skipping \(skipAmount / (1024 * 1024)) MB of allocated space to next free block at \(currentRange.startOffset)")
+            }
+            
+            state.bytesScanned = currentRange.startOffset
+            state.carryOver = 0
+            state.buffer = [UInt8](repeating: 0, count: state.chunkSize + Self.maxSignatureLength)
+        }
+        
+        if state.bytesScanned >= currentRange.endOffset {
+            state.currentRangeIndex! += 1
+            return advanceToNextFreeSpaceIfNeeded(state: &state, totalBytes: totalBytes)
+        }
+        
+        return true
     }
 }
