@@ -6,9 +6,11 @@ struct FreeSpaceRange: Equatable, Sendable {
     let startOffset: UInt64
     /// The length of the contiguous free space in bytes
     let length: UInt64
-    
+
     /// The exclusive end offset of the free space
-    var endOffset: UInt64 { startOffset + length }
+    var endOffset: UInt64 {
+        startOffset + length
+    }
 }
 
 /// A protocol for components that can parse a filesystem's allocation table

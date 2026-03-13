@@ -1,7 +1,16 @@
 import Foundation
 
 extension DeepScanService {
+    struct CandidateEmissionDecision {
+        let shouldEmit: Bool
+        let reason: String
+    }
+
     func shouldEmit(_ file: RecoverableFile, entropy: Double? = nil) -> Bool {
+        emissionDecision(for: file, entropy: entropy).shouldEmit
+    }
+
+    func emissionDecision(for file: RecoverableFile, entropy: Double? = nil) -> CandidateEmissionDecision {
         let score = file.confidenceScore ?? 0
 
         if let entropy {
@@ -11,11 +20,21 @@ extension DeepScanService {
                file.sizeInBytes > 0,
                file.sizeInBytes < 256 * 1024
             {
-                return false
+                return CandidateEmissionDecision(
+                    shouldEmit: false,
+                    reason: "low_entropy_small_jpeg"
+                )
             }
         }
 
-        return score >= Self.confidenceRejectThreshold
+        guard score >= Self.confidenceRejectThreshold else {
+            return CandidateEmissionDecision(
+                shouldEmit: false,
+                reason: "confidence_below_threshold"
+            )
+        }
+
+        return CandidateEmissionDecision(shouldEmit: true, reason: "accepted")
     }
 
     func confidenceScore(

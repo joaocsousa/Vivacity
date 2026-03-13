@@ -1,6 +1,18 @@
 import XCTest
 @testable import Vivacity
 
+private actor RecordingDeepScanTraceSink: DeepScanDecisionTracing {
+    private var records: [DeepScanTraceRecord] = []
+
+    func record(_ record: DeepScanTraceRecord) async {
+        records.append(record)
+    }
+
+    func snapshot() -> [DeepScanTraceRecord] {
+        records
+    }
+}
+
 final class DeepScanServiceTests: XCTestCase {
     func testDeepScanThrowsWhenFirstReadReturnsNoData() async {
         let fakeReader = FakePrivilegedDiskReader(buffer: Data())
@@ -158,6 +170,39 @@ final class DeepScanServiceTests: XCTestCase {
         }
 
         XCTAssertTrue(foundFiles.isEmpty)
+    }
+
+    func testDeepScanTraceRecordsLowEntropyRejectionReason() async throws {
+        var bytes: [UInt8] = [0xFF, 0xD8, 0xFF]
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 512))
+        bytes.append(contentsOf: [0xFF, 0xD9])
+        bytes.append(contentsOf: Array(repeating: 0x00, count: 4096 - bytes.count))
+
+        let fakeReader = FakePrivilegedDiskReader(buffer: Data(bytes))
+        let traceSink = RecordingDeepScanTraceSink()
+        let deepScanService = DeepScanService(
+            diskReaderFactory: { _ in fakeReader },
+            decisionTracer: traceSink
+        )
+        let device = StorageDevice(
+            id: "test", name: "test", volumePath: URL(fileURLWithPath: "/dev/null"),
+            volumeUUID: "test", filesystemType: .other, isExternal: true, isDiskImage: false,
+            partitionOffset: nil, partitionSize: nil, totalCapacity: Int64(bytes.count), availableCapacity: 0
+        )
+
+        let stream = deepScanService.scan(device: device, existingOffsets: [], startOffset: 0, cameraProfile: .generic)
+        for try await _ in stream {}
+
+        let records = await traceSink.snapshot()
+        let rejection = records.first { record in
+            record.event == "candidate_decision" &&
+                record.finalDecision == "rejected" &&
+                record.reason == "low_entropy_small_jpeg"
+        }
+
+        XCTAssertNotNil(rejection)
+        XCTAssertEqual(rejection?.candidateSource, "magic_scan")
+        XCTAssertEqual(rejection?.signature, FileSignature.jpeg.rawValue)
     }
 
     func testDeepScanEmitsHighEntropyJPEGWithConfidenceScore() async throws {
@@ -426,11 +471,11 @@ final class DeepScanServiceTests: XCTestCase {
 
     func testDeepScanRejectsCandidateThatOverrunsDeviceBounds() async throws {
         var bytes = [UInt8](repeating: 0, count: 4096)
-        
+
         let startOffset = 512
         bytes[startOffset] = 0x42 // 'B'
         bytes[startOffset + 1] = 0x4D // 'M'
-        
+
         // Encode a massive size (e.g., 2000 bytes)
         let declaredSize: UInt32 = 2000
         bytes[startOffset + 2] = UInt8(declaredSize & 0xFF)

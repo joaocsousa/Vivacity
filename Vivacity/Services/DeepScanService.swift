@@ -1,6 +1,7 @@
 import Foundation
 import os
 
+// swiftlint:disable file_length
 protocol DeepScanServicing: Sendable {
     func scan(
         device: StorageDevice,
@@ -46,6 +47,80 @@ struct RollingOffsetBloomFilter {
     }
 }
 
+protocol DeepScanDecisionTracing: Sendable {
+    func record(_ record: DeepScanTraceRecord) async
+}
+
+struct DeepScanTraceRecord: Sendable, Codable {
+    let timestamp: Date
+    let event: String
+    let devicePath: String?
+    let filesystem: String?
+    let totalBytes: UInt64?
+    let freeSpaceRangeCount: Int?
+    let filesFound: Int?
+    let scanOffset: UInt64?
+    let nextOffset: UInt64?
+    let skippedBytes: UInt64?
+    let candidateSource: String?
+    let signature: String?
+    let fileName: String?
+    let fileExtension: String?
+    let offsetOnDisk: UInt64?
+    let estimatedSizeInBytes: Int64?
+    let entropy: Double?
+    let confidenceScore: Double?
+    let allocationState: String?
+    let preferredRangeStartOffset: UInt64?
+    let preferredRangeEndOffset: UInt64?
+    let crossesPreferredBoundary: Bool?
+    let estimationMethod: String?
+    let maxScanBytes: Int?
+    let hasInvalidCriticalChunkCRC: Bool?
+    let emissionDecision: String?
+    let acceptanceDecision: String?
+    let finalDecision: String?
+    let reason: String?
+}
+
+actor DeepScanTraceWriter: DeepScanDecisionTracing {
+    private let fileHandle: FileHandle
+    private let encoder: JSONEncoder
+
+    init(url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+        }
+
+        fileHandle = try FileHandle(forWritingTo: url)
+        try fileHandle.seekToEnd()
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        self.encoder = encoder
+    }
+
+    deinit {
+        try? fileHandle.close()
+    }
+
+    func record(_ record: DeepScanTraceRecord) async {
+        do {
+            var data = try encoder.encode(record)
+            data.append(0x0A)
+            try fileHandle.seekToEnd()
+            try fileHandle.write(contentsOf: data)
+        } catch {
+            // Tracing is best-effort and must never interfere with scan results.
+        }
+    }
+}
+
+// swiftlint:disable:next type_body_length
 struct DeepScanService: DeepScanServicing {
     struct PerformanceConfiguration: Sendable {
         let maxParallelSignatureWorkers: Int
@@ -65,16 +140,27 @@ struct DeepScanService: DeepScanServicing {
     private let diskReaderFactory: @Sendable (String) -> any PrivilegedDiskReading
     let fileFooterDetector: FileFooterDetecting
     let performanceConfig: PerformanceConfiguration
+    let decisionTracer: (any DeepScanDecisionTracing)?
+    let decisionTracePath: String?
 
     init(
         diskReaderFactory: @escaping @Sendable (String)
             -> any PrivilegedDiskReading = { DiskReaderFactoryProvider.makeReader(forPath: $0) },
         fileFooterDetector: FileFooterDetecting = FileFooterDetector(),
-        performanceConfig: PerformanceConfiguration = .default
+        performanceConfig: PerformanceConfiguration = .default,
+        decisionTracer: (any DeepScanDecisionTracing)? = nil
     ) {
         self.diskReaderFactory = diskReaderFactory
         self.fileFooterDetector = fileFooterDetector
         self.performanceConfig = performanceConfig
+        if let decisionTracer {
+            self.decisionTracer = decisionTracer
+            decisionTracePath = nil
+        } else {
+            let traceConfiguration = Self.makeDefaultDecisionTraceConfiguration()
+            self.decisionTracer = traceConfiguration.tracer
+            decisionTracePath = traceConfiguration.path
+        }
     }
 
     static let sectorSize = 512
@@ -83,6 +169,7 @@ struct DeepScanService: DeepScanServicing {
     static let entropySampleBytes = 4096
     static let entropyRejectThreshold = 2.2
     static let confidenceRejectThreshold = 0.4
+    static let crossRangeConfidenceCap = 0.44
     static let bloomCapacityBits = 1 << 20
 
     private func logInfo(_ message: String) {
@@ -134,6 +221,7 @@ struct DeepScanService: DeepScanServicing {
         let cameraProfile: CameraProfile
         let totalBytes: UInt64
         let maxContiguousEndOffset: UInt64
+        let preferredFreeSpaceRange: FreeSpaceRange?
     }
 
     struct ClaimedRange: Sendable {
@@ -162,6 +250,8 @@ struct DeepScanService: DeepScanServicing {
     struct CandidateEstimation {
         var sizeInBytes: Int64
         var hasInvalidCriticalChunkCRC: Bool
+        var estimationMethod: String
+        var maxScanBytes: Int?
     }
 
     private struct ActiveCarvers {
@@ -197,8 +287,10 @@ struct DeepScanService: DeepScanServicing {
         let cameraProfile: CameraProfile
         let totalBytes: UInt64
         let continuation: AsyncThrowingStream<ScanEvent, Error>.Continuation
+        let decisionTracer: (any DeepScanDecisionTracing)?
     }
 
+    // swiftlint:disable:next function_body_length
     private func performScan(
         device: StorageDevice,
         existingOffsets: Set<UInt64>,
@@ -229,7 +321,7 @@ struct DeepScanService: DeepScanServicing {
 
         var carvers = initializeCarvers(for: volumeInfo, reader: reader)
         let freeSpaceRanges = await initializeFreeSpaceMap(for: volumeInfo, reader: reader)
-        
+
         var state = makeInitialScanLoopState(
             volumeInfo: volumeInfo,
             existingOffsets: existingOffsets,
@@ -241,8 +333,47 @@ struct DeepScanService: DeepScanServicing {
             reader: reader,
             cameraProfile: cameraProfile,
             totalBytes: totalBytes,
-            continuation: continuation
+            continuation: continuation,
+            decisionTracer: decisionTracer
         )
+        if let decisionTracePath {
+            logInfo("Deep scan decision tracing enabled path=\(decisionTracePath)")
+        }
+        if let decisionTracer {
+            await decisionTracer.record(
+                DeepScanTraceRecord(
+                    timestamp: Date(),
+                    event: "scan_started",
+                    devicePath: devicePath,
+                    filesystem: volumeInfo.filesystemType.displayName,
+                    totalBytes: totalBytes,
+                    freeSpaceRangeCount: freeSpaceRanges?.count,
+                    filesFound: nil,
+                    scanOffset: startOffset,
+                    nextOffset: nil,
+                    skippedBytes: nil,
+                    candidateSource: nil,
+                    signature: nil,
+                    fileName: nil,
+                    fileExtension: nil,
+                    offsetOnDisk: nil,
+                    estimatedSizeInBytes: nil,
+                    entropy: nil,
+                    confidenceScore: nil,
+                    allocationState: freeSpaceRanges == nil ? "unknown" : "free_space_map_loaded",
+                    preferredRangeStartOffset: nil,
+                    preferredRangeEndOffset: nil,
+                    crossesPreferredBoundary: nil,
+                    estimationMethod: nil,
+                    maxScanBytes: nil,
+                    hasInvalidCriticalChunkCRC: nil,
+                    emissionDecision: nil,
+                    acceptanceDecision: nil,
+                    finalDecision: nil,
+                    reason: nil
+                )
+            )
+        }
         logInfo(
             "Deep scanning totalBytes=\(totalBytes) " +
                 "(\(totalBytes / (1024 * 1024)) MB) " +
@@ -258,6 +389,41 @@ struct DeepScanService: DeepScanServicing {
             "Deep scan complete: \(state.scanAccumulator.filesFound) file(s) " +
             "found after scanning \(state.bytesScanned) bytes"
         logInfo(completionMessage)
+        if let decisionTracer {
+            await decisionTracer.record(
+                DeepScanTraceRecord(
+                    timestamp: Date(),
+                    event: "scan_completed",
+                    devicePath: devicePath,
+                    filesystem: volumeInfo.filesystemType.displayName,
+                    totalBytes: totalBytes,
+                    freeSpaceRangeCount: freeSpaceRanges?.count,
+                    filesFound: state.scanAccumulator.filesFound,
+                    scanOffset: state.bytesScanned,
+                    nextOffset: nil,
+                    skippedBytes: nil,
+                    candidateSource: nil,
+                    signature: nil,
+                    fileName: nil,
+                    fileExtension: nil,
+                    offsetOnDisk: nil,
+                    estimatedSizeInBytes: nil,
+                    entropy: nil,
+                    confidenceScore: nil,
+                    allocationState: nil,
+                    preferredRangeStartOffset: nil,
+                    preferredRangeEndOffset: nil,
+                    crossesPreferredBoundary: nil,
+                    estimationMethod: nil,
+                    maxScanBytes: nil,
+                    hasInvalidCriticalChunkCRC: nil,
+                    emissionDecision: nil,
+                    acceptanceDecision: nil,
+                    finalDecision: nil,
+                    reason: nil
+                )
+            )
+        }
         continuation.yield(.checkpoint(state.bytesScanned))
         continuation.yield(.completed)
         continuation.finish()
@@ -292,20 +458,21 @@ struct DeepScanService: DeepScanServicing {
         return FATCarver(bpb: bpb)
     }
 
-    private func initializeFreeSpaceMap(for volumeInfo: VolumeInfo, reader: PrivilegedDiskReading) async -> [FreeSpaceRange]? {
-        let mapper: FreeSpaceMapping?
-        
-        switch volumeInfo.filesystemType {
+    private func initializeFreeSpaceMap(
+        for volumeInfo: VolumeInfo,
+        reader: PrivilegedDiskReading
+    ) async -> [FreeSpaceRange]? {
+        let mapper: FreeSpaceMapping? = switch volumeInfo.filesystemType {
         case .fat32:
-            mapper = FATAllocationTable(reader: reader)
+            FATAllocationTable(reader: reader)
         case .apfs:
-            mapper = APFSSpaceManager(reader: reader)
+            APFSSpaceManager(reader: reader)
         default:
-            mapper = nil
+            nil
         }
-        
+
         guard let mapper else { return nil }
-        
+
         do {
             var ranges: [FreeSpaceRange] = []
             for try await range in mapper.freeSpaceRanges() {
@@ -313,12 +480,18 @@ struct DeepScanService: DeepScanServicing {
             }
             // Sort to ensure monotonic progression
             ranges.sort { $0.startOffset < $1.startOffset }
-            
+
             let totalFree = ranges.reduce(0) { $0 + $1.length }
-            logInfo("Successfully loaded free-space map: \(ranges.count) contiguous ranges, total unallocated \(totalFree / (1024 * 1024)) MB")
+            logInfo(
+                "Successfully loaded free-space map: \(ranges.count) contiguous ranges, " +
+                    "total unallocated \(totalFree / (1024 * 1024)) MB"
+            )
             return ranges.isEmpty ? nil : ranges
         } catch {
-            logWarning("Failed to build free-space map for \(volumeInfo.filesystemType.displayName): \(error.localizedDescription). Proceeding with standard contiguous scan.")
+            logWarning(
+                "Failed to build free-space map for \(volumeInfo.filesystemType.displayName): " +
+                    "\(error.localizedDescription). Proceeding with standard contiguous scan."
+            )
             return nil
         }
     }
@@ -368,11 +541,15 @@ struct DeepScanService: DeepScanServicing {
     ) async throws {
         while state.bytesScanned < runtime.totalBytes {
             try Task.checkCancellation()
-            
-            guard advanceToNextFreeSpaceIfNeeded(state: &state, totalBytes: runtime.totalBytes) else {
+
+            guard await advanceToNextFreeSpaceIfNeeded(
+                state: &state,
+                totalBytes: runtime.totalBytes,
+                decisionTracer: runtime.decisionTracer
+            ) else {
                 break
             }
-            
+
             ensureBufferCapacity(state: &state)
 
             guard let chunk = readNextChunk(state: &state, runtime: runtime) else {
@@ -395,7 +572,7 @@ struct DeepScanService: DeepScanServicing {
                 break
             }
 
-            processFilesystemCarvers(
+            await processFilesystemCarvers(
                 carvers: &carvers,
                 chunk: chunk,
                 state: &state,
@@ -427,10 +604,11 @@ struct DeepScanService: DeepScanServicing {
         chunk: ChunkReadResult,
         state: inout ScanLoopState,
         runtime: ScanRuntimeContext
-    ) {
+    ) async {
         let chunkStart = state.bytesScanned > UInt64(chunk.readOffset)
             ? state.bytesScanned - UInt64(chunk.readOffset)
             : 0
+        let preferredFreeSpaceRange = currentFreeSpaceRange(state: state)
         let candidates = carveCandidates(
             carvers: &carvers,
             buffer: state.buffer,
@@ -442,12 +620,14 @@ struct DeepScanService: DeepScanServicing {
             if state.scanAccumulator.tracker.allOffsets.contains(candidate.offsetOnDisk) {
                 continue
             }
-            processCarvedFile(
+            await processCarvedFile(
                 candidate: candidate,
                 reader: runtime.reader,
                 scanAccumulator: &state.scanAccumulator,
                 totalBytes: runtime.totalBytes,
-                continuation: runtime.continuation
+                continuation: runtime.continuation,
+                preferredFreeSpaceRange: preferredFreeSpaceRange,
+                decisionTracer: runtime.decisionTracer
             )
         }
     }
@@ -505,13 +685,13 @@ struct DeepScanService: DeepScanServicing {
         state: inout ScanLoopState,
         runtime: ScanRuntimeContext
     ) async -> Int {
-        let maxContiguousEndOffset: UInt64
-        if let ranges = state.freeSpaceRanges, let index = state.currentRangeIndex, index < ranges.count {
-            maxContiguousEndOffset = ranges[index].endOffset
+        let preferredFreeSpaceRange = currentFreeSpaceRange(state: state)
+        let maxContiguousEndOffset: UInt64 = if let preferredFreeSpaceRange {
+            preferredFreeSpaceRange.endOffset
         } else {
-            maxContiguousEndOffset = runtime.totalBytes
+            runtime.totalBytes
         }
-        
+
         let context = ScanContext(
             buffer: state.buffer,
             scanLength: chunk.scanLength,
@@ -519,15 +699,28 @@ struct DeepScanService: DeepScanServicing {
             bytesScanned: state.bytesScanned,
             cameraProfile: runtime.cameraProfile,
             totalBytes: runtime.totalBytes,
-            maxContiguousEndOffset: maxContiguousEndOffset
+            maxContiguousEndOffset: maxContiguousEndOffset,
+            preferredFreeSpaceRange: preferredFreeSpaceRange
         )
 
         return await scanChunk(
             context: context,
             reader: runtime.reader,
             scanAccumulator: &state.scanAccumulator,
-            continuation: runtime.continuation
+            continuation: runtime.continuation,
+            decisionTracer: runtime.decisionTracer
         )
+    }
+
+    private func currentFreeSpaceRange(state: ScanLoopState) -> FreeSpaceRange? {
+        guard let ranges = state.freeSpaceRanges,
+              let index = state.currentRangeIndex,
+              index < ranges.count
+        else {
+            return nil
+        }
+
+        return ranges[index]
     }
 }
 
@@ -560,13 +753,14 @@ extension DeepScanService {
         state: inout ScanLoopState,
         runtime: ScanRuntimeContext
     ) -> ChunkReadResult? {
-        let maxAvailableBytes: UInt64
-        if let ranges = state.freeSpaceRanges, let index = state.currentRangeIndex, index < ranges.count {
-            maxAvailableBytes = ranges[index].endOffset - state.bytesScanned
+        let maxAvailableBytes: UInt64 = if let ranges = state.freeSpaceRanges, let index = state.currentRangeIndex,
+                                           index < ranges.count
+        {
+            ranges[index].endOffset - state.bytesScanned
         } else {
-            maxAvailableBytes = runtime.totalBytes - state.bytesScanned
+            runtime.totalBytes - state.bytesScanned
         }
-        
+
         let bytesToRead = min(state.chunkSize, Int(maxAvailableBytes))
         let readOffset = state.carryOver
 
@@ -657,31 +851,150 @@ extension DeepScanService {
         }
     }
 
-    private func advanceToNextFreeSpaceIfNeeded(state: inout ScanLoopState, totalBytes: UInt64) -> Bool {
+    // swiftlint:disable:next function_body_length
+    private func advanceToNextFreeSpaceIfNeeded(
+        state: inout ScanLoopState,
+        totalBytes: UInt64,
+        decisionTracer: (any DeepScanDecisionTracing)?
+    ) async -> Bool {
         guard let ranges = state.freeSpaceRanges, let index = state.currentRangeIndex else { return true }
-        
+
         guard index < ranges.count else {
+            if let decisionTracer {
+                await decisionTracer.record(
+                    DeepScanTraceRecord(
+                        timestamp: Date(),
+                        event: "free_space_exhausted",
+                        devicePath: nil,
+                        filesystem: nil,
+                        totalBytes: totalBytes,
+                        freeSpaceRangeCount: ranges.count,
+                        filesFound: state.scanAccumulator.filesFound,
+                        scanOffset: state.bytesScanned,
+                        nextOffset: totalBytes,
+                        skippedBytes: totalBytes > state.bytesScanned ? totalBytes - state.bytesScanned : 0,
+                        candidateSource: nil,
+                        signature: nil,
+                        fileName: nil,
+                        fileExtension: nil,
+                        offsetOnDisk: nil,
+                        estimatedSizeInBytes: nil,
+                        entropy: nil,
+                        confidenceScore: nil,
+                        allocationState: nil,
+                        preferredRangeStartOffset: nil,
+                        preferredRangeEndOffset: nil,
+                        crossesPreferredBoundary: nil,
+                        estimationMethod: nil,
+                        maxScanBytes: nil,
+                        hasInvalidCriticalChunkCRC: nil,
+                        emissionDecision: nil,
+                        acceptanceDecision: nil,
+                        finalDecision: nil,
+                        reason: "no_more_free_space_ranges"
+                    )
+                )
+            }
             state.bytesScanned = totalBytes
             return false
         }
-        
+
         let currentRange = ranges[index]
         if state.bytesScanned < currentRange.startOffset {
             let skipAmount = currentRange.startOffset - state.bytesScanned
             if skipAmount > 1024 * 1024 { // Only log significant skips
-                logInfo("Skipping \(skipAmount / (1024 * 1024)) MB of allocated space to next free block at \(currentRange.startOffset)")
+                logInfo(
+                    "Skipping \(skipAmount / (1024 * 1024)) MB of allocated space " +
+                        "to next free block at \(currentRange.startOffset)"
+                )
             }
-            
+            if let decisionTracer {
+                await decisionTracer.record(
+                    DeepScanTraceRecord(
+                        timestamp: Date(),
+                        event: "free_space_skip",
+                        devicePath: nil,
+                        filesystem: nil,
+                        totalBytes: totalBytes,
+                        freeSpaceRangeCount: ranges.count,
+                        filesFound: state.scanAccumulator.filesFound,
+                        scanOffset: state.bytesScanned,
+                        nextOffset: currentRange.startOffset,
+                        skippedBytes: skipAmount,
+                        candidateSource: nil,
+                        signature: nil,
+                        fileName: nil,
+                        fileExtension: nil,
+                        offsetOnDisk: nil,
+                        estimatedSizeInBytes: nil,
+                        entropy: nil,
+                        confidenceScore: nil,
+                        allocationState: "allocated",
+                        preferredRangeStartOffset: currentRange.startOffset,
+                        preferredRangeEndOffset: currentRange.endOffset,
+                        crossesPreferredBoundary: nil,
+                        estimationMethod: nil,
+                        maxScanBytes: nil,
+                        hasInvalidCriticalChunkCRC: nil,
+                        emissionDecision: nil,
+                        acceptanceDecision: nil,
+                        finalDecision: nil,
+                        reason: "advanced_to_next_free_space_range"
+                    )
+                )
+            }
+
             state.bytesScanned = currentRange.startOffset
             state.carryOver = 0
             state.buffer = [UInt8](repeating: 0, count: state.chunkSize + Self.maxSignatureLength)
         }
-        
+
         if state.bytesScanned >= currentRange.endOffset {
             state.currentRangeIndex! += 1
-            return advanceToNextFreeSpaceIfNeeded(state: &state, totalBytes: totalBytes)
+            return await advanceToNextFreeSpaceIfNeeded(
+                state: &state,
+                totalBytes: totalBytes,
+                decisionTracer: decisionTracer
+            )
         }
-        
+
         return true
+    }
+}
+
+extension DeepScanService {
+    private static func makeDefaultDecisionTraceConfiguration() -> (
+        tracer: (any DeepScanDecisionTracing)?,
+        path: String?
+    ) {
+        let environment = ProcessInfo.processInfo.environment
+        let explicitPath = environment["VIVACITY_DEEP_SCAN_TRACE_PATH"]
+        let isEnabled = environment["VIVACITY_DEEP_SCAN_TRACE"] == "1" || explicitPath != nil
+        guard isEnabled else { return (nil, nil) }
+
+        let url = explicitPath
+            .map { URL(fileURLWithPath: $0) }
+            ?? defaultDecisionTraceURL()
+
+        do {
+            return try (DeepScanTraceWriter(url: url), url.path)
+        } catch {
+            let logger = Logger(subsystem: "com.vivacity.app", category: "DeepScan")
+            let tracePath = url.path
+            let failureDescription = error.localizedDescription
+            let traceInitializationFailure =
+                "Failed to initialize deep scan decision trace at \(tracePath): \(failureDescription)"
+            logger.error("\(traceInitializationFailure, privacy: .public)")
+            return (nil, nil)
+        }
+    }
+
+    private static func defaultDecisionTraceURL() -> URL {
+        let timestamp = Int(Date().timeIntervalSince1970)
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Logs", isDirectory: true)
+            .appendingPathComponent("Vivacity", isDirectory: true)
+            .appendingPathComponent("deep-scan-trace-\(timestamp).jsonl")
     }
 }
