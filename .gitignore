@@ -68,6 +68,8 @@ fastlane/test_output
 *.profraw
 Build/
 build/
+__pycache__/
+*.pyc
 
 # AI and Design Artifacts
 .codex/
