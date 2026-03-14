@@ -58,7 +58,7 @@ actor APFSSpaceManager: FreeSpaceMapping {
 
     private func _populateStream(continuation: AsyncThrowingStream<FreeSpaceRange, Error>.Continuation) async {
         do {
-            try await initializeIfNeeded()
+            try initializeIfNeeded()
             continuation.finish()
         } catch {
             continuation.finish(throwing: error)
