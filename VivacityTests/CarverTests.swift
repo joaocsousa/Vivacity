@@ -38,13 +38,15 @@ final class CarverTests: XCTestCase {
         }
 
         XCTAssertEqual(files.count, 1)
-        let ext = files.first?.fileExtension.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        let ext = files.first?.fileExtension
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            .lowercased() ?? ""
         XCTAssertEqual(ext, "jpg")
     }
 
     func testAPFSCarverSkipsNonNodes() {
-        var carver = APFSCarver()
-        var buffer = [UInt8](repeating: 0, count: 4096)
+        let carver = APFSCarver()
+        let buffer = [UInt8](repeating: 0, count: 4096)
         // leave buffer zeros so it is not a valid node
         let files = buffer.withUnsafeBytes { ptr in
             carver.carveChunk(buffer: ptr, baseOffset: 0)

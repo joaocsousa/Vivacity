@@ -1376,7 +1376,11 @@ final class ViewRenderingCoverageTests: XCTestCase {
     }
 
     private func render(_ view: some View) {
-        let host = NSHostingView(rootView: view)
+        let host = NSHostingView(
+            rootView: NavigationStack {
+                view
+            }
+        )
         host.frame = NSRect(x: 0, y: 0, width: 1200, height: 800)
         host.layoutSubtreeIfNeeded()
         _ = host.fittingSize
@@ -1769,7 +1773,11 @@ final class AdditionalCoverageTests: XCTestCase {
     }
 
     private func render(_ view: some View) {
-        let host = NSHostingView(rootView: view)
+        let host = NSHostingView(
+            rootView: NavigationStack {
+                view
+            }
+        )
         host.frame = NSRect(x: 0, y: 0, width: 1200, height: 800)
         host.layoutSubtreeIfNeeded()
         _ = host.fittingSize
