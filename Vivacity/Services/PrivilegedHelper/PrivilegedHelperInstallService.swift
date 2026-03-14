@@ -364,12 +364,14 @@ final class PrivilegedHelperInstallService {
 
         return plist
     }
+}
 
+extension PrivilegedHelperInstallService {
     private func blessHelper() throws {
         let helperLabel = helperLabel
-        let blessStartMessage = "SMJobBless starting helperLabel=\(helperLabel)"
+        let blessStartMessage = "Privileged helper install starting helperLabel=\(helperLabel)"
         logger.info("\(blessStartMessage, privacy: .public)")
-        logDiagnosticLines(context: "smjobbless-before", asError: false)
+        logDiagnosticLines(context: "helper-install-before", asError: false)
 
         var authRef: AuthorizationRef?
         let flags: AuthorizationFlags = [.interactionAllowed, .extendRights, .preAuthorize]
@@ -404,22 +406,27 @@ final class PrivilegedHelperInstallService {
         logger.info("AuthorizationCopyRights succeeded right=\(kSMRightBlessPrivilegedHelper, privacy: .public)")
 
         var cfError: Unmanaged<CFError>?
-        guard SMJobBless(kSMDomainSystemLaunchd, helperLabel as CFString, authRef, &cfError) else {
+        guard LegacyServiceManagementAPI.bless(
+            domain: kSMDomainSystemLaunchd,
+            executableLabel: helperLabel as CFString,
+            authorizationRef: authRef,
+            outError: &cfError
+        ) else {
             let reason: String = if let error = cfError?.takeRetainedValue() {
                 describe(cfError: error)
             } else {
                 "unknown"
             }
             let blessFailureMessage =
-                "SMJobBless failed helperLabel=\(helperLabel) reason=\(reason)"
+                "Privileged helper install failed helperLabel=\(helperLabel) reason=\(reason)"
             logger.error("\(blessFailureMessage, privacy: .public)")
-            logDiagnosticLines(context: "smjobbless-failure", asError: true)
+            logDiagnosticLines(context: "helper-install-failure", asError: true)
             throw PrivilegedHelperInstallError.blessFailed(reason)
         }
 
-        let blessSuccessMessage = "SMJobBless succeeded helperLabel=\(helperLabel)"
+        let blessSuccessMessage = "Privileged helper install succeeded helperLabel=\(helperLabel)"
         logger.info("\(blessSuccessMessage, privacy: .public)")
-        logDiagnosticLines(context: "smjobbless-after", asError: false)
+        logDiagnosticLines(context: "helper-install-after", asError: false)
     }
 
     private func removeHelper() throws {
@@ -428,16 +435,22 @@ final class PrivilegedHelperInstallService {
         defer { AuthorizationFree(authRef, []) }
 
         var cfError: Unmanaged<CFError>?
-        guard SMJobRemove(kSMDomainSystemLaunchd, helperLabel as CFString, authRef, true, &cfError) else {
+        guard LegacyServiceManagementAPI.remove(
+            domain: kSMDomainSystemLaunchd,
+            jobLabel: helperLabel as CFString,
+            authorizationRef: authRef,
+            wait: true,
+            outError: &cfError
+        ) else {
             let reason: String = if let error = cfError?.takeRetainedValue() {
                 describe(cfError: error)
             } else {
                 "unknown"
             }
             let removeFailureMessage =
-                "SMJobRemove failed helperLabel=\(helperLabel) reason=\(reason)"
+                "Privileged helper removal failed helperLabel=\(helperLabel) reason=\(reason)"
             logger.error("\(removeFailureMessage, privacy: .public)")
-            logDiagnosticLines(context: "smjobremove-failure", asError: true)
+            logDiagnosticLines(context: "helper-remove-failure", asError: true)
             throw PrivilegedHelperInstallError.removeFailed(reason)
         }
     }
@@ -538,9 +551,9 @@ enum PrivilegedHelperInstallError: LocalizedError {
             let message = SecCopyErrorMessageString(status, nil) as String? ?? "unknown"
             return "Privileged helper authorization failed (status: \(status), message: \(message))"
         case let .blessFailed(reason):
-            return "SMJobBless failed: \(reason)"
+            return "Privileged helper installation failed: \(reason)"
         case let .removeFailed(reason):
-            return "SMJobRemove failed: \(reason)"
+            return "Privileged helper removal failed: \(reason)"
         case let .versionReadFailed(reason):
             return "Failed to read helper version: \(reason)"
         }

@@ -66,8 +66,6 @@ struct APFSCarver {
     }
 
     private func parseNode(slice: UnsafeRawBufferPointer, sliceOffset: UInt64) -> [CarvedFile] {
-        var files: [CarvedFile] = []
-
         // btree_node_phys_t structure (starts at offset 32, after obj_phys_t)
         // UInt16 btn_flags;
         // UInt16 btn_level;
@@ -81,11 +79,11 @@ struct APFSCarver {
         // We only care about leaf nodes (level 0)
         let btnodeLeaf: UInt16 = 0x0002
         if btnLevel != 0 || (btnFlags & btnodeLeaf) == 0 {
-            return files
+            return []
         }
 
         if btnNKeys == 0 || btnNKeys > 2000 {
-            return files // Unreasonable key count
+            return [] // Unreasonable key count
         }
 
         // Keys and Values area.
@@ -103,11 +101,6 @@ struct APFSCarver {
         for k in 0 ..< Int(btnNKeys) {
             let tocOffset = 40 + (k * 8)
             if tocOffset + 8 > nodeSize { break }
-
-            let keyOff = Int(UInt16(slice[tocOffset]) | UInt16(slice[tocOffset + 1]) << 8)
-            let keyLen = Int(UInt16(slice[tocOffset + 2]) | UInt16(slice[tocOffset + 3]) << 8)
-            let valOff = Int(UInt16(slice[tocOffset + 4]) | UInt16(slice[tocOffset + 5]) << 8)
-            let valLen = Int(UInt16(slice[tocOffset + 6]) | UInt16(slice[tocOffset + 7]) << 8)
 
             // In APFS B-Trees, key offsets are from the end of the TOC (which we don't know exactly without node size)
             // or from the END of the node minus the offset.
@@ -136,6 +129,6 @@ struct APFSCarver {
         // We will just return empty file sizes here to let DeepScanService find the actual signatures
         // near this location, providing the filename as context.
 
-        return files
+        return []
     }
 }
