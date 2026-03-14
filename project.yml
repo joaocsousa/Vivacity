@@ -22,6 +22,7 @@ targets:
     platform: macOS
     dependencies:
       - target: VivacityPrivilegedHelper
+      - sdk: AppIntents.framework
     sources:
       - path: Vivacity
         excludes:
@@ -56,7 +57,6 @@ targets:
           - $(DERIVED_FILE_DIR)/swiftlint.done
     postBuildScripts:
       - name: Embed Privileged Helper
-        basedOnDependencyAnalysis: false
         script: |
           set -euo pipefail
           APP_BUNDLE="${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}"
@@ -76,14 +76,22 @@ targets:
           /usr/libexec/PlistBuddy -c "Delete :SMPrivilegedExecutables" "$APP_PLIST" >/dev/null 2>&1 || true
           /usr/libexec/PlistBuddy -c "Add :SMPrivilegedExecutables dict" "$APP_PLIST"
           /usr/libexec/PlistBuddy -c "Add :SMPrivilegedExecutables:com.joao.Vivacity.PrivilegedHelper string \"$HELPER_REQ_ESCAPED\"" "$APP_PLIST"
+          touch "${DERIVED_FILE_DIR}/embed_privileged_helper.done"
+        inputFiles:
+          - $(BUILT_PRODUCTS_DIR)/com.joao.Vivacity.PrivilegedHelper
+          - $(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)/Contents/Info.plist
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(FULL_PRODUCT_NAME)/Contents/Library/LaunchServices/com.joao.Vivacity.PrivilegedHelper
+          - $(DERIVED_FILE_DIR)/embed_privileged_helper.done
 
   VivacityTests:
     type: bundle.unit-test
     platform: macOS
-    sources:
-      - path: VivacityTests
     dependencies:
       - target: Vivacity
+      - sdk: AppIntents.framework
+    sources:
+      - path: VivacityTests
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.joao.VivacityTests
@@ -94,10 +102,11 @@ targets:
   VivacityUITests:
     type: bundle.ui-testing
     platform: macOS
-    sources:
-      - path: VivacityUITests
     dependencies:
       - target: Vivacity
+      - sdk: AppIntents.framework
+    sources:
+      - path: VivacityUITests
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.joao.VivacityUITests

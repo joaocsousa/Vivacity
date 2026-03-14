@@ -47,7 +47,7 @@ final class PrivilegedHelperClient {
         do {
             try installService.installIfNeeded()
             lastInstallErrorDescription = nil
-            logger.info("Privileged helper installed/available via SMJobBless")
+            logger.info("Privileged helper installed/available")
         } catch {
             lastInstallErrorDescription = error.localizedDescription
             logger.error("Privileged helper install failed: \(error.localizedDescription, privacy: .public)")

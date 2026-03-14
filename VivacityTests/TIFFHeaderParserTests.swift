@@ -32,7 +32,7 @@ final class TIFFHeaderParserTests: XCTestCase {
         let stringDataStart = 8 + 2 + entryCount * 12 + 4
 
         if let make {
-            var makeBytes = Array(make.utf8) + [0x00] // null-terminated
+            let makeBytes = Array(make.utf8) + [0x00] // null-terminated
             let entry = createIFDEntry(
                 tag: 0x010F, type: 2, count: UInt32(makeBytes.count),
                 valueOrOffset: UInt32(stringDataStart + stringData.reduce(0) { $0 + $1.bytes.count })
@@ -42,7 +42,7 @@ final class TIFFHeaderParserTests: XCTestCase {
         }
 
         if let model {
-            var modelBytes = Array(model.utf8) + [0x00]
+            let modelBytes = Array(model.utf8) + [0x00]
             let entry = createIFDEntry(
                 tag: 0x0110, type: 2, count: UInt32(modelBytes.count),
                 valueOrOffset: UInt32(stringDataStart + stringData.reduce(0) { $0 + $1.bytes.count })
